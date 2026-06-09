@@ -7,7 +7,7 @@ export function getEmailDomain(email: string): string {
   const parts = normalized.split("@");
   const [localPart, domain] = parts;
 
-  if (parts.length !== 2 || !localPart || !domain) {
+  if (parts.length !== 2 || !localPart || !domain || /\s/.test(normalized)) {
     throw new Error("Valid email is required");
   }
 

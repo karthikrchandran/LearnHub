@@ -31,6 +31,10 @@ type ParsedUserImportRow = ValidatedUserImportRow & {
   hasErrors: boolean;
 };
 
+type CsvParseResult =
+  | { records: string[][]; error: null }
+  | { records: []; error: UserImportValidationError };
+
 const requiredHeaders = ["email", "firstName", "lastName", "role", "managerEmail", "employeeId", "department", "title", "status"];
 const roles: UserImportRole[] = ["ADMIN", "MANAGER", "LEARNER"];
 const statuses: UserImportStatus[] = ["INVITED", "ACTIVE", "INACTIVE"];
@@ -40,8 +44,14 @@ export function parseAndValidateUserImportCsv(input: {
   allowedEmailDomains: string[];
   existingManagerEmails?: string[];
 }): UserImportPlan {
-  const records = parseCsv(input.csv);
+  const parseResult = parseCsv(input.csv);
   const errors: UserImportValidationError[] = [];
+
+  if (parseResult.error) {
+    return { rows: [], errors: [parseResult.error] };
+  }
+
+  const { records } = parseResult;
 
   if (records.length === 0) {
     return { rows: [], errors: [{ rowNumber: 1, field: "csv", message: "CSV header row is required" }] };
@@ -55,7 +65,6 @@ export function parseAndValidateUserImportCsv(input: {
   }
 
   const seenEmails = new Set<string>();
-  const importEmails = new Set<string>();
   const parsedRows: ParsedUserImportRow[] = [];
 
   for (const [index, record] of records.slice(1).entries()) {
@@ -89,7 +98,6 @@ export function parseAndValidateUserImportCsv(input: {
     }
 
     seenEmails.add(email);
-    importEmails.add(email);
 
     const firstName = getCell("firstName");
     const lastName = getCell("lastName");
@@ -134,13 +142,14 @@ export function parseAndValidateUserImportCsv(input: {
   }
 
   const existingManagerEmails = new Set((input.existingManagerEmails ?? []).map((email) => normalizeEmail(email)));
+  const validImportEmails = new Set(parsedRows.filter((row) => !row.hasErrors).map((row) => row.email));
 
   for (const row of parsedRows) {
     if (!row.managerEmail || row.managerEmail === row.email) {
       continue;
     }
 
-    if (!importEmails.has(row.managerEmail) && !existingManagerEmails.has(row.managerEmail)) {
+    if (!validImportEmails.has(row.managerEmail) && !existingManagerEmails.has(row.managerEmail)) {
       errors.push({
         rowNumber: row.rowNumber,
         field: "managerEmail",
@@ -151,8 +160,23 @@ export function parseAndValidateUserImportCsv(input: {
   }
 
   return {
-    rows: parsedRows.filter((row) => !row.hasErrors).map(({ hasErrors: _hasErrors, ...row }) => row),
+    rows: parsedRows.filter((row) => !row.hasErrors).map(toValidatedUserImportRow),
     errors,
+  };
+}
+
+function toValidatedUserImportRow(row: ParsedUserImportRow): ValidatedUserImportRow {
+  return {
+    rowNumber: row.rowNumber,
+    email: row.email,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    role: row.role,
+    managerEmail: row.managerEmail,
+    employeeId: row.employeeId,
+    department: row.department,
+    title: row.title,
+    status: row.status,
   };
 }
 
@@ -184,17 +208,22 @@ function normalizeStatus(value: string): UserImportStatus | null {
   return statuses.includes(normalized as UserImportStatus) ? (normalized as UserImportStatus) : null;
 }
 
-function parseCsv(input: string): string[][] {
+function parseCsv(input: string): CsvParseResult {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
+  let quotedFieldStartRow = 1;
 
   for (let index = 0; index < input.length; index += 1) {
     const character = input[index];
     const nextCharacter = input[index + 1];
 
     if (character === '"') {
+      if (!inQuotes) {
+        quotedFieldStartRow = rows.length + 1;
+      }
+
       if (inQuotes && nextCharacter === '"') {
         cell += '"';
         index += 1;
@@ -225,11 +254,22 @@ function parseCsv(input: string): string[][] {
     cell += character;
   }
 
+  if (inQuotes) {
+    return {
+      records: [],
+      error: {
+        rowNumber: quotedFieldStartRow,
+        field: "csv",
+        message: "CSV contains an unterminated quoted field",
+      },
+    };
+  }
+
   row.push(cell);
 
   if (row.length > 1 || row[0].trim() !== "") {
     rows.push(row);
   }
 
-  return rows;
+  return { records: rows, error: null };
 }

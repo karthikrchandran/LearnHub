@@ -42,6 +42,9 @@ describe("email auth helpers", () => {
   it("rejects malformed emails before organization domain validation", () => {
     expect(() => requireAllowedOrganizationEmail("@acme.test", ["acme.test"])).toThrow("Valid email is required");
     expect(() => requireAllowedOrganizationEmail("bad@@acme.test", ["acme.test"])).toThrow("Valid email is required");
+    expect(() => requireAllowedOrganizationEmail("bad local@acme.test", ["acme.test"])).toThrow(
+      "Valid email is required",
+    );
   });
 
   it("returns the normalized email for allowed organization emails", () => {
