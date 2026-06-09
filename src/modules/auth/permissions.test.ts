@@ -77,4 +77,15 @@ describe("authorization permissions", () => {
       }),
     ).toBe(true);
   });
+
+  it("does not let learners view same-user progress without a target organization membership", () => {
+    expect(
+      canViewMembershipProgress(learner, {
+        id: "other-org-membership",
+        userId: "learner-user",
+        organizationId: "org_2",
+        managerMembershipId: null,
+      }),
+    ).toBe(false);
+  });
 });

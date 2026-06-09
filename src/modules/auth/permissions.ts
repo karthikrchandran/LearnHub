@@ -45,11 +45,15 @@ export function canViewMembershipProgress(context: MembershipAuthContext, target
     return true;
   }
 
+  const membership = membershipForOrganization(context, target.organizationId);
+
+  if (!membership) {
+    return false;
+  }
+
   if (target.userId === context.userId) {
     return true;
   }
 
-  const managerMembership = membershipForOrganization(context, target.organizationId);
-
-  return managerMembership?.roles.includes("MANAGER") === true && target.managerMembershipId === managerMembership.id;
+  return membership.roles.includes("MANAGER") && target.managerMembershipId === membership.id;
 }
