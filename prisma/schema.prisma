@@ -93,6 +93,7 @@ model OrganizationMembership {
   updatedAt      DateTime           @updatedAt
 
   @@unique([organizationId, userId])
+  @@unique([organizationId, id])
   @@index([organizationId])
   @@index([managerId])
 }
@@ -108,6 +109,7 @@ model CourseCategory {
   updatedAt      DateTime     @updatedAt
 
   @@unique([organizationId, slug])
+  @@unique([organizationId, id])
 }
 
 model CourseTag {
@@ -116,11 +118,12 @@ model CourseTag {
   name           String
   slug           String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  courses        Course[]
+  courseLinks    CourseTagLink[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@unique([organizationId, slug])
+  @@unique([organizationId, id])
 }
 
 model Course {
@@ -135,14 +138,27 @@ model Course {
   expectedDurationMinutes         Int                @default(60)
   categoryId                      String?
   organization                    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  category                        CourseCategory?    @relation(fields: [categoryId], references: [id])
-  tags                            CourseTag[]
+  category                        CourseCategory?    @relation(fields: [organizationId, categoryId], references: [organizationId, id])
+  tagLinks                        CourseTagLink[]
   assignments                     CourseAssignment[]
   createdAt                       DateTime           @default(now())
   updatedAt                       DateTime           @updatedAt
 
   @@unique([organizationId, slug])
+  @@unique([organizationId, id])
   @@index([organizationId, status])
+}
+
+model CourseTagLink {
+  organizationId String
+  courseId       String
+  tagId          String
+  course         Course    @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  tag            CourseTag @relation(fields: [organizationId, tagId], references: [organizationId, id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+
+  @@id([organizationId, courseId, tagId])
+  @@index([organizationId, tagId])
 }
 
 model CourseAssignment {
@@ -154,14 +170,14 @@ model CourseAssignment {
   startDate      DateTime
   dueDate        DateTime
   status         AssignmentStatus       @default(ASSIGNED)
-  course         Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  membership     OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  course         Course                 @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  membership     OrganizationMembership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
   @@index([organizationId])
-  @@index([courseId])
-  @@index([membershipId])
+  @@index([organizationId, courseId])
+  @@index([organizationId, membershipId])
 }
 
 model AuditLog {
