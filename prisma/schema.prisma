@@ -51,6 +51,8 @@ model User {
   status          UserStatus               @default(INVITED)
   isPlatformOwner Boolean                  @default(false)
   memberships     OrganizationMembership[] @relation("UserMemberships")
+  invitationTokens UserInvitationToken[]    @relation("UserInvitationTokens")
+  passwordResetTokens PasswordResetToken[]  @relation("UserPasswordResetTokens")
   auditLogs       AuditLog[]               @relation("AuditActor")
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
@@ -63,9 +65,11 @@ model Organization {
   logoUrl              String?
   primaryColor         String                       @default("#2563eb")
   accentColor          String                       @default("#14b8a6")
+  allowedEmailDomains  String[]                     @default([])
   enrollmentPolicy     OrganizationEnrollmentPolicy @default(ASSIGNMENT_ONLY)
   globalLibraryEnabled Boolean                      @default(false)
   memberships          OrganizationMembership[]
+  invitationTokens     UserInvitationToken[]
   categories           CourseCategory[]
   tags                 CourseTag[]
   courses              Course[]
@@ -88,6 +92,7 @@ model OrganizationMembership {
   user                User                     @relation("UserMemberships", fields: [userId], references: [id], onDelete: Cascade)
   managerMembership   OrganizationMembership?  @relation("MembershipManager", fields: [organizationId, managerMembershipId], references: [organizationId, id], onDelete: NoAction)
   directReports       OrganizationMembership[] @relation("MembershipManager")
+  invitationTokens    UserInvitationToken[]
   learningAssignments CourseAssignment[]       @relation("LearnerAssignments")
   assignedAssignments CourseAssignment[]       @relation("AssignedByMembership")
   createdAt           DateTime                 @default(now())
@@ -97,6 +102,37 @@ model OrganizationMembership {
   @@unique([organizationId, id])
   @@index([organizationId])
   @@index([organizationId, managerMembershipId])
+}
+
+model UserInvitationToken {
+  id             String                 @id @default(cuid())
+  organizationId String
+  membershipId   String
+  userId         String
+  tokenHash      String                 @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membership     OrganizationMembership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  user           User                   @relation("UserInvitationTokens", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime               @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation("UserPasswordResetTokens", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model CourseCategory {
