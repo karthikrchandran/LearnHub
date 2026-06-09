@@ -8,6 +8,7 @@ export type CommitUserImportInput = {
 };
 
 export type CommitUserImportRepository = {
+  runInTransaction<T>(operation: () => Promise<T>): Promise<T>;
   upsertUser(data: {
     email: string;
     firstName: string;
@@ -23,6 +24,10 @@ export type CommitUserImportRepository = {
     title: string | null;
     status: UserImportStatus;
   }): Promise<{ id: string; userId: string; email: string }>;
+  findMembershipByOrganizationAndEmail(data: {
+    organizationId: string;
+    email: string;
+  }): Promise<{ id: string; userId: string; email: string } | null>;
   setMembershipManager(data: {
     organizationId: string;
     membershipId: string;
@@ -57,63 +62,89 @@ export async function commitUserImport(
     throw new Error("Cannot commit a user import plan with validation errors");
   }
 
-  const memberships: ImportedMembership[] = [];
-  const membershipsByEmail = new Map<string, ImportedMembership>();
+  return repository.runInTransaction(async () => {
+    const memberships: ImportedMembership[] = [];
+    const membershipsByEmail = new Map<string, ImportedMembership>();
 
-  for (const row of input.plan.rows) {
-    const user = await repository.upsertUser({
-      email: row.email,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      status: row.status,
-    });
-    const membership = await repository.upsertMembership({
-      organizationId: input.organizationId,
-      userId: user.id,
-      roles: [row.role],
-      employeeId: row.employeeId,
-      department: row.department,
-      title: row.title,
-      status: row.status,
-    });
-    const importedMembership = {
-      id: membership.id,
-      userId: user.id,
-      email: user.email,
-      managerEmail: row.managerEmail,
-      status: row.status,
-    };
+    for (const row of input.plan.rows) {
+      const user = await repository.upsertUser({
+        email: row.email,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        status: row.status,
+      });
+      const membership = await repository.upsertMembership({
+        organizationId: input.organizationId,
+        userId: user.id,
+        roles: [row.role],
+        employeeId: row.employeeId,
+        department: row.department,
+        title: row.title,
+        status: row.status,
+      });
+      const importedMembership = {
+        id: membership.id,
+        userId: user.id,
+        email: user.email,
+        managerEmail: row.managerEmail,
+        status: row.status,
+      };
 
-    memberships.push(importedMembership);
-    membershipsByEmail.set(user.email, importedMembership);
-  }
-
-  for (const membership of memberships) {
-    await repository.setMembershipManager({
-      organizationId: input.organizationId,
-      membershipId: membership.id,
-      managerMembershipId: membership.managerEmail ? membershipsByEmail.get(membership.managerEmail)?.id ?? null : null,
-    });
-  }
-
-  for (const membership of memberships) {
-    if (membership.status !== "INVITED") {
-      continue;
+      memberships.push(importedMembership);
+      membershipsByEmail.set(user.email, importedMembership);
     }
 
-    await repository.createInvitation({
+    for (const membership of memberships) {
+      await repository.setMembershipManager({
+        organizationId: input.organizationId,
+        membershipId: membership.id,
+        managerMembershipId: await resolveManagerMembershipId(input.organizationId, membership.managerEmail, membershipsByEmail, repository),
+      });
+    }
+
+    for (const membership of memberships) {
+      if (membership.status !== "INVITED") {
+        continue;
+      }
+
+      await repository.createInvitation({
+        organizationId: input.organizationId,
+        membershipId: membership.id,
+        userId: membership.userId,
+        now: input.now,
+      });
+    }
+
+    await repository.recordAuditLog({
       organizationId: input.organizationId,
-      membershipId: membership.id,
-      userId: membership.userId,
-      now: input.now,
+      actorId: input.actorId,
+      importedCount: input.plan.rows.length,
     });
+
+    return { importedCount: input.plan.rows.length };
+  });
+}
+
+async function resolveManagerMembershipId(
+  organizationId: string,
+  managerEmail: string | null,
+  membershipsByEmail: Map<string, ImportedMembership>,
+  repository: CommitUserImportRepository,
+): Promise<string | null> {
+  if (!managerEmail) {
+    return null;
   }
 
-  await repository.recordAuditLog({
-    organizationId: input.organizationId,
-    actorId: input.actorId,
-    importedCount: input.plan.rows.length,
+  const importedManagerMembership = membershipsByEmail.get(managerEmail);
+
+  if (importedManagerMembership) {
+    return importedManagerMembership.id;
+  }
+
+  const existingManagerMembership = await repository.findMembershipByOrganizationAndEmail({
+    organizationId,
+    email: managerEmail,
   });
 
-  return { importedCount: input.plan.rows.length };
+  return existingManagerMembership?.id ?? null;
 }

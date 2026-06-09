@@ -3,15 +3,27 @@ import { describe, expect, it, vi } from "vitest";
 import type { UserImportPlan } from "./csv-import";
 import { commitUserImport, type CommitUserImportRepository } from "./user-import";
 
-function createRepository(): CommitUserImportRepository & {
+type TestRepository = CommitUserImportRepository & {
   calls: string[];
-} {
+  existingMembershipsByEmail: Map<string, { id: string; userId: string; email: string }>;
+};
+
+function createRepository(): TestRepository {
   const userIdsByEmail = new Map<string, string>();
   const membershipIdsByEmail = new Map<string, string>();
+  const existingMembershipsByEmail = new Map<string, { id: string; userId: string; email: string }>();
   const calls: string[] = [];
 
   return {
     calls,
+    existingMembershipsByEmail,
+    runInTransaction: vi.fn(async (operation) => {
+      calls.push("transaction:start");
+      const result = await operation();
+      calls.push("transaction:end");
+
+      return result;
+    }),
     upsertUser: vi.fn(async (data) => {
       calls.push(`user:${data.email}`);
       const id = `user_${userIdsByEmail.size + 1}`;
@@ -26,6 +38,11 @@ function createRepository(): CommitUserImportRepository & {
       membershipIdsByEmail.set(email, id);
 
       return { id, userId: data.userId, email };
+    }),
+    findMembershipByOrganizationAndEmail: vi.fn(async (data) => {
+      calls.push(`find-manager:${data.email}`);
+
+      return existingMembershipsByEmail.get(`${data.organizationId}:${data.email}`) ?? null;
     }),
     setMembershipManager: vi.fn(async (data) => {
       calls.push(`manager:${data.membershipId}:${data.managerMembershipId ?? "none"}`);
@@ -102,6 +119,7 @@ describe("commitUserImport", () => {
 
     expect(repository.upsertUser).not.toHaveBeenCalled();
     expect(repository.upsertMembership).not.toHaveBeenCalled();
+    expect(repository.runInTransaction).not.toHaveBeenCalled();
     expect(repository.recordAuditLog).not.toHaveBeenCalled();
   });
 
@@ -142,6 +160,7 @@ describe("commitUserImport", () => {
       status: "INVITED",
     });
     expect(repository.calls).toEqual([
+      "transaction:start",
       "user:manager@acme.test",
       "membership:user_1",
       "user:learner@acme.test",
@@ -153,6 +172,7 @@ describe("commitUserImport", () => {
       "manager:membership_3:none",
       "invitation:membership_2:user_2",
       "audit:3",
+      "transaction:end",
     ]);
     expect(repository.setMembershipManager).toHaveBeenNthCalledWith(2, {
       organizationId: "org_1",
@@ -187,5 +207,81 @@ describe("commitUserImport", () => {
       actorId: "actor_1",
       importedCount: 3,
     });
+  });
+
+  it("uses an existing organization membership when a manager email is outside the import batch", async () => {
+    const repository = createRepository();
+    repository.existingMembershipsByEmail.set("org_1:existing.manager@acme.test", {
+      id: "existing_manager_membership",
+      userId: "existing_manager_user",
+      email: "existing.manager@acme.test",
+    });
+
+    await commitUserImport(
+      {
+        organizationId: "org_1",
+        actorId: "actor_1",
+        now: new Date("2026-06-09T12:00:00.000Z"),
+        plan: {
+          errors: [],
+          rows: [
+            {
+              rowNumber: 2,
+              email: "learner@acme.test",
+              firstName: "Leela",
+              lastName: "Learner",
+              role: "LEARNER",
+              managerEmail: "existing.manager@acme.test",
+              employeeId: "EMP-1",
+              department: "Operations",
+              title: "Specialist",
+              status: "ACTIVE",
+            },
+          ],
+        },
+      },
+      repository,
+    );
+
+    expect(repository.findMembershipByOrganizationAndEmail).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      email: "existing.manager@acme.test",
+    });
+    expect(repository.setMembershipManager).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      membershipId: "membership_1",
+      managerMembershipId: "existing_manager_membership",
+    });
+  });
+
+  it("runs import writes inside one repository transaction", async () => {
+    const repository = createRepository();
+
+    await commitUserImport(
+      {
+        organizationId: "org_1",
+        actorId: "actor_1",
+        now: new Date("2026-06-09T12:00:00.000Z"),
+        plan: validPlan,
+      },
+      repository,
+    );
+
+    expect(repository.runInTransaction).toHaveBeenCalledTimes(1);
+    expect(repository.calls).toEqual([
+      "transaction:start",
+      "user:manager@acme.test",
+      "membership:user_1",
+      "user:learner@acme.test",
+      "membership:user_2",
+      "user:admin@acme.test",
+      "membership:user_3",
+      "manager:membership_1:none",
+      "manager:membership_2:membership_1",
+      "manager:membership_3:none",
+      "invitation:membership_2:user_2",
+      "audit:3",
+      "transaction:end",
+    ]);
   });
 });
