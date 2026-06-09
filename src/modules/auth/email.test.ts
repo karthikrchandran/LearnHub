@@ -15,6 +15,11 @@ describe("email auth helpers", () => {
     expect(() => getEmailDomain("not-an-email")).toThrow("Valid email is required");
   });
 
+  it("requires a valid email shape before extracting the domain", () => {
+    expect(() => getEmailDomain("@acme.test")).toThrow("Valid email is required");
+    expect(() => getEmailDomain("bad@@acme.test")).toThrow("Valid email is required");
+  });
+
   it("allows email domains configured for the organization", () => {
     expect(emailDomainAllowed("learner@acme.test", ["acme.test"])).toBe(true);
     expect(emailDomainAllowed("learner@other.test", ["acme.test"])).toBe(false);
@@ -32,6 +37,11 @@ describe("email auth helpers", () => {
     expect(() => requireAllowedOrganizationEmail("person@gmail.com", ["acme.test"])).toThrow(
       "Email domain is not allowed for this organization",
     );
+  });
+
+  it("rejects malformed emails before organization domain validation", () => {
+    expect(() => requireAllowedOrganizationEmail("@acme.test", ["acme.test"])).toThrow("Valid email is required");
+    expect(() => requireAllowedOrganizationEmail("bad@@acme.test", ["acme.test"])).toThrow("Valid email is required");
   });
 
   it("returns the normalized email for allowed organization emails", () => {

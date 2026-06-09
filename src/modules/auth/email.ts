@@ -4,10 +4,10 @@ export function normalizeEmail(email: string): string {
 
 export function getEmailDomain(email: string): string {
   const normalized = normalizeEmail(email);
-  const atIndex = normalized.lastIndexOf("@");
-  const domain = atIndex >= 0 ? normalized.slice(atIndex + 1) : "";
+  const parts = normalized.split("@");
+  const [localPart, domain] = parts;
 
-  if (!domain) {
+  if (parts.length !== 2 || !localPart || !domain) {
     throw new Error("Valid email is required");
   }
 

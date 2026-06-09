@@ -25,6 +25,15 @@ describe("auth token helpers", () => {
     expect(() => createExpiringToken(now, -1)).toThrow("Token expiry must be positive");
   });
 
+  it("requires a finite integer expiry duration", () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+
+    expect(() => createExpiringToken(now, Number.NaN)).toThrow("Token expiry must be positive");
+    expect(() => createExpiringToken(now, Number.POSITIVE_INFINITY)).toThrow("Token expiry must be positive");
+    expect(() => createExpiringToken(now, Number.NEGATIVE_INFINITY)).toThrow("Token expiry must be positive");
+    expect(() => createExpiringToken(now, 1.5)).toThrow("Token expiry must be positive");
+  });
+
   it("treats used or expired tokens as unusable", () => {
     const now = new Date("2026-06-09T12:00:00.000Z");
 

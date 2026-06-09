@@ -16,7 +16,7 @@ export function hashToken(rawToken: string): string {
 }
 
 export function createExpiringToken(now: Date, expiresInMinutes: number): ExpiringToken {
-  if (expiresInMinutes <= 0) {
+  if (!Number.isFinite(expiresInMinutes) || !Number.isInteger(expiresInMinutes) || expiresInMinutes <= 0) {
     throw new Error("Token expiry must be positive");
   }
 
