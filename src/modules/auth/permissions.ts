@@ -1,0 +1,55 @@
+import type { OrganizationRole } from "@prisma/client";
+
+export type AuthMembership = {
+  id: string;
+  organizationId: string;
+  roles: OrganizationRole[];
+  managerMembershipId: string | null;
+};
+
+export type MembershipAuthContext = {
+  userId: string;
+  isPlatformOwner: boolean;
+  memberships: AuthMembership[];
+};
+
+export type TargetMembership = {
+  id: string;
+  userId: string;
+  organizationId: string;
+  managerMembershipId: string | null;
+};
+
+function membershipForOrganization(context: MembershipAuthContext, organizationId: string): AuthMembership | undefined {
+  return context.memberships.find((membership) => membership.organizationId === organizationId);
+}
+
+export function hasOrganizationRole(
+  context: MembershipAuthContext,
+  organizationId: string,
+  role: OrganizationRole,
+): boolean {
+  return membershipForOrganization(context, organizationId)?.roles.includes(role) ?? false;
+}
+
+export function canManageOrganization(context: MembershipAuthContext, organizationId: string): boolean {
+  return context.isPlatformOwner || hasOrganizationRole(context, organizationId, "ADMIN");
+}
+
+export function canManageOrganizationUsers(context: MembershipAuthContext, organizationId: string): boolean {
+  return canManageOrganization(context, organizationId);
+}
+
+export function canViewMembershipProgress(context: MembershipAuthContext, target: TargetMembership): boolean {
+  if (context.isPlatformOwner || hasOrganizationRole(context, target.organizationId, "ADMIN")) {
+    return true;
+  }
+
+  if (target.userId === context.userId) {
+    return true;
+  }
+
+  const managerMembership = membershipForOrganization(context, target.organizationId);
+
+  return managerMembership?.roles.includes("MANAGER") === true && target.managerMembershipId === managerMembership.id;
+}
