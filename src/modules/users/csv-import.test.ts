@@ -107,6 +107,23 @@ bad local@acme.test,Leela,Learner,LEARNER,,,,,`,
     expect(plan.rows).toEqual([]);
   });
 
+  it("reports invalid email local parts as row-level errors", () => {
+    const plan = parseAndValidateUserImportCsv({
+      csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status
+bad..local@acme.test,Leela,Learner,LEARNER,,,,,`,
+      allowedEmailDomains: ["acme.test"],
+    });
+
+    expect(plan.errors).toEqual([
+      {
+        rowNumber: 2,
+        field: "email",
+        message: "Valid email is required",
+      },
+    ]);
+    expect(plan.rows).toEqual([]);
+  });
+
   it("reports missing first and last names as row-level errors", () => {
     const plan = parseAndValidateUserImportCsv({
       csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status
@@ -218,6 +235,25 @@ learner@acme.test,Leela,Learner,OWNER,,,,,PENDING`,
           rowNumber: 2,
           field: "csv",
           message: "CSV contains an unterminated quoted field",
+        },
+      ],
+    });
+  });
+
+  it("reports misplaced quotes as CSV-level errors", () => {
+    const plan = parseAndValidateUserImportCsv({
+      csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status
+"learner"@acme.test,Leela,Learner,LEARNER,,,,,`,
+      allowedEmailDomains: ["acme.test"],
+    });
+
+    expect(plan).toEqual({
+      rows: [],
+      errors: [
+        {
+          rowNumber: 2,
+          field: "csv",
+          message: "CSV contains an invalid quoted field",
         },
       ],
     });

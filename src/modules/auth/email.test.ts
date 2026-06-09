@@ -47,6 +47,12 @@ describe("email auth helpers", () => {
     );
   });
 
+  it("rejects invalid local parts even when the organization domain is allowed", () => {
+    for (const email of ["bad..local@acme.test", ".bad@acme.test", "bad.@acme.test", "bad()@acme.test"]) {
+      expect(() => requireAllowedOrganizationEmail(email, ["acme.test"])).toThrow("Valid email is required");
+    }
+  });
+
   it("returns the normalized email for allowed organization emails", () => {
     expect(requireAllowedOrganizationEmail("  Learner@Acme.TEST ", ["acme.test"])).toBe("learner@acme.test");
   });

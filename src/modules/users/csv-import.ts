@@ -214,14 +214,21 @@ function parseCsv(input: string): CsvParseResult {
   let cell = "";
   let inQuotes = false;
   let quotedFieldStartRow = 1;
+  let cellWasQuoted = false;
+  let quoteClosed = false;
 
   for (let index = 0; index < input.length; index += 1) {
     const character = input[index];
     const nextCharacter = input[index + 1];
 
     if (character === '"') {
+      if (!inQuotes && (cell !== "" || quoteClosed)) {
+        return invalidQuotedField(rows.length + 1);
+      }
+
       if (!inQuotes) {
         quotedFieldStartRow = rows.length + 1;
+        cellWasQuoted = true;
       }
 
       if (inQuotes && nextCharacter === '"') {
@@ -229,6 +236,7 @@ function parseCsv(input: string): CsvParseResult {
         index += 1;
       } else {
         inQuotes = !inQuotes;
+        quoteClosed = !inQuotes;
       }
       continue;
     }
@@ -236,6 +244,8 @@ function parseCsv(input: string): CsvParseResult {
     if (character === "," && !inQuotes) {
       row.push(cell);
       cell = "";
+      cellWasQuoted = false;
+      quoteClosed = false;
       continue;
     }
 
@@ -248,7 +258,13 @@ function parseCsv(input: string): CsvParseResult {
       rows.push(row);
       row = [];
       cell = "";
+      cellWasQuoted = false;
+      quoteClosed = false;
       continue;
+    }
+
+    if (quoteClosed && cellWasQuoted) {
+      return invalidQuotedField(rows.length + 1);
     }
 
     cell += character;
@@ -272,4 +288,15 @@ function parseCsv(input: string): CsvParseResult {
   }
 
   return { records: rows, error: null };
+}
+
+function invalidQuotedField(rowNumber: number): CsvParseResult {
+  return {
+    records: [],
+    error: {
+      rowNumber,
+      field: "csv",
+      message: "CSV contains an invalid quoted field",
+    },
+  };
 }
