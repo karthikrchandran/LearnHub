@@ -1,9 +1,10 @@
-import type { OrganizationRole } from "@prisma/client";
+import type { OrganizationRole, UserStatus } from "@prisma/client";
 
 export type AuthMembership = {
   id: string;
   organizationId: string;
   roles: OrganizationRole[];
+  status: UserStatus;
   managerMembershipId: string | null;
 };
 
@@ -21,7 +22,9 @@ export type TargetMembership = {
 };
 
 function membershipForOrganization(context: MembershipAuthContext, organizationId: string): AuthMembership | undefined {
-  return context.memberships.find((membership) => membership.organizationId === organizationId);
+  return context.memberships.find(
+    (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
+  );
 }
 
 export function hasOrganizationRole(

@@ -10,19 +10,43 @@ import {
 const admin: MembershipAuthContext = {
   userId: "admin-user",
   isPlatformOwner: false,
-  memberships: [{ id: "admin-membership", organizationId: "org_1", roles: ["ADMIN"], managerMembershipId: null }],
+  memberships: [
+    {
+      id: "admin-membership",
+      organizationId: "org_1",
+      roles: ["ADMIN"],
+      status: "ACTIVE",
+      managerMembershipId: null,
+    },
+  ],
 };
 
 const manager: MembershipAuthContext = {
   userId: "manager-user",
   isPlatformOwner: false,
-  memberships: [{ id: "manager-membership", organizationId: "org_1", roles: ["MANAGER"], managerMembershipId: null }],
+  memberships: [
+    {
+      id: "manager-membership",
+      organizationId: "org_1",
+      roles: ["MANAGER"],
+      status: "ACTIVE",
+      managerMembershipId: null,
+    },
+  ],
 };
 
 const learner: MembershipAuthContext = {
   userId: "learner-user",
   isPlatformOwner: false,
-  memberships: [{ id: "learner-membership", organizationId: "org_1", roles: ["LEARNER"], managerMembershipId: null }],
+  memberships: [
+    {
+      id: "learner-membership",
+      organizationId: "org_1",
+      roles: ["LEARNER"],
+      status: "ACTIVE",
+      managerMembershipId: null,
+    },
+  ],
 };
 
 describe("authorization permissions", () => {
@@ -36,6 +60,27 @@ describe("authorization permissions", () => {
   it("lets organization admins manage their own users only", () => {
     expect(canManageOrganizationUsers(admin, "org_1")).toBe(true);
     expect(canManageOrganizationUsers(admin, "org_2")).toBe(false);
+  });
+
+  it("does not let inactive admin memberships manage organization users", () => {
+    expect(
+      canManageOrganizationUsers(
+        {
+          userId: "inactive-admin-user",
+          isPlatformOwner: false,
+          memberships: [
+            {
+              id: "inactive-admin-membership",
+              organizationId: "org_1",
+              roles: ["ADMIN"],
+              status: "INACTIVE",
+              managerMembershipId: null,
+            },
+          ],
+        },
+        "org_1",
+      ),
+    ).toBe(false);
   });
 
   it("lets managers view only direct report progress in the same organization", () => {
@@ -67,6 +112,32 @@ describe("authorization permissions", () => {
     ).toBe(false);
   });
 
+  it("does not let invited manager memberships view direct report progress", () => {
+    expect(
+      canViewMembershipProgress(
+        {
+          userId: "invited-manager-user",
+          isPlatformOwner: false,
+          memberships: [
+            {
+              id: "invited-manager-membership",
+              organizationId: "org_1",
+              roles: ["MANAGER"],
+              status: "INVITED",
+              managerMembershipId: null,
+            },
+          ],
+        },
+        {
+          id: "learner-membership",
+          userId: "learner-user",
+          organizationId: "org_1",
+          managerMembershipId: "invited-manager-membership",
+        },
+      ),
+    ).toBe(false);
+  });
+
   it("lets learners view their own progress", () => {
     expect(
       canViewMembershipProgress(learner, {
@@ -76,6 +147,32 @@ describe("authorization permissions", () => {
         managerMembershipId: null,
       }),
     ).toBe(true);
+  });
+
+  it("does not let inactive learner memberships view self progress", () => {
+    expect(
+      canViewMembershipProgress(
+        {
+          userId: "learner-user",
+          isPlatformOwner: false,
+          memberships: [
+            {
+              id: "inactive-learner-membership",
+              organizationId: "org_1",
+              roles: ["LEARNER"],
+              status: "INACTIVE",
+              managerMembershipId: null,
+            },
+          ],
+        },
+        {
+          id: "inactive-learner-membership",
+          userId: "learner-user",
+          organizationId: "org_1",
+          managerMembershipId: null,
+        },
+      ),
+    ).toBe(false);
   });
 
   it("does not let learners view same-user progress without a target organization membership", () => {
