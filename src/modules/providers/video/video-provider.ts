@@ -6,7 +6,7 @@ export type CreateVideoUploadInput = {
 
 export type CreateVideoUploadResult = {
   uploadUrl: string;
-  providerAssetId: string;
+  providerUploadId: string;
 };
 
 export type VideoPlaybackSource = {
