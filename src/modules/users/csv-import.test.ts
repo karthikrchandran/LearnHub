@@ -184,6 +184,27 @@ learner@acme.test,Leela,Learner,LEARNER,manager@other.test,EMP-1,Operations,Spec
     expect(plan.rows).toEqual([]);
   });
 
+  it("does not allow rows invalidated by manager validation to satisfy manager references", () => {
+    const plan = parseAndValidateUserImportCsv({
+      csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status
+manager@acme.test,Mohan,Manager,MANAGER,missing@acme.test,MGR-1,Operations,Manager,ACTIVE
+learner@acme.test,Leela,Learner,LEARNER,manager@acme.test,EMP-1,Operations,Specialist,`,
+      allowedEmailDomains: ["acme.test"],
+    });
+
+    expect(plan.errors).toContainEqual({
+      rowNumber: 2,
+      field: "managerEmail",
+      message: "Manager email must match a row in this import or an existing manager",
+    });
+    expect(plan.errors).toContainEqual({
+      rowNumber: 3,
+      field: "managerEmail",
+      message: "Manager email must match a row in this import or an existing manager",
+    });
+    expect(plan.rows).toEqual([]);
+  });
+
   it("reports self-manager assignments as row-level errors", () => {
     const plan = parseAndValidateUserImportCsv({
       csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status

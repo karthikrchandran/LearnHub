@@ -142,20 +142,34 @@ export function parseAndValidateUserImportCsv(input: {
   }
 
   const existingManagerEmails = new Set((input.existingManagerEmails ?? []).map((email) => normalizeEmail(email)));
-  const validImportEmails = new Set(parsedRows.filter((row) => !row.hasErrors).map((row) => row.email));
+  const rowsWithManagerReferenceErrors = new Set<number>();
+  let foundNewManagerReferenceError = true;
 
-  for (const row of parsedRows) {
-    if (!row.managerEmail || row.managerEmail === row.email) {
-      continue;
-    }
+  while (foundNewManagerReferenceError) {
+    foundNewManagerReferenceError = false;
+    const validImportEmails = new Set(parsedRows.filter((row) => !row.hasErrors).map((row) => row.email));
 
-    if (!validImportEmails.has(row.managerEmail) && !existingManagerEmails.has(row.managerEmail)) {
+    for (const row of parsedRows) {
+      if (!row.managerEmail || row.managerEmail === row.email) {
+        continue;
+      }
+
+      if (validImportEmails.has(row.managerEmail) || existingManagerEmails.has(row.managerEmail)) {
+        continue;
+      }
+
+      if (rowsWithManagerReferenceErrors.has(row.rowNumber)) {
+        continue;
+      }
+
+      rowsWithManagerReferenceErrors.add(row.rowNumber);
       errors.push({
         rowNumber: row.rowNumber,
         field: "managerEmail",
         message: "Manager email must match a row in this import or an existing manager",
       });
       row.hasErrors = true;
+      foundNewManagerReferenceError = true;
     }
   }
 
