@@ -18,7 +18,7 @@ export type PasswordResetRepository = {
     userId: string;
     passwordHash: string;
     usedAt: Date;
-  }): Promise<void>;
+  }): Promise<boolean>;
 };
 
 export async function requestPasswordReset(
@@ -59,10 +59,14 @@ export async function completePasswordReset(
 
   const passwordHash = await hashPassword(input.password);
 
-  await repository.completePasswordReset({
+  const completed = await repository.completePasswordReset({
     resetTokenId: resetToken.id,
     userId: resetToken.userId,
     passwordHash,
     usedAt: input.now,
   });
+
+  if (!completed) {
+    throw new Error("Password reset token is invalid or expired");
+  }
 }

@@ -21,6 +21,8 @@ type InvitationTokenRecord = {
 
 class FakeInvitationRepository implements InvitationRepository {
   readonly invitationTokens: InvitationTokenRecord[] = [];
+  readonly users = new Map<string, { status: "INVITED" | "ACTIVE"; passwordHash: string | null }>();
+  readonly memberships = new Map<string, { status: "INVITED" | "ACTIVE" }>();
   readonly activationCalls: Array<{
     invitationId: string;
     userId: string;
@@ -41,6 +43,8 @@ class FakeInvitationRepository implements InvitationRepository {
       usedAt: null,
       ...data,
     });
+    this.users.set(data.userId, { status: "INVITED", passwordHash: null });
+    this.memberships.set(data.membershipId, { status: "INVITED" });
   }
 
   async findInvitationByTokenHash(tokenHash: string): Promise<{
@@ -71,8 +75,24 @@ class FakeInvitationRepository implements InvitationRepository {
     membershipId: string;
     passwordHash: string;
     usedAt: Date;
-  }): Promise<void> {
+  }): Promise<boolean> {
+    const token = this.invitationTokens.find(
+      (invitationToken) =>
+        invitationToken.id === data.invitationId &&
+        invitationToken.userId === data.userId &&
+        invitationToken.membershipId === data.membershipId,
+    );
+
+    if (!token || token.usedAt !== null || token.expiresAt.getTime() <= data.usedAt.getTime()) {
+      return false;
+    }
+
+    token.usedAt = data.usedAt;
     this.activationCalls.push(data);
+    this.users.set(data.userId, { status: "ACTIVE", passwordHash: data.passwordHash });
+    this.memberships.set(data.membershipId, { status: "ACTIVE" });
+
+    return true;
   }
 }
 
@@ -212,5 +232,74 @@ describe("invitation service", () => {
     await expect(verifyPassword("CorrectPassword123!", repository.activationCalls[0]!.passwordHash)).resolves.toBe(
       true,
     );
+    expect(repository.invitationTokens[0]?.usedAt).toBe(usedAt);
+    expect(repository.users.get("user_1")?.status).toBe("ACTIVE");
+    expect(repository.users.get("user_1")?.passwordHash).toBe(repository.activationCalls[0]?.passwordHash);
+    expect(repository.memberships.get("membership_1")?.status).toBe("ACTIVE");
+  });
+
+  it("consumes a valid invitation so the same token cannot be activated twice", async () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+    const repository = new FakeInvitationRepository();
+    const invitation = await createInvitation(
+      {
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        now,
+      },
+      repository,
+    );
+
+    await activateInvitation(
+      {
+        rawToken: invitation.rawToken,
+        password: "CorrectPassword123!",
+        now: new Date("2026-06-09T12:30:00.000Z"),
+      },
+      repository,
+    );
+
+    await expect(
+      activateInvitation(
+        {
+          rawToken: invitation.rawToken,
+          password: "AnotherPassword123!",
+          now: new Date("2026-06-09T12:31:00.000Z"),
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Invitation token is invalid or expired");
+    expect(repository.activationCalls).toHaveLength(1);
+  });
+
+  it("rejects when the repository cannot atomically consume the invitation", async () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+    const repository = new FakeInvitationRepository();
+    const invitation = await createInvitation(
+      {
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        now,
+      },
+      repository,
+    );
+    const failingRepository: InvitationRepository = {
+      createInvitationToken: repository.createInvitationToken.bind(repository),
+      findInvitationByTokenHash: repository.findInvitationByTokenHash.bind(repository),
+      activateInvitation: async () => false,
+    };
+
+    await expect(
+      activateInvitation(
+        {
+          rawToken: invitation.rawToken,
+          password: "CorrectPassword123!",
+          now: new Date("2026-06-09T12:30:00.000Z"),
+        },
+        failingRepository,
+      ),
+    ).rejects.toThrow("Invitation token is invalid or expired");
   });
 });

@@ -37,7 +37,7 @@ export type InvitationRepository = {
     membershipId: string;
     passwordHash: string;
     usedAt: Date;
-  }): Promise<void>;
+  }): Promise<boolean>;
 };
 
 export async function createInvitation(
@@ -73,11 +73,15 @@ export async function activateInvitation(
 
   const passwordHash = await hashPassword(input.password);
 
-  await repository.activateInvitation({
+  const activated = await repository.activateInvitation({
     invitationId: invitation.id,
     userId: invitation.userId,
     membershipId: invitation.membershipId,
     passwordHash,
     usedAt: input.now,
   });
+
+  if (!activated) {
+    throw new Error("Invitation token is invalid or expired");
+  }
 }
