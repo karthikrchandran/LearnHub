@@ -1,9 +1,8 @@
-import { PrismaClient } from "@prisma/client";
-
 import { addBusinessDays } from "../src/lib/dates/business-days";
 import { hashPassword } from "../src/lib/auth/password";
+import { createPrismaClient } from "../src/lib/prisma";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   const passwordHash = await hashPassword("LearnHubDemo123!");
@@ -151,7 +150,7 @@ async function main() {
       },
     },
     update: {
-      managerId: manager.id,
+      managerMembershipId: managerMembership.id,
       roles: ["LEARNER"],
       status: "ACTIVE",
       employeeId: "ACME-1001",
@@ -161,7 +160,7 @@ async function main() {
     create: {
       organizationId: organization.id,
       userId: learner.id,
-      managerId: manager.id,
+      managerMembershipId: managerMembership.id,
       roles: ["LEARNER"],
       status: "ACTIVE",
       employeeId: "ACME-1001",
@@ -259,7 +258,7 @@ async function main() {
       organizationId: organization.id,
       courseId: course.id,
       membershipId: learnerMembership.id,
-      assignedById: admin.id,
+      assignedByMembershipId: adminMembership.id,
       startDate,
       dueDate: addBusinessDays(startDate, course.estimatedCompletionBusinessDays),
       status: "ASSIGNED",
@@ -269,15 +268,31 @@ async function main() {
       organizationId: organization.id,
       courseId: course.id,
       membershipId: learnerMembership.id,
-      assignedById: admin.id,
+      assignedByMembershipId: adminMembership.id,
       startDate,
       dueDate: addBusinessDays(startDate, course.estimatedCompletionBusinessDays),
       status: "ASSIGNED",
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
+  await prisma.auditLog.upsert({
+    where: {
+      id: "seed-acme-demo-created",
+    },
+    update: {
+      organizationId: organization.id,
+      actorId: platformOwner.id,
+      action: "seed.demo_created",
+      targetType: "organization",
+      targetId: organization.id,
+      metadata: {
+        adminMembershipId: adminMembership.id,
+        managerMembershipId: managerMembership.id,
+        learnerMembershipId: learnerMembership.id,
+      },
+    },
+    create: {
+      id: "seed-acme-demo-created",
       organizationId: organization.id,
       actorId: platformOwner.id,
       action: "seed.demo_created",

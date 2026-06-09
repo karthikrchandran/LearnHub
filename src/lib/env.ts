@@ -10,7 +10,7 @@ const envSchema = z.object({
   NEXTAUTH_SECRET: z.string().min(1),
   NEXTAUTH_URL: z.string().url(),
   APP_BASE_URL: z.string().url(),
-  EMAIL_PROVIDER: z.enum(["console", "smtp", "api-provider"]).default("console"),
+  EMAIL_PROVIDER: z.enum(["console", "smtp", "api-provider"]),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional(),

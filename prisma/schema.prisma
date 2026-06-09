@@ -51,7 +51,6 @@ model User {
   status          UserStatus               @default(INVITED)
   isPlatformOwner Boolean                  @default(false)
   memberships     OrganizationMembership[] @relation("UserMemberships")
-  managedUsers    OrganizationMembership[] @relation("ManagerMemberships")
   auditLogs       AuditLog[]               @relation("AuditActor")
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
@@ -76,26 +75,28 @@ model Organization {
 }
 
 model OrganizationMembership {
-  id             String             @id @default(cuid())
-  organizationId String
-  userId         String
-  managerId      String?
-  roles          OrganizationRole[]
-  employeeId     String?
-  department     String?
-  title          String?
-  status         UserStatus         @default(INVITED)
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User               @relation("UserMemberships", fields: [userId], references: [id], onDelete: Cascade)
-  manager        User?              @relation("ManagerMemberships", fields: [managerId], references: [id])
-  assignments    CourseAssignment[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id                  String                   @id @default(cuid())
+  organizationId      String
+  userId              String
+  managerMembershipId String?
+  roles               OrganizationRole[]
+  employeeId          String?
+  department          String?
+  title               String?
+  status              UserStatus               @default(INVITED)
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                User                     @relation("UserMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  managerMembership   OrganizationMembership?  @relation("MembershipManager", fields: [organizationId, managerMembershipId], references: [organizationId, id], onDelete: NoAction)
+  directReports       OrganizationMembership[] @relation("MembershipManager")
+  learningAssignments CourseAssignment[]       @relation("LearnerAssignments")
+  assignedAssignments CourseAssignment[]       @relation("AssignedByMembership")
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   @@unique([organizationId, userId])
   @@unique([organizationId, id])
   @@index([organizationId])
-  @@index([managerId])
+  @@index([organizationId, managerMembershipId])
 }
 
 model CourseCategory {
@@ -113,14 +114,14 @@ model CourseCategory {
 }
 
 model CourseTag {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   organizationId String
   name           String
   slug           String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   courseLinks    CourseTagLink[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
@@ -162,22 +163,24 @@ model CourseTagLink {
 }
 
 model CourseAssignment {
-  id             String                 @id @default(cuid())
-  organizationId String
-  courseId       String
-  membershipId   String
-  assignedById   String?
-  startDate      DateTime
-  dueDate        DateTime
-  status         AssignmentStatus       @default(ASSIGNED)
-  course         Course                 @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
-  membership     OrganizationMembership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id                     String                  @id @default(cuid())
+  organizationId         String
+  courseId               String
+  membershipId           String
+  assignedByMembershipId String?
+  startDate              DateTime
+  dueDate                DateTime
+  status                 AssignmentStatus        @default(ASSIGNED)
+  course                 Course                  @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  membership             OrganizationMembership  @relation("LearnerAssignments", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  assignedByMembership   OrganizationMembership? @relation("AssignedByMembership", fields: [organizationId, assignedByMembershipId], references: [organizationId, id], onDelete: NoAction)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
   @@index([organizationId])
   @@index([organizationId, courseId])
   @@index([organizationId, membershipId])
+  @@index([organizationId, assignedByMembershipId])
 }
 
 model AuditLog {

@@ -31,8 +31,21 @@ describe("environment contract", () => {
         NEXTAUTH_SECRET: "replace-with-a-local-secret",
         NEXTAUTH_URL: "https://learnhub.example.com",
         APP_BASE_URL: "https://learnhub.example.com",
+        EMAIL_PROVIDER: "console",
       }),
     ).toThrow(/NEXTAUTH_SECRET/);
+  });
+
+  it("requires EMAIL_PROVIDER in production", () => {
+    expect(() =>
+      getEnv({
+        NODE_ENV: "production",
+        DATABASE_URL: localDatabaseUrl,
+        NEXTAUTH_SECRET: "production-secret",
+        NEXTAUTH_URL: "https://learnhub.example.com",
+        APP_BASE_URL: "https://learnhub.example.com",
+      }),
+    ).toThrow(/EMAIL_PROVIDER/);
   });
 
   it("allows placeholder secrets outside production", () => {
