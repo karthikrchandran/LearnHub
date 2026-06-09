@@ -7,7 +7,7 @@ export type RecordAuditLogInput = {
   action: string;
   targetType: string;
   targetId: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonObject;
 };
 
 export async function recordAuditLog(input: RecordAuditLogInput): Promise<void> {
@@ -18,7 +18,7 @@ export async function recordAuditLog(input: RecordAuditLogInput): Promise<void> 
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId,
-      metadata: (input.metadata ?? {}) as Prisma.InputJsonObject,
+      metadata: input.metadata ?? {},
     },
   });
 }
