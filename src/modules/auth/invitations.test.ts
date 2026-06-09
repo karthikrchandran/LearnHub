@@ -1,0 +1,216 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  INVITATION_EXPIRES_IN_MINUTES,
+  activateInvitation,
+  createInvitation,
+  type InvitationRepository,
+} from "./invitations";
+import { hashToken } from "./tokens";
+import { verifyPassword } from "../../lib/auth/password";
+
+type InvitationTokenRecord = {
+  id: string;
+  organizationId: string;
+  membershipId: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+};
+
+class FakeInvitationRepository implements InvitationRepository {
+  readonly invitationTokens: InvitationTokenRecord[] = [];
+  readonly activationCalls: Array<{
+    invitationId: string;
+    userId: string;
+    membershipId: string;
+    passwordHash: string;
+    usedAt: Date;
+  }> = [];
+
+  async createInvitationToken(data: {
+    organizationId: string;
+    membershipId: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    this.invitationTokens.push({
+      id: `invitation_${this.invitationTokens.length + 1}`,
+      usedAt: null,
+      ...data,
+    });
+  }
+
+  async findInvitationByTokenHash(tokenHash: string): Promise<{
+    id: string;
+    userId: string;
+    membershipId: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+  } | null> {
+    const token = this.invitationTokens.find((invitationToken) => invitationToken.tokenHash === tokenHash);
+
+    if (!token) {
+      return null;
+    }
+
+    return {
+      id: token.id,
+      userId: token.userId,
+      membershipId: token.membershipId,
+      expiresAt: token.expiresAt,
+      usedAt: token.usedAt,
+    };
+  }
+
+  async activateInvitation(data: {
+    invitationId: string;
+    userId: string;
+    membershipId: string;
+    passwordHash: string;
+    usedAt: Date;
+  }): Promise<void> {
+    this.activationCalls.push(data);
+  }
+}
+
+describe("invitation service", () => {
+  it("creates an expiring invitation token and stores only the hash", async () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+    const repository = new FakeInvitationRepository();
+
+    const result = await createInvitation(
+      {
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        now,
+      },
+      repository,
+    );
+
+    expect(result.rawToken).toEqual(expect.any(String));
+    expect(result.rawToken.length).toBeGreaterThanOrEqual(32);
+    expect(result.expiresAt.toISOString()).toBe("2026-06-16T12:00:00.000Z");
+    expect(INVITATION_EXPIRES_IN_MINUTES).toBe(60 * 24 * 7);
+    expect(repository.invitationTokens).toEqual([
+      {
+        id: "invitation_1",
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        tokenHash: hashToken(result.rawToken),
+        expiresAt: result.expiresAt,
+        usedAt: null,
+      },
+    ]);
+    expect(repository.invitationTokens[0]?.tokenHash).not.toBe(result.rawToken);
+  });
+
+  it("rejects missing invitation tokens", async () => {
+    const repository = new FakeInvitationRepository();
+
+    await expect(
+      activateInvitation(
+        {
+          rawToken: "missing-token",
+          password: "CorrectPassword123!",
+          now: new Date("2026-06-09T12:00:00.000Z"),
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Invitation token is invalid or expired");
+    expect(repository.activationCalls).toEqual([]);
+  });
+
+  it("rejects used invitation tokens", async () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+    const repository = new FakeInvitationRepository();
+    const invitation = await createInvitation(
+      {
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        now,
+      },
+      repository,
+    );
+    repository.invitationTokens[0]!.usedAt = new Date("2026-06-09T12:01:00.000Z");
+
+    await expect(
+      activateInvitation(
+        {
+          rawToken: invitation.rawToken,
+          password: "CorrectPassword123!",
+          now: new Date("2026-06-09T12:02:00.000Z"),
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Invitation token is invalid or expired");
+    expect(repository.activationCalls).toEqual([]);
+  });
+
+  it("rejects expired invitation tokens", async () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+    const repository = new FakeInvitationRepository();
+    const invitation = await createInvitation(
+      {
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        now,
+      },
+      repository,
+    );
+
+    await expect(
+      activateInvitation(
+        {
+          rawToken: invitation.rawToken,
+          password: "CorrectPassword123!",
+          now: new Date("2026-06-16T12:00:00.000Z"),
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Invitation token is invalid or expired");
+    expect(repository.activationCalls).toEqual([]);
+  });
+
+  it("activates valid invitations with a password hash and used timestamp", async () => {
+    const now = new Date("2026-06-09T12:00:00.000Z");
+    const usedAt = new Date("2026-06-09T12:30:00.000Z");
+    const repository = new FakeInvitationRepository();
+    const invitation = await createInvitation(
+      {
+        organizationId: "org_1",
+        membershipId: "membership_1",
+        userId: "user_1",
+        now,
+      },
+      repository,
+    );
+
+    await activateInvitation(
+      {
+        rawToken: invitation.rawToken,
+        password: "CorrectPassword123!",
+        now: usedAt,
+      },
+      repository,
+    );
+
+    expect(repository.activationCalls).toHaveLength(1);
+    expect(repository.activationCalls[0]).toMatchObject({
+      invitationId: "invitation_1",
+      userId: "user_1",
+      membershipId: "membership_1",
+      usedAt,
+    });
+    expect(repository.activationCalls[0]?.passwordHash).not.toBe("CorrectPassword123!");
+    await expect(verifyPassword("CorrectPassword123!", repository.activationCalls[0]!.passwordHash)).resolves.toBe(
+      true,
+    );
+  });
+});
