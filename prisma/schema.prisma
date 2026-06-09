@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrganizationEnrollmentPolicy {
+  ASSIGNMENT_ONLY
+  ASSIGNMENT_AND_SELF_ENROLLMENT
+}
+
+enum OrganizationRole {
+  ADMIN
+  MANAGER
+  LEARNER
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  INACTIVE
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  DEPRECATED
+  RETIRED
+}
+
+enum CourseType {
+  NATIVE_VIDEO
+  SCORM_1_2
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+model User {
+  id              String                   @id @default(cuid())
+  email           String                   @unique
+  firstName       String
+  lastName        String
+  passwordHash    String?
+  status          UserStatus               @default(INVITED)
+  isPlatformOwner Boolean                  @default(false)
+  memberships     OrganizationMembership[] @relation("UserMemberships")
+  managedUsers    OrganizationMembership[] @relation("ManagerMemberships")
+  auditLogs       AuditLog[]               @relation("AuditActor")
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+}
+
+model Organization {
+  id                   String                       @id @default(cuid())
+  name                 String
+  slug                 String                       @unique
+  logoUrl              String?
+  primaryColor         String                       @default("#2563eb")
+  accentColor          String                       @default("#14b8a6")
+  enrollmentPolicy     OrganizationEnrollmentPolicy @default(ASSIGNMENT_ONLY)
+  globalLibraryEnabled Boolean                      @default(false)
+  memberships          OrganizationMembership[]
+  categories           CourseCategory[]
+  tags                 CourseTag[]
+  courses              Course[]
+  auditLogs            AuditLog[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+}
+
+model OrganizationMembership {
+  id             String             @id @default(cuid())
+  organizationId String
+  userId         String
+  managerId      String?
+  roles          OrganizationRole[]
+  employeeId     String?
+  department     String?
+  title          String?
+  status         UserStatus         @default(INVITED)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User               @relation("UserMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  manager        User?              @relation("ManagerMemberships", fields: [managerId], references: [id])
+  assignments    CourseAssignment[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([managerId])
+}
+
+model CourseCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courses        Course[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, slug])
+}
+
+model CourseTag {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courses        Course[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, slug])
+}
+
+model Course {
+  id                              String             @id @default(cuid())
+  organizationId                  String
+  title                           String
+  slug                            String
+  description                     String             @default("")
+  status                          CourseStatus       @default(DRAFT)
+  type                            CourseType
+  estimatedCompletionBusinessDays Int                @default(5)
+  expectedDurationMinutes         Int                @default(60)
+  categoryId                      String?
+  organization                    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category                        CourseCategory?    @relation(fields: [categoryId], references: [id])
+  tags                            CourseTag[]
+  assignments                     CourseAssignment[]
+  createdAt                       DateTime           @default(now())
+  updatedAt                       DateTime           @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+}
+
+model CourseAssignment {
+  id             String                 @id @default(cuid())
+  organizationId String
+  courseId       String
+  membershipId   String
+  assignedById   String?
+  startDate      DateTime
+  dueDate        DateTime
+  status         AssignmentStatus       @default(ASSIGNED)
+  course         Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  membership     OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([organizationId])
+  @@index([courseId])
+  @@index([membershipId])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  actorId        String?
+  action         String
+  targetType     String
+  targetId       String
+  metadata       Json          @default("{}")
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  actor          User?         @relation("AuditActor", fields: [actorId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([actorId])
+  @@index([action])
+}
