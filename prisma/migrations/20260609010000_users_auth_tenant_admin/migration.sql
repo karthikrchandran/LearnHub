@@ -24,6 +24,7 @@ CREATE TABLE "PasswordResetToken" (
 );
 
 CREATE UNIQUE INDEX "UserInvitationToken_tokenHash_key" ON "UserInvitationToken"("tokenHash");
+CREATE UNIQUE INDEX "OrganizationMembership_organizationId_id_userId_key" ON "OrganizationMembership"("organizationId", "id", "userId");
 CREATE INDEX "UserInvitationToken_organizationId_idx" ON "UserInvitationToken"("organizationId");
 CREATE INDEX "UserInvitationToken_userId_idx" ON "UserInvitationToken"("userId");
 CREATE INDEX "UserInvitationToken_expiresAt_idx" ON "UserInvitationToken"("expiresAt");
@@ -38,7 +39,7 @@ FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE
 
 ALTER TABLE "UserInvitationToken"
 ADD CONSTRAINT "UserInvitationToken_organizationId_membershipId_fkey"
-FOREIGN KEY ("organizationId", "membershipId") REFERENCES "OrganizationMembership"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+FOREIGN KEY ("organizationId", "membershipId", "userId") REFERENCES "OrganizationMembership"("organizationId", "id", "userId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "UserInvitationToken"
 ADD CONSTRAINT "UserInvitationToken_userId_fkey"

@@ -100,6 +100,7 @@ model OrganizationMembership {
 
   @@unique([organizationId, userId])
   @@unique([organizationId, id])
+  @@unique([organizationId, id, userId])
   @@index([organizationId])
   @@index([organizationId, managerMembershipId])
 }
@@ -113,7 +114,7 @@ model UserInvitationToken {
   expiresAt      DateTime
   usedAt         DateTime?
   organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  membership     OrganizationMembership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  membership     OrganizationMembership @relation(fields: [organizationId, membershipId, userId], references: [organizationId, id, userId], onDelete: Cascade)
   user           User                   @relation("UserInvitationTokens", fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime               @default(now())
 
