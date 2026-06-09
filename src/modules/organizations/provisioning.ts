@@ -24,10 +24,32 @@ export type ProvisionOrganizationRepository = {
 };
 
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
+const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const domainLabelPattern = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 function requireHexColor(color: string): void {
   if (!hexColorPattern.test(color)) {
     throw new Error("Theme color must be a 6-digit hex color");
+  }
+}
+
+function requireValidSlug(slug: string): void {
+  if (!slugPattern.test(slug)) {
+    throw new Error("Organization slug must use lowercase letters, numbers, and hyphens");
+  }
+}
+
+function requireValidAllowedEmailDomain(domain: string): void {
+  const labels = domain.split(".");
+
+  if (
+    domain.includes("@") ||
+    domain.includes("/") ||
+    domain.includes(":") ||
+    labels.length < 2 ||
+    labels.some((label) => !domainLabelPattern.test(label))
+  ) {
+    throw new Error("Allowed email domain is invalid");
   }
 }
 
@@ -54,10 +76,14 @@ export async function provisionOrganization(
   if (!slug) {
     throw new Error("Organization slug is required");
   }
+  requireValidSlug(slug);
 
   const allowedEmailDomains = normalizeAllowedEmailDomains(input.allowedEmailDomains);
   if (allowedEmailDomains.length === 0) {
     throw new Error("At least one allowed email domain is required");
+  }
+  for (const domain of allowedEmailDomains) {
+    requireValidAllowedEmailDomain(domain);
   }
 
   requireHexColor(input.primaryColor);

@@ -56,12 +56,42 @@ describe("provisionOrganization", () => {
     );
   });
 
+  it("requires lowercase URL-safe slugs", async () => {
+    const repository = createRepository();
+
+    for (const slug of ["Acme", "acme ops", "acme/ops", "acme_ops", "-acme", "acme-"]) {
+      await expect(provisionOrganization({ ...validInput, slug }, repository)).rejects.toThrow(
+        "Organization slug must use lowercase letters, numbers, and hyphens",
+      );
+    }
+  });
+
   it("requires at least one allowed email domain", async () => {
     const repository = createRepository();
 
     await expect(provisionOrganization({ ...validInput, allowedEmailDomains: [] }, repository)).rejects.toThrow(
       "At least one allowed email domain is required",
     );
+  });
+
+  it("rejects invalid allowed email domains", async () => {
+    const repository = createRepository();
+
+    for (const domain of [
+      "admin@acme.test",
+      "https://acme.test",
+      "acme.test/path",
+      "acme..test",
+      ".acme.test",
+      "acme.test.",
+      "-acme.test",
+      "acme-.test",
+      "acme_test",
+    ]) {
+      await expect(provisionOrganization({ ...validInput, allowedEmailDomains: [domain] }, repository)).rejects.toThrow(
+        "Allowed email domain is invalid",
+      );
+    }
   });
 
   it("validates hex theme colors", async () => {
@@ -87,6 +117,14 @@ describe("provisionOrganization", () => {
     );
 
     expect(repository.createdOrganizations[0].allowedEmailDomains).toEqual(["acme.test", "learnhub.test"]);
+  });
+
+  it("accepts valid lowercase hyphenated slugs", async () => {
+    const repository = createRepository();
+
+    await provisionOrganization({ ...validInput, slug: "acme-ops-2" }, repository);
+
+    expect(repository.createdOrganizations[0].slug).toBe("acme-ops-2");
   });
 
   it("passes organization settings to the repository", async () => {
