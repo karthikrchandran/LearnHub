@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "postinstall": "prisma generate",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "pretest": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
