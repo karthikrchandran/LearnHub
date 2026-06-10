@@ -441,7 +441,7 @@ async function main() {
     ],
   });
 
-  await prisma.course.upsert({
+  const scormCourse = await prisma.course.upsert({
     where: {
       organizationId_slug: {
         organizationId: organization.id,
@@ -467,6 +467,38 @@ async function main() {
       estimatedCompletionBusinessDays: 5,
       expectedDurationMinutes: 40,
       categoryId: category.id,
+    },
+  });
+
+  await prisma.scormPackage.upsert({
+    where: {
+      organizationId_courseId: {
+        organizationId: organization.id,
+        courseId: scormCourse.id,
+      },
+    },
+    update: {
+      originalFileName: "archived-policy-orientation.zip",
+      contentType: "application/zip",
+      byteSize: 4096,
+      storageKey: `org/${organization.id}/courses/${scormCourse.id}/scorm/seed-archived-policy-orientation/archived-policy-orientation.zip`,
+      launchPath: "index.html",
+      manifestTitle: "Archived Policy Orientation",
+      uploadedByUserId: admin.id,
+      active: true,
+    },
+    create: {
+      id: "seed-archived-policy-orientation",
+      organizationId: organization.id,
+      courseId: scormCourse.id,
+      originalFileName: "archived-policy-orientation.zip",
+      contentType: "application/zip",
+      byteSize: 4096,
+      storageKey: `org/${organization.id}/courses/${scormCourse.id}/scorm/seed-archived-policy-orientation/archived-policy-orientation.zip`,
+      launchPath: "index.html",
+      manifestTitle: "Archived Policy Orientation",
+      uploadedByUserId: admin.id,
+      active: true,
     },
   });
 
