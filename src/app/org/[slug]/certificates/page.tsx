@@ -1,5 +1,4 @@
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
-import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +11,7 @@ type CertificatesPageProps = {
 export default async function CertificatesPage({ params }: CertificatesPageProps) {
   const { slug } = await params;
   const { organizationId } = await requireOrganizationMemberBySlug(slug);
+  const { prisma } = await import("@/lib/prisma");
 
   const certificates = await prisma.certificate.findMany({
     where: { organizationId },

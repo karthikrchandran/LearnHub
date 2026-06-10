@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +10,7 @@ type CertificateVerificationPageProps = {
 
 export default async function CertificateVerificationPage({ params }: CertificateVerificationPageProps) {
   const { verificationCode } = await params;
+  const { prisma } = await import("@/lib/prisma");
 
   const certificate = await prisma.certificate.findUnique({
     where: { verificationCode },
