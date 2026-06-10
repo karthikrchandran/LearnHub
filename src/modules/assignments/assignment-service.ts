@@ -104,7 +104,7 @@ export async function selfEnrollInCourse(
 
   assertCourseSelfEnrollable(course);
 
-  if (input.actor.userId !== learner.userId) {
+  if (!canSelfEnroll(input.actor, learner)) {
     throw new Error("Not allowed to self-enroll this learner");
   }
 
@@ -210,5 +210,19 @@ function activeActorMembershipId(actor: MembershipAuthContext, organizationId: s
   return (
     actor.memberships.find((membership) => membership.organizationId === organizationId && membership.status === "ACTIVE")
       ?.id ?? null
+  );
+}
+
+function canSelfEnroll(actor: MembershipAuthContext, learner: AssignmentMembership): boolean {
+  if (actor.userId !== learner.userId) {
+    return false;
+  }
+
+  return actor.memberships.some(
+    (membership) =>
+      membership.id === learner.id &&
+      membership.organizationId === learner.organizationId &&
+      membership.status === "ACTIVE" &&
+      membership.roles.includes("LEARNER"),
   );
 }

@@ -1,9 +1,38 @@
 import { describe, expect, it } from "vitest";
 
-import { assignCourse, selfEnrollInCourse, type AssignmentRepository } from "./assignment-service";
+import {
+  assignCourse,
+  selfEnrollInCourse,
+  type AssignmentCourse,
+  type AssignmentMembership,
+  type AssignmentRepository,
+} from "./assignment-service";
 import type { MembershipAuthContext } from "../auth/permissions";
 
+type AssignmentOrganization = NonNullable<Awaited<ReturnType<AssignmentRepository["findOrganization"]>>>;
+
 const startDate = new Date("2026-06-12T12:00:00.000Z");
+
+const publishedCourse: AssignmentCourse = {
+  id: "course_1",
+  organizationId: "org_1",
+  status: "PUBLISHED",
+  estimatedCompletionBusinessDays: 3,
+};
+
+const activeLearner: AssignmentMembership = {
+  id: "learner-membership",
+  userId: "learner-user",
+  organizationId: "org_1",
+  managerMembershipId: "manager-membership",
+  status: "ACTIVE",
+  roles: ["LEARNER"],
+};
+
+const selfEnrollmentOrganization: AssignmentOrganization = {
+  id: "org_1",
+  enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
+};
 
 const adminActor: MembershipAuthContext = {
   userId: "admin-user",
@@ -52,58 +81,57 @@ function createRepository(overrides: Partial<FakeAssignmentRepository> = {}): Fa
 }
 
 class FakeAssignmentRepository implements AssignmentRepository {
-  course = {
-    id: "course_1",
-    organizationId: "org_1",
-    status: "PUBLISHED" as const,
-    estimatedCompletionBusinessDays: 3,
-  };
-  learner = {
-    id: "learner-membership",
-    userId: "learner-user",
-    organizationId: "org_1",
-    managerMembershipId: "manager-membership",
-    status: "ACTIVE" as const,
-    roles: ["LEARNER" as const],
-  };
-  organization = {
-    id: "org_1",
-    enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT" as const,
-  };
+  course: AssignmentCourse | null = publishedCourse;
+  learner: AssignmentMembership | null = activeLearner;
+  organization: AssignmentOrganization | null = selfEnrollmentOrganization;
   existingAssignment = false;
   transactions = 0;
+  calls: string[] = [];
   createdAssignments: Array<Parameters<AssignmentRepository["createAssignment"]>[0]> = [];
   auditLogs: Array<Parameters<AssignmentRepository["recordAuditLog"]>[0]> = [];
 
   async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
     this.transactions += 1;
+    this.calls.push("transaction:start");
+    const result = await operation();
+    this.calls.push("transaction:end");
 
-    return operation();
+    return result;
   }
 
-  async findCourse(): Promise<FakeAssignmentRepository["course"] | null> {
+  async findCourse(): Promise<AssignmentCourse | null> {
+    this.calls.push("find-course");
+
     return this.course;
   }
 
-  async findMembership(): Promise<FakeAssignmentRepository["learner"] | null> {
+  async findMembership(): Promise<AssignmentMembership | null> {
+    this.calls.push("find-membership");
+
     return this.learner;
   }
 
-  async findOrganization(): Promise<FakeAssignmentRepository["organization"] | null> {
+  async findOrganization(): Promise<AssignmentOrganization | null> {
+    this.calls.push("find-organization");
+
     return this.organization;
   }
 
   async assignmentExists(): Promise<boolean> {
+    this.calls.push("assignment-exists");
+
     return this.existingAssignment;
   }
 
   async createAssignment(data: Parameters<AssignmentRepository["createAssignment"]>[0]): Promise<{ id: string }> {
+    this.calls.push("create-assignment");
     this.createdAssignments.push(data);
 
     return { id: "assignment_1" };
   }
 
   async recordAuditLog(data: Parameters<AssignmentRepository["recordAuditLog"]>[0]): Promise<void> {
+    this.calls.push(`audit:${data.action}`);
     this.auditLogs.push(data);
   }
 }
@@ -137,6 +165,16 @@ describe("assignment service", () => {
     ]);
     expect(repository.auditLogs).toMatchObject([{ action: "assignment.created", targetId: "assignment_1" }]);
     expect(repository.transactions).toBe(1);
+    expect(repository.calls).toEqual([
+      "find-course",
+      "find-membership",
+      "transaction:start",
+      "assignment-exists",
+      "find-course",
+      "create-assignment",
+      "audit:assignment.created",
+      "transaction:end",
+    ]);
   });
 
   it("lets a manager assign a published course only to an active direct report", async () => {
@@ -166,7 +204,7 @@ describe("assignment service", () => {
         },
         createRepository({
           learner: {
-            ...repository.learner,
+            ...activeLearner,
             managerMembershipId: "other-manager-membership",
           },
         }),
@@ -185,7 +223,7 @@ describe("assignment service", () => {
             actor: adminActor,
             startDate,
           },
-          createRepository({ course: { ...new FakeAssignmentRepository().course, status } }),
+          createRepository({ course: { ...publishedCourse, status } }),
         ),
       ).rejects.toThrow("Only published courses can be assigned");
     }
@@ -210,6 +248,34 @@ describe("assignment service", () => {
     expect(repository.createdAssignments).toHaveLength(0);
   });
 
+  it("throws clear errors for missing course and learner membership", async () => {
+    await expect(
+      assignCourse(
+        {
+          organizationId: "org_1",
+          courseId: "missing-course",
+          learnerMembershipId: "learner-membership",
+          actor: adminActor,
+          startDate,
+        },
+        createRepository({ course: null }),
+      ),
+    ).rejects.toThrow("Course not found");
+
+    await expect(
+      assignCourse(
+        {
+          organizationId: "org_1",
+          courseId: "course_1",
+          learnerMembershipId: "missing-learner",
+          actor: adminActor,
+          startDate,
+        },
+        createRepository({ learner: null }),
+      ),
+    ).rejects.toThrow("Learner membership not found");
+  });
+
   it("validates learner membership before assignment", async () => {
     await expect(
       assignCourse(
@@ -220,7 +286,7 @@ describe("assignment service", () => {
           actor: adminActor,
           startDate,
         },
-        createRepository({ learner: { ...new FakeAssignmentRepository().learner, status: "INACTIVE" } }),
+        createRepository({ learner: { ...activeLearner, status: "INACTIVE" } }),
       ),
     ).rejects.toThrow("Learner membership must be active");
 
@@ -233,7 +299,7 @@ describe("assignment service", () => {
           actor: adminActor,
           startDate,
         },
-        createRepository({ learner: { ...new FakeAssignmentRepository().learner, roles: ["MANAGER"] } }),
+        createRepository({ learner: { ...activeLearner, roles: ["MANAGER"] } }),
       ),
     ).rejects.toThrow("Course can only be assigned to learners");
   });
@@ -255,6 +321,17 @@ describe("assignment service", () => {
     ).resolves.toEqual({ id: "assignment_1" });
     expect(repository.createdAssignments[0]?.assignedByMembershipId).toBeNull();
     expect(repository.auditLogs).toMatchObject([{ action: "assignment.self_enrolled", targetId: "assignment_1" }]);
+    expect(repository.calls).toEqual([
+      "find-organization",
+      "find-course",
+      "find-membership",
+      "transaction:start",
+      "assignment-exists",
+      "find-course",
+      "create-assignment",
+      "audit:assignment.self_enrolled",
+      "transaction:end",
+    ]);
 
     await expect(
       selfEnrollInCourse(
@@ -268,5 +345,36 @@ describe("assignment service", () => {
         createRepository({ organization: { id: "org_1", enrollmentPolicy: "ASSIGNMENT_ONLY" } }),
       ),
     ).rejects.toThrow("Self-enrollment is not enabled for this organization");
+  });
+
+  it("blocks self-enrollment by a different or inactive learner actor", async () => {
+    await expect(
+      selfEnrollInCourse(
+        {
+          organizationId: "org_1",
+          courseId: "course_1",
+          learnerMembershipId: "learner-membership",
+          actor: { ...learnerActor, userId: "other-user" },
+          startDate,
+        },
+        createRepository(),
+      ),
+    ).rejects.toThrow("Not allowed to self-enroll this learner");
+
+    await expect(
+      selfEnrollInCourse(
+        {
+          organizationId: "org_1",
+          courseId: "course_1",
+          learnerMembershipId: "learner-membership",
+          actor: {
+            ...learnerActor,
+            memberships: [{ ...learnerActor.memberships[0], status: "INACTIVE" }],
+          },
+          startDate,
+        },
+        createRepository(),
+      ),
+    ).rejects.toThrow("Not allowed to self-enroll this learner");
   });
 });
