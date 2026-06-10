@@ -16,6 +16,8 @@ describe("video validation", () => {
   it("requires non-negative seconds with a label", () => {
     expect(requireNonNegativeSecond(0, "Position")).toBe(0);
     expect(() => requireNonNegativeSecond(-1, "Position")).toThrow("Position cannot be negative");
+    expect(() => requireNonNegativeSecond(1.5, "Position")).toThrow("Position must be a whole number");
+    expect(() => requireNonNegativeSecond(Number.NaN, "Position")).toThrow("Position must be a whole number");
   });
 
   it("clamps seconds to the video duration", () => {

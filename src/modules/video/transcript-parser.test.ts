@@ -35,4 +35,13 @@ describe("transcript parser", () => {
       "Transcript line 1 end time must be after start time",
     );
   });
+
+  it("rejects malformed timestamp ranges", () => {
+    expect(() => parseTranscriptText("[00:00 -] Missing end")).toThrow(
+      "Transcript line 1 has an invalid timestamp",
+    );
+    expect(() => parseTranscriptText("[00:00 - 00:10 - 00:20] Too many delimiters")).toThrow(
+      "Transcript line 1 has an invalid timestamp",
+    );
+  });
 });

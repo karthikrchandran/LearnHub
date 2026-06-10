@@ -42,7 +42,16 @@ function parseTranscriptLine(line: string, lineNumber: number): ParsedTranscript
     throw new Error(`Transcript line ${lineNumber} must include cue text`);
   }
 
-  const [startTimestamp, endTimestamp] = match.groups.timestampRange.split(/\s*-\s*/, 2);
+  const timestampParts = match.groups.timestampRange.split(/\s*-\s*/);
+
+  if (
+    timestampParts.length > 2 ||
+    timestampParts.some((timestampPart) => timestampPart.trim().length === 0)
+  ) {
+    throw new Error(`Transcript line ${lineNumber} has an invalid timestamp`);
+  }
+
+  const [startTimestamp, endTimestamp] = timestampParts;
   const startSecond = parseLineTimestamp(startTimestamp, lineNumber);
   const endSecond = endTimestamp ? parseLineTimestamp(endTimestamp, lineNumber) : null;
 

@@ -7,7 +7,11 @@ export function requirePositiveDurationSeconds(seconds: number): number {
 }
 
 export function requireNonNegativeSecond(seconds: number, label: string): number {
-  if (!Number.isInteger(seconds) || seconds < 0) {
+  if (!Number.isInteger(seconds)) {
+    throw new Error(`${label} must be a whole number`);
+  }
+
+  if (seconds < 0) {
     throw new Error(`${label} cannot be negative`);
   }
 
