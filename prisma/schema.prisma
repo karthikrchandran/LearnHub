@@ -95,6 +95,11 @@ model Organization {
   categories           CourseCategory[]
   tags                 CourseTag[]
   courses              Course[]
+  courseModules        CourseModule[]
+  videoLessons         VideoLesson[]
+  videoChapters        VideoChapter[]
+  videoTranscriptCues  VideoTranscriptCue[]
+  videoLessonProgress  VideoLessonProgress[]
   assignmentProgresses AssignmentProgress[]
   learningEvents       LearningProgressEvent[]
   certificates         Certificate[]
@@ -206,6 +211,8 @@ model Course {
   category                        CourseCategory?    @relation(fields: [organizationId, categoryId], references: [organizationId, id])
   tagLinks                        CourseTagLink[]
   assignments                     CourseAssignment[]
+  modules                         CourseModule[]
+  videoLessons                    VideoLesson[]
   certificates                    Certificate[]
   createdAt                       DateTime           @default(now())
   updatedAt                       DateTime           @updatedAt
@@ -241,6 +248,7 @@ model CourseAssignment {
   assignedByMembership   OrganizationMembership? @relation("AssignedByMembership", fields: [organizationId, assignedByMembershipId], references: [organizationId, id], onDelete: NoAction)
   progress               AssignmentProgress?
   learningEvents         LearningProgressEvent[]
+  videoProgress          VideoLessonProgress[]
   certificate            Certificate?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -251,6 +259,103 @@ model CourseAssignment {
   @@index([organizationId, membershipId])
   @@index([organizationId, assignedByMembershipId])
   @@unique([organizationId, courseId, membershipId])
+}
+
+model CourseModule {
+  id             String        @id @default(cuid())
+  organizationId String
+  courseId       String
+  title          String
+  slug           String
+  sortOrder      Int           @default(0)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course         Course        @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  lessons        VideoLesson[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, courseId, slug])
+  @@unique([organizationId, id])
+  @@unique([organizationId, courseId, id])
+  @@index([organizationId, courseId, sortOrder])
+}
+
+model VideoLesson {
+  id                 String                @id @default(cuid())
+  organizationId     String
+  courseId           String
+  moduleId           String?
+  title              String
+  slug               String
+  sortOrder          Int                   @default(0)
+  durationSeconds    Int
+  required           Boolean               @default(true)
+  providerAssetId    String?
+  playbackUrl        String?
+  transcriptLanguage String                @default("en")
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course             Course                @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  module             CourseModule?         @relation(fields: [organizationId, courseId, moduleId], references: [organizationId, courseId, id], onDelete: NoAction)
+  chapters           VideoChapter[]
+  transcriptCues     VideoTranscriptCue[]
+  progress           VideoLessonProgress[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@unique([organizationId, courseId, slug])
+  @@unique([organizationId, id])
+  @@unique([organizationId, courseId, id])
+  @@index([organizationId, courseId, moduleId, sortOrder])
+}
+
+model VideoChapter {
+  id             String       @id @default(cuid())
+  organizationId String
+  lessonId       String
+  title          String
+  startSecond    Int
+  endSecond      Int?
+  sortOrder      Int          @default(0)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lesson         VideoLesson  @relation(fields: [organizationId, lessonId], references: [organizationId, id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, lessonId, startSecond])
+}
+
+model VideoTranscriptCue {
+  id             String       @id @default(cuid())
+  organizationId String
+  lessonId       String
+  startSecond    Int
+  endSecond      Int?
+  text           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lesson         VideoLesson  @relation(fields: [organizationId, lessonId], references: [organizationId, id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, lessonId, startSecond])
+}
+
+model VideoLessonProgress {
+  id                 String           @id @default(cuid())
+  organizationId     String
+  assignmentId       String
+  lessonId           String
+  lastPositionSecond Int              @default(0)
+  maxWatchedSecond   Int              @default(0)
+  completed          Boolean          @default(false)
+  lastWatchedAt      DateTime?
+  assignment         CourseAssignment @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  lesson             VideoLesson      @relation(fields: [organizationId, lessonId], references: [organizationId, id], onDelete: Cascade)
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([organizationId, assignmentId, lessonId])
+  @@index([organizationId, assignmentId])
+  @@index([organizationId, lessonId])
 }
 
 model AssignmentProgress {
