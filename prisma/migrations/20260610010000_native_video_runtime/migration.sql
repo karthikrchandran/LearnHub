@@ -55,6 +55,7 @@ CREATE TABLE "VideoTranscriptCue" (
 CREATE TABLE "VideoLessonProgress" (
   "id" TEXT NOT NULL,
   "organizationId" TEXT NOT NULL,
+  "courseId" TEXT NOT NULL,
   "assignmentId" TEXT NOT NULL,
   "lessonId" TEXT NOT NULL,
   "lastPositionSecond" INTEGER NOT NULL DEFAULT 0,
@@ -65,6 +66,8 @@ CREATE TABLE "VideoLessonProgress" (
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "VideoLessonProgress_pkey" PRIMARY KEY ("id")
 );
+
+CREATE UNIQUE INDEX "CourseAssignment_organizationId_courseId_id_key" ON "CourseAssignment"("organizationId", "courseId", "id");
 
 CREATE UNIQUE INDEX "CourseModule_organizationId_courseId_slug_key" ON "CourseModule"("organizationId", "courseId", "slug");
 CREATE UNIQUE INDEX "CourseModule_organizationId_id_key" ON "CourseModule"("organizationId", "id");
@@ -81,8 +84,33 @@ CREATE INDEX "VideoChapter_organizationId_lessonId_startSecond_idx" ON "VideoCha
 CREATE INDEX "VideoTranscriptCue_organizationId_lessonId_startSecond_idx" ON "VideoTranscriptCue"("organizationId", "lessonId", "startSecond");
 
 CREATE UNIQUE INDEX "VideoLessonProgress_organizationId_assignmentId_lessonId_key" ON "VideoLessonProgress"("organizationId", "assignmentId", "lessonId");
-CREATE INDEX "VideoLessonProgress_organizationId_assignmentId_idx" ON "VideoLessonProgress"("organizationId", "assignmentId");
-CREATE INDEX "VideoLessonProgress_organizationId_lessonId_idx" ON "VideoLessonProgress"("organizationId", "lessonId");
+CREATE INDEX "VideoLessonProgress_organizationId_courseId_assignmentId_idx" ON "VideoLessonProgress"("organizationId", "courseId", "assignmentId");
+CREATE INDEX "VideoLessonProgress_organizationId_courseId_lessonId_idx" ON "VideoLessonProgress"("organizationId", "courseId", "lessonId");
+
+ALTER TABLE "VideoLesson"
+ADD CONSTRAINT "VideoLesson_durationSeconds_check"
+CHECK ("durationSeconds" > 0);
+
+ALTER TABLE "VideoChapter"
+ADD CONSTRAINT "VideoChapter_time_range_check"
+CHECK (
+  "startSecond" >= 0
+  AND ("endSecond" IS NULL OR "endSecond" > "startSecond")
+);
+
+ALTER TABLE "VideoTranscriptCue"
+ADD CONSTRAINT "VideoTranscriptCue_time_range_check"
+CHECK (
+  "startSecond" >= 0
+  AND ("endSecond" IS NULL OR "endSecond" > "startSecond")
+);
+
+ALTER TABLE "VideoLessonProgress"
+ADD CONSTRAINT "VideoLessonProgress_seconds_check"
+CHECK (
+  "lastPositionSecond" >= 0
+  AND "maxWatchedSecond" >= 0
+);
 
 ALTER TABLE "CourseModule"
 ADD CONSTRAINT "CourseModule_organizationId_fkey"
@@ -126,8 +154,8 @@ FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE
 
 ALTER TABLE "VideoLessonProgress"
 ADD CONSTRAINT "VideoLessonProgress_organizationId_assignmentId_fkey"
-FOREIGN KEY ("organizationId", "assignmentId") REFERENCES "CourseAssignment"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+FOREIGN KEY ("organizationId", "courseId", "assignmentId") REFERENCES "CourseAssignment"("organizationId", "courseId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "VideoLessonProgress"
 ADD CONSTRAINT "VideoLessonProgress_organizationId_lessonId_fkey"
-FOREIGN KEY ("organizationId", "lessonId") REFERENCES "VideoLesson"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+FOREIGN KEY ("organizationId", "courseId", "lessonId") REFERENCES "VideoLesson"("organizationId", "courseId", "id") ON DELETE CASCADE ON UPDATE CASCADE;

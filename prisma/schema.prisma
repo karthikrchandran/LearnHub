@@ -254,6 +254,7 @@ model CourseAssignment {
   updatedAt              DateTime                @updatedAt
 
   @@unique([organizationId, id])
+  @@unique([organizationId, courseId, id])
   @@index([organizationId])
   @@index([organizationId, courseId])
   @@index([organizationId, membershipId])
@@ -341,21 +342,22 @@ model VideoTranscriptCue {
 model VideoLessonProgress {
   id                 String           @id @default(cuid())
   organizationId     String
+  courseId           String
   assignmentId       String
   lessonId           String
   lastPositionSecond Int              @default(0)
   maxWatchedSecond   Int              @default(0)
   completed          Boolean          @default(false)
   lastWatchedAt      DateTime?
-  assignment         CourseAssignment @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
-  lesson             VideoLesson      @relation(fields: [organizationId, lessonId], references: [organizationId, id], onDelete: Cascade)
+  assignment         CourseAssignment @relation(fields: [organizationId, courseId, assignmentId], references: [organizationId, courseId, id], onDelete: Cascade)
+  lesson             VideoLesson      @relation(fields: [organizationId, courseId, lessonId], references: [organizationId, courseId, id], onDelete: Cascade)
   organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
   @@unique([organizationId, assignmentId, lessonId])
-  @@index([organizationId, assignmentId])
-  @@index([organizationId, lessonId])
+  @@index([organizationId, courseId, assignmentId])
+  @@index([organizationId, courseId, lessonId])
 }
 
 model AssignmentProgress {
