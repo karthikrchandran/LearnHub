@@ -30,19 +30,20 @@ export function parseTimestampToSeconds(timestamp: string): number {
 }
 
 function parseTranscriptLine(line: string, lineNumber: number): ParsedTranscriptCue {
-  const match = /^\[(?<timestampRange>[^\]]+)\]\s*(?<text>.*)$/.exec(line);
+  const match = /^\[([^\]]+)\]\s*(.*)$/.exec(line);
 
-  if (!match?.groups) {
+  if (!match) {
     throw new Error(`Transcript line ${lineNumber} has an invalid timestamp`);
   }
 
-  const text = match.groups.text.trim();
+  const [, timestampRange, rawText] = match;
+  const text = rawText.trim();
 
   if (!text) {
     throw new Error(`Transcript line ${lineNumber} must include cue text`);
   }
 
-  const timestampParts = match.groups.timestampRange.split(/\s*-\s*/);
+  const timestampParts = timestampRange.split(/\s*-\s*/);
 
   if (
     timestampParts.length > 2 ||
