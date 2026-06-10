@@ -312,6 +312,135 @@ async function main() {
     },
   });
 
+  const coachingModule = await prisma.courseModule.upsert({
+    where: {
+      organizationId_courseId_slug: {
+        organizationId: organization.id,
+        courseId: coachingCourse.id,
+        slug: "manager-foundations",
+      },
+    },
+    update: {
+      title: "Manager Foundations",
+      sortOrder: 0,
+    },
+    create: {
+      organizationId: organization.id,
+      courseId: coachingCourse.id,
+      title: "Manager Foundations",
+      slug: "manager-foundations",
+      sortOrder: 0,
+    },
+  });
+
+  const coachingLesson = await prisma.videoLesson.upsert({
+    where: {
+      organizationId_courseId_slug: {
+        organizationId: organization.id,
+        courseId: coachingCourse.id,
+        slug: "coaching-conversation-basics",
+      },
+    },
+    update: {
+      moduleId: coachingModule.id,
+      title: "Coaching Conversation Basics",
+      sortOrder: 0,
+      durationSeconds: 180,
+      required: true,
+      providerAssetId: null,
+      playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
+      transcriptLanguage: "en",
+    },
+    create: {
+      organizationId: organization.id,
+      courseId: coachingCourse.id,
+      moduleId: coachingModule.id,
+      title: "Coaching Conversation Basics",
+      slug: "coaching-conversation-basics",
+      sortOrder: 0,
+      durationSeconds: 180,
+      required: true,
+      playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
+      transcriptLanguage: "en",
+    },
+  });
+
+  await prisma.videoChapter.deleteMany({
+    where: {
+      organizationId: organization.id,
+      lessonId: coachingLesson.id,
+    },
+  });
+
+  await prisma.videoChapter.createMany({
+    data: [
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        title: "Open the Conversation",
+        startSecond: 0,
+        endSecond: 45,
+        sortOrder: 0,
+      },
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        title: "Ask Better Questions",
+        startSecond: 45,
+        endSecond: 120,
+        sortOrder: 1,
+      },
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        title: "Close with Commitments",
+        startSecond: 120,
+        endSecond: null,
+        sortOrder: 2,
+      },
+    ],
+  });
+
+  await prisma.videoTranscriptCue.deleteMany({
+    where: {
+      organizationId: organization.id,
+      lessonId: coachingLesson.id,
+    },
+  });
+
+  await prisma.videoTranscriptCue.createMany({
+    data: [
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        startSecond: 0,
+        endSecond: 30,
+        text: "Welcome to coaching conversation basics for managers.",
+      },
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        startSecond: 30,
+        endSecond: 90,
+        text: "Start by naming the goal and inviting the team member to share context.",
+      },
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        startSecond: 90,
+        endSecond: 150,
+        text: "Use open questions to understand blockers before offering advice.",
+      },
+      {
+        organizationId: organization.id,
+        lessonId: coachingLesson.id,
+        startSecond: 150,
+        endSecond: null,
+        text: "End with clear commitments, owners, and a follow-up date.",
+      },
+    ],
+  });
+
   await prisma.course.upsert({
     where: {
       organizationId_slug: {

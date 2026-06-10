@@ -1,0 +1,330 @@
+import type { PrismaClient } from "@prisma/client";
+
+import type { VideoContentRepository } from "./video-content-service";
+import type { TranscriptSearchCue } from "./transcript-search";
+import type {
+  VideoRuntimeAssignment,
+  VideoRuntimeRepository,
+} from "./video-runtime";
+
+type PrismaVideoClient = Pick<
+  PrismaClient,
+  | "$transaction"
+  | "course"
+  | "courseModule"
+  | "videoLesson"
+  | "videoChapter"
+  | "videoTranscriptCue"
+  | "videoLessonProgress"
+  | "courseAssignment"
+  | "auditLog"
+>;
+
+export type PrismaVideoRepository = VideoContentRepository &
+  VideoRuntimeRepository & {
+    findTranscriptSearchCues(input: {
+      organizationId: string;
+      courseId: string;
+    }): Promise<TranscriptSearchCue[]>;
+  };
+
+type RuntimeAssignmentRecord = {
+  id: string;
+  organizationId: string;
+  courseId: string;
+  course: {
+    id: string;
+    title: string;
+    type: VideoRuntimeAssignment["course"]["type"];
+    status: unknown;
+    modules: VideoRuntimeAssignment["course"]["modules"];
+    videoLessons: VideoRuntimeAssignment["course"]["lessons"];
+  };
+  videoProgress: VideoRuntimeAssignment["videoProgress"];
+};
+
+export function createPrismaVideoRepository(client: PrismaVideoClient): PrismaVideoRepository {
+  let transactionClient: PrismaVideoClient | null = null;
+  const activeClient = () => transactionClient ?? client;
+
+  return {
+    async runInTransaction(operation) {
+      return client.$transaction(async (transaction) => {
+        transactionClient = transaction as PrismaVideoClient;
+
+        try {
+          return await operation();
+        } finally {
+          transactionClient = null;
+        }
+      });
+    },
+    findCourse(input) {
+      return activeClient().course.findFirst({
+        where: {
+          id: input.courseId,
+          organizationId: input.organizationId,
+        },
+        select: {
+          id: true,
+          organizationId: true,
+          type: true,
+        },
+      });
+    },
+    findModule(input) {
+      return activeClient().courseModule.findFirst({
+        where: {
+          id: input.moduleId,
+          organizationId: input.organizationId,
+          courseId: input.courseId,
+        },
+        select: {
+          id: true,
+          organizationId: true,
+          courseId: true,
+        },
+      });
+    },
+    createLesson(data) {
+      return activeClient().videoLesson.create({
+        data,
+        select: {
+          id: true,
+          slug: true,
+        },
+      });
+    },
+    async replaceChapters(input) {
+      await activeClient().videoChapter.deleteMany({
+        where: {
+          organizationId: input.organizationId,
+          lessonId: input.lessonId,
+        },
+      });
+
+      if (input.chapters.length === 0) {
+        return;
+      }
+
+      await activeClient().videoChapter.createMany({
+        data: input.chapters.map((chapter) => ({
+          organizationId: input.organizationId,
+          lessonId: input.lessonId,
+          title: chapter.title,
+          startSecond: chapter.startSecond,
+          endSecond: chapter.endSecond,
+          sortOrder: chapter.sortOrder,
+        })),
+      });
+    },
+    async replaceTranscriptCues(input) {
+      await activeClient().videoTranscriptCue.deleteMany({
+        where: {
+          organizationId: input.organizationId,
+          lessonId: input.lessonId,
+        },
+      });
+
+      if (input.cues.length === 0) {
+        return;
+      }
+
+      await activeClient().videoTranscriptCue.createMany({
+        data: input.cues.map((cue) => ({
+          organizationId: input.organizationId,
+          lessonId: input.lessonId,
+          startSecond: cue.startSecond,
+          endSecond: cue.endSecond,
+          text: cue.text,
+        })),
+      });
+    },
+    findLesson(input) {
+      return activeClient().videoLesson.findFirst({
+        where: {
+          id: input.lessonId,
+          organizationId: input.organizationId,
+        },
+        select: {
+          id: true,
+          durationSeconds: true,
+        },
+      });
+    },
+    async recordAuditLog(input) {
+      await activeClient().auditLog.create({
+        data: {
+          organizationId: input.organizationId,
+          actorId: input.actorId,
+          action: input.action,
+          targetType: input.targetType,
+          targetId: input.targetId,
+        },
+      });
+    },
+    async findAssignmentForRuntime(input) {
+      const assignment = await activeClient().courseAssignment.findFirst({
+        where: {
+          id: input.assignmentId,
+          organizationId: input.organizationId,
+        },
+        select: {
+          id: true,
+          organizationId: true,
+          courseId: true,
+          course: {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              status: true,
+              modules: {
+                orderBy: { sortOrder: "asc" },
+                select: {
+                  id: true,
+                  title: true,
+                  slug: true,
+                  sortOrder: true,
+                },
+              },
+              videoLessons: {
+                orderBy: { sortOrder: "asc" },
+                select: {
+                  id: true,
+                  moduleId: true,
+                  title: true,
+                  slug: true,
+                  sortOrder: true,
+                  durationSeconds: true,
+                  required: true,
+                  playbackUrl: true,
+                  providerAssetId: true,
+                  chapters: {
+                    orderBy: { sortOrder: "asc" },
+                    select: {
+                      id: true,
+                      title: true,
+                      startSecond: true,
+                      endSecond: true,
+                      sortOrder: true,
+                    },
+                  },
+                  transcriptCues: {
+                    orderBy: { startSecond: "asc" },
+                    select: {
+                      id: true,
+                      startSecond: true,
+                      endSecond: true,
+                      text: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          videoProgress: {
+            select: {
+              lessonId: true,
+              lastPositionSecond: true,
+              maxWatchedSecond: true,
+              completed: true,
+              lastWatchedAt: true,
+            },
+          },
+        },
+      });
+
+      return assignment ? mapRuntimeAssignment(assignment) : null;
+    },
+    upsertLessonProgress(input) {
+      return activeClient().videoLessonProgress.upsert({
+        where: {
+          organizationId_assignmentId_lessonId: {
+            organizationId: input.organizationId,
+            assignmentId: input.assignmentId,
+            lessonId: input.lessonId,
+          },
+        },
+        update: {
+          lastPositionSecond: input.lastPositionSecond,
+          maxWatchedSecond: input.maxWatchedSecond,
+          completed: input.completed,
+          lastWatchedAt: input.lastWatchedAt,
+        },
+        create: {
+          organizationId: input.organizationId,
+          courseId: input.courseId,
+          assignmentId: input.assignmentId,
+          lessonId: input.lessonId,
+          lastPositionSecond: input.lastPositionSecond,
+          maxWatchedSecond: input.maxWatchedSecond,
+          completed: input.completed,
+          lastWatchedAt: input.lastWatchedAt,
+        },
+        select: {
+          lessonId: true,
+          lastPositionSecond: true,
+          maxWatchedSecond: true,
+          completed: true,
+          lastWatchedAt: true,
+        },
+      });
+    },
+    async findTranscriptSearchCues(input) {
+      const cues = await activeClient().videoTranscriptCue.findMany({
+        where: {
+          organizationId: input.organizationId,
+          lesson: {
+            courseId: input.courseId,
+          },
+        },
+        orderBy: [
+          { lesson: { sortOrder: "asc" } },
+          { startSecond: "asc" },
+        ],
+        select: {
+          startSecond: true,
+          endSecond: true,
+          text: true,
+          lesson: {
+            select: {
+              id: true,
+              title: true,
+              sortOrder: true,
+            },
+          },
+        },
+      });
+
+      return cues.map((cue) => ({
+        lessonId: cue.lesson.id,
+        lessonTitle: cue.lesson.title,
+        lessonSortOrder: cue.lesson.sortOrder,
+        startSecond: cue.startSecond,
+        endSecond: cue.endSecond,
+        text: cue.text,
+      }));
+    },
+  };
+}
+
+function mapRuntimeAssignment(assignment: RuntimeAssignmentRecord): VideoRuntimeAssignment {
+  if (!assignment) {
+    throw new Error("Assignment was not found");
+  }
+
+  return {
+    id: assignment.id,
+    organizationId: assignment.organizationId,
+    courseId: assignment.courseId,
+    course: {
+      id: assignment.course.id,
+      title: assignment.course.title,
+      type: assignment.course.type,
+      modules: assignment.course.modules,
+      lessons: assignment.course.videoLessons,
+    },
+    videoProgress: assignment.videoProgress,
+  };
+}
