@@ -125,17 +125,19 @@ export async function updateCourseLifecycle(
   const actorId = requireNonEmptyValue(input.actorId, "Actor id is required");
   const courseId = requireNonEmptyValue(input.courseId, "Course id is required");
 
-  await repository.updateCourseLifecycle({
-    organizationId,
-    courseId,
-    status: input.status,
-  });
-  await repository.recordAuditLog({
-    organizationId,
-    actorId,
-    action: "course.lifecycle_updated",
-    targetType: "course",
-    targetId: courseId,
+  await repository.runInTransaction(async () => {
+    await repository.updateCourseLifecycle({
+      organizationId,
+      courseId,
+      status: input.status,
+    });
+    await repository.recordAuditLog({
+      organizationId,
+      actorId,
+      action: "course.lifecycle_updated",
+      targetType: "course",
+      targetId: courseId,
+    });
   });
 }
 

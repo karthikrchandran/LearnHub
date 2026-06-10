@@ -38,12 +38,12 @@ function createRepository(): TestRepository {
 
       return categoriesByOrganization.has(`${organizationId}:${categoryId}`) ? { id: categoryId } : null;
     }),
-    findTagsByIds: vi.fn(async ({ organizationId, tagIds }) => {
+    findTagsByIds: vi.fn(async ({ organizationId, tagIds }: { organizationId: string; tagIds: string[] }) => {
       calls.push(`tags:${tagIds.join(",")}`);
 
       return tagIds
-        .filter((tagId) => tagsByOrganization.has(`${organizationId}:${tagId}`))
-        .map((id) => ({ id }));
+        .filter((tagId: string) => tagsByOrganization.has(`${organizationId}:${tagId}`))
+        .map((id: string) => ({ id }));
     }),
     createCourse: vi.fn(async (data) => {
       calls.push(`course:${data.slug}`);
@@ -199,7 +199,7 @@ describe("createCourse", () => {
 });
 
 describe("updateCourseLifecycle", () => {
-  it("allows direct lifecycle update and records audit", async () => {
+  it("allows direct lifecycle update and records audit inside one transaction", async () => {
     const repository = createRepository();
 
     await updateCourseLifecycle(
@@ -212,6 +212,7 @@ describe("updateCourseLifecycle", () => {
       repository,
     );
 
+    expect(repository.runInTransaction).toHaveBeenCalledTimes(1);
     expect(repository.updateCourseLifecycle).toHaveBeenCalledWith({
       organizationId: "org_1",
       courseId: "course_1",
@@ -225,8 +226,10 @@ describe("updateCourseLifecycle", () => {
       targetId: "course_1",
     });
     expect(repository.calls).toEqual([
+      "transaction:start",
       "lifecycle:course_1:PUBLISHED",
       "audit:course.lifecycle_updated:course_1",
+      "transaction:end",
     ]);
   });
 });
