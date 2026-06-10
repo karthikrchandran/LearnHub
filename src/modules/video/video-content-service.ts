@@ -126,13 +126,13 @@ export async function createVideoLesson(
   }
 
   if (data.moduleId) {
-    const module = await repository.findModule({
+    const courseModule = await repository.findModule({
       organizationId: data.organizationId,
       courseId: data.courseId,
       moduleId: data.moduleId,
     });
 
-    if (!module || module.organizationId !== data.organizationId || module.courseId !== data.courseId) {
+    if (!courseModule || courseModule.organizationId !== data.organizationId || courseModule.courseId !== data.courseId) {
       throw new Error("Module does not belong to this course");
     }
   }
