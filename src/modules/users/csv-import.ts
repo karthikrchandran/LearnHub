@@ -147,14 +147,16 @@ export function parseAndValidateUserImportCsv(input: {
 
   while (foundNewManagerReferenceError) {
     foundNewManagerReferenceError = false;
-    const validImportEmails = new Set(parsedRows.filter((row) => !row.hasErrors).map((row) => row.email));
+    const validImportManagerEmails = new Set(
+      parsedRows.filter((row) => !row.hasErrors && row.role === "MANAGER").map((row) => row.email),
+    );
 
     for (const row of parsedRows) {
       if (!row.managerEmail || row.managerEmail === row.email) {
         continue;
       }
 
-      if (validImportEmails.has(row.managerEmail) || existingManagerEmails.has(row.managerEmail)) {
+      if (validImportManagerEmails.has(row.managerEmail) || existingManagerEmails.has(row.managerEmail)) {
         continue;
       }
 
@@ -166,7 +168,7 @@ export function parseAndValidateUserImportCsv(input: {
       errors.push({
         rowNumber: row.rowNumber,
         field: "managerEmail",
-        message: "Manager email must match a row in this import or an existing manager",
+        message: "Manager email must match a manager row in this import or an existing manager",
       });
       row.hasErrors = true;
       foundNewManagerReferenceError = true;

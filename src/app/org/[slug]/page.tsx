@@ -1,3 +1,7 @@
+import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
+
+export const dynamic = "force-dynamic";
+
 type OrganizationPageProps = {
   params: Promise<{
     slug: string;
@@ -6,6 +10,7 @@ type OrganizationPageProps = {
 
 export default async function OrganizationPage({ params }: OrganizationPageProps) {
   const { slug } = await params;
+  await requireOrganizationMemberBySlug(slug);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
