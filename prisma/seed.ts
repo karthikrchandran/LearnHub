@@ -257,7 +257,9 @@ async function main() {
         slug: "leadership",
       },
     },
-    update: {},
+    update: {
+      name: "Leadership",
+    },
     create: {
       organizationId: organization.id,
       name: "Leadership",
@@ -272,7 +274,15 @@ async function main() {
         slug: "manager-coaching-basics",
       },
     },
-    update: {},
+    update: {
+      title: "Manager Coaching Basics",
+      description: "Demo published course for manager assignment flows.",
+      status: "PUBLISHED",
+      type: "NATIVE_VIDEO",
+      estimatedCompletionBusinessDays: 3,
+      expectedDurationMinutes: 30,
+      categoryId: category.id,
+    },
     create: {
       organizationId: organization.id,
       title: "Manager Coaching Basics",
@@ -309,7 +319,15 @@ async function main() {
         slug: "archived-policy-orientation",
       },
     },
-    update: {},
+    update: {
+      title: "Archived Policy Orientation",
+      description: "Demo deprecated course for lifecycle gating.",
+      status: "DEPRECATED",
+      type: "SCORM_1_2",
+      estimatedCompletionBusinessDays: 5,
+      expectedDurationMinutes: 40,
+      categoryId: category.id,
+    },
     create: {
       organizationId: organization.id,
       title: "Archived Policy Orientation",
@@ -327,12 +345,13 @@ async function main() {
 
   await prisma.courseAssignment.upsert({
     where: {
-      id: "seed-acme-learner-security-basics",
+      organizationId_courseId_membershipId: {
+        organizationId: organization.id,
+        courseId: course.id,
+        membershipId: learnerMembership.id,
+      },
     },
     update: {
-      organizationId: organization.id,
-      courseId: course.id,
-      membershipId: learnerMembership.id,
       assignedByMembershipId: adminMembership.id,
       startDate,
       dueDate: addBusinessDays(startDate, course.estimatedCompletionBusinessDays),
