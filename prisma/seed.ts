@@ -250,6 +250,79 @@ async function main() {
     },
   });
 
+  const leadershipTag = await prisma.courseTag.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: organization.id,
+        slug: "leadership",
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      name: "Leadership",
+      slug: "leadership",
+    },
+  });
+
+  const coachingCourse = await prisma.course.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: organization.id,
+        slug: "manager-coaching-basics",
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      title: "Manager Coaching Basics",
+      slug: "manager-coaching-basics",
+      description: "Demo published course for manager assignment flows.",
+      status: "PUBLISHED",
+      type: "NATIVE_VIDEO",
+      estimatedCompletionBusinessDays: 3,
+      expectedDurationMinutes: 30,
+      categoryId: category.id,
+    },
+  });
+
+  await prisma.courseTagLink.upsert({
+    where: {
+      organizationId_courseId_tagId: {
+        organizationId: organization.id,
+        courseId: coachingCourse.id,
+        tagId: leadershipTag.id,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      courseId: coachingCourse.id,
+      tagId: leadershipTag.id,
+    },
+  });
+
+  await prisma.course.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: organization.id,
+        slug: "archived-policy-orientation",
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      title: "Archived Policy Orientation",
+      slug: "archived-policy-orientation",
+      description: "Demo deprecated course for lifecycle gating.",
+      status: "DEPRECATED",
+      type: "SCORM_1_2",
+      estimatedCompletionBusinessDays: 5,
+      expectedDurationMinutes: 40,
+      categoryId: category.id,
+    },
+  });
+
   const startDate = new Date("2026-06-15T12:00:00.000Z");
 
   await prisma.courseAssignment.upsert({
