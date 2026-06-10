@@ -75,6 +75,7 @@ model User {
   memberships     OrganizationMembership[] @relation("UserMemberships")
   invitationTokens UserInvitationToken[]    @relation("UserInvitationTokens")
   passwordResetTokens PasswordResetToken[]  @relation("UserPasswordResetTokens")
+  uploadedScormPackages ScormPackage[]
   auditLogs       AuditLog[]               @relation("AuditActor")
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
@@ -100,6 +101,8 @@ model Organization {
   videoChapters        VideoChapter[]
   videoTranscriptCues  VideoTranscriptCue[]
   videoLessonProgress  VideoLessonProgress[]
+  scormPackages        ScormPackage[]
+  scormRegistrations   ScormRegistration[]
   assignmentProgresses AssignmentProgress[]
   learningEvents       LearningProgressEvent[]
   certificates         Certificate[]
@@ -213,6 +216,7 @@ model Course {
   assignments                     CourseAssignment[]
   modules                         CourseModule[]
   videoLessons                    VideoLesson[]
+  scormPackages                   ScormPackage[]
   certificates                    Certificate[]
   createdAt                       DateTime           @default(now())
   updatedAt                       DateTime           @updatedAt
@@ -249,6 +253,7 @@ model CourseAssignment {
   progress               AssignmentProgress?
   learningEvents         LearningProgressEvent[]
   videoProgress          VideoLessonProgress[]
+  scormRegistration      ScormRegistration?
   certificate            Certificate?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -373,6 +378,54 @@ model AssignmentProgress {
 
   @@unique([organizationId, assignmentId])
   @@index([organizationId])
+}
+
+model ScormPackage {
+  id               String       @id @default(cuid())
+  organizationId   String
+  courseId         String
+  originalFileName String
+  contentType      String
+  byteSize         Int
+  storageKey       String
+  launchPath       String
+  manifestTitle    String?
+  uploadedByUserId String?
+  active           Boolean      @default(true)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  course           Course       @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  uploadedBy       User?        @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  registrations    ScormRegistration[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([organizationId, courseId])
+  @@unique([organizationId, id])
+  @@index([organizationId, courseId])
+  @@index([uploadedByUserId])
+}
+
+model ScormRegistration {
+  id                    String           @id @default(cuid())
+  organizationId        String
+  assignmentId          String
+  packageId             String
+  cmiData               Json             @default("{}")
+  lessonStatus          String           @default("not attempted")
+  scoreRaw              Int?
+  sessionTimeSeconds    Int              @default(0)
+  totalTimeSeconds      Int              @default(0)
+  launchCount           Int              @default(0)
+  lastLaunchedAt        DateTime?
+  lastCommittedAt       DateTime?
+  organization          Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment            CourseAssignment @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  package               ScormPackage     @relation(fields: [organizationId, packageId], references: [organizationId, id], onDelete: Cascade)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@unique([organizationId, assignmentId])
+  @@index([organizationId, packageId])
 }
 
 model LearningProgressEvent {
