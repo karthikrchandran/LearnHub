@@ -1,0 +1,318 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  launchVideoRuntime,
+  recordVideoProgress,
+  type RecordVideoProgressInput,
+  type VideoRuntimeAssignment,
+  type VideoRuntimeRepository,
+} from "./video-runtime";
+import type { LearningEventInput } from "../progress/progress";
+
+const occurredAt = new Date("2026-06-10T10:00:00.000Z");
+
+const nativeAssignment: VideoRuntimeAssignment = {
+  id: "assignment_1",
+  organizationId: "org_1",
+  courseId: "course_1",
+  course: {
+    id: "course_1",
+    title: "Manager Coaching Basics",
+    type: "NATIVE_VIDEO",
+    modules: [
+      {
+        id: "module_1",
+        title: "Manager Foundations",
+        slug: "manager-foundations",
+        sortOrder: 0,
+      },
+    ],
+    lessons: [
+      {
+        id: "lesson_1",
+        moduleId: "module_1",
+        title: "Coaching Conversation Basics",
+        slug: "coaching-conversation-basics",
+        sortOrder: 0,
+        durationSeconds: 180,
+        required: true,
+        playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
+        providerAssetId: null,
+        chapters: [
+          {
+            id: "chapter_1",
+            title: "Open the conversation",
+            startSecond: 0,
+            endSecond: 45,
+            sortOrder: 0,
+          },
+        ],
+        transcriptCues: [
+          {
+            id: "cue_1",
+            startSecond: 0,
+            endSecond: 30,
+            text: "Welcome to coaching basics.",
+          },
+        ],
+      },
+      {
+        id: "lesson_2",
+        moduleId: "module_1",
+        title: "Follow Up",
+        slug: "follow-up",
+        sortOrder: 1,
+        durationSeconds: 120,
+        required: true,
+        playbackUrl: "https://video.learnhub.local/demo/follow-up.mp4",
+        providerAssetId: null,
+        chapters: [],
+        transcriptCues: [],
+      },
+    ],
+  },
+  videoProgress: [
+    {
+      lessonId: "lesson_1",
+      lastPositionSecond: 45,
+      maxWatchedSecond: 90,
+      completed: false,
+      lastWatchedAt: new Date("2026-06-10T09:00:00.000Z"),
+    },
+  ],
+};
+
+class FakeVideoRuntimeRepository implements VideoRuntimeRepository {
+  assignment: VideoRuntimeAssignment | null = nativeAssignment;
+  savedProgress: Parameters<VideoRuntimeRepository["upsertLessonProgress"]>[0][] = [];
+
+  async findAssignmentForRuntime(): Promise<VideoRuntimeAssignment | null> {
+    return this.assignment;
+  }
+
+  async upsertLessonProgress(input: Parameters<VideoRuntimeRepository["upsertLessonProgress"]>[0]) {
+    this.savedProgress.push(input);
+
+    return {
+      lessonId: input.lessonId,
+      lastPositionSecond: input.lastPositionSecond,
+      maxWatchedSecond: input.maxWatchedSecond,
+      completed: input.completed,
+      lastWatchedAt: input.lastWatchedAt,
+    };
+  }
+}
+
+function createRepository(assignment: VideoRuntimeAssignment | null = nativeAssignment): FakeVideoRuntimeRepository {
+  const repository = new FakeVideoRuntimeRepository();
+  repository.assignment = assignment ? structuredClone(assignment) : null;
+
+  return repository;
+}
+
+function createProgressInput(overrides: Partial<RecordVideoProgressInput> = {}): RecordVideoProgressInput {
+  return {
+    organizationId: "org_1",
+    assignmentId: "assignment_1",
+    lessonId: "lesson_1",
+    positionSecond: 200,
+    watchedSecond: 200,
+    occurredAt,
+    ...overrides,
+  };
+}
+
+describe("launchVideoRuntime", () => {
+  it("rejects missing assignments", async () => {
+    await expect(
+      launchVideoRuntime(
+        {
+          organizationId: "org_1",
+          assignmentId: "missing",
+        },
+        createRepository(null),
+      ),
+    ).rejects.toThrow("Assignment was not found");
+  });
+
+  it("rejects assignments for non-native courses", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.course.type = "SCORM_1_2";
+
+    await expect(
+      launchVideoRuntime(
+        {
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+        },
+        createRepository(assignment),
+      ),
+    ).rejects.toThrow("Assignment is not for a native video course");
+  });
+
+  it("returns modules, lessons, current lesson, chapters, transcript cues, and progress", async () => {
+    const runtime = await launchVideoRuntime(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+      },
+      createRepository(),
+    );
+
+    expect(runtime.assignmentId).toBe("assignment_1");
+    expect(runtime.modules).toEqual([
+      {
+        id: "module_1",
+        title: "Manager Foundations",
+        slug: "manager-foundations",
+        sortOrder: 0,
+      },
+    ]);
+    expect(runtime.lessons.map((lesson) => lesson.id)).toEqual(["lesson_1", "lesson_2"]);
+    expect(runtime.currentLesson).toMatchObject({
+      id: "lesson_1",
+      title: "Coaching Conversation Basics",
+      chapters: [{ id: "chapter_1", title: "Open the conversation", startSecond: 0 }],
+      transcriptCues: [{ id: "cue_1", text: "Welcome to coaching basics." }],
+      progress: {
+        lastPositionSecond: 45,
+        maxWatchedSecond: 90,
+        completed: false,
+      },
+    });
+    expect(runtime.courseProgressPercent).toBe(0);
+  });
+});
+
+describe("recordVideoProgress", () => {
+  it("clamps position and watched seconds to the lesson duration", async () => {
+    const repository = createRepository();
+    const events: LearningEventInput[] = [];
+
+    await recordVideoProgress(createProgressInput(), repository, async (event) => {
+      events.push(event);
+      return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "COMPLETED", completed: true };
+    });
+
+    expect(repository.savedProgress).toEqual([
+      {
+        organizationId: "org_1",
+        courseId: "course_1",
+        assignmentId: "assignment_1",
+        lessonId: "lesson_1",
+        lastPositionSecond: 180,
+        maxWatchedSecond: 180,
+        completed: true,
+        lastWatchedAt: occurredAt,
+      },
+    ]);
+  });
+
+  it("marks a lesson complete at 100 percent watched", async () => {
+    const repository = createRepository();
+
+    const result = await recordVideoProgress(createProgressInput(), repository, async (event) => ({
+      progressPercent: event.progressPercent ?? 0,
+      assignmentStatus: "COMPLETED",
+      completed: true,
+    }));
+
+    expect(result.lessonProgress).toMatchObject({
+      lessonId: "lesson_1",
+      maxWatchedSecond: 180,
+      completed: true,
+    });
+  });
+
+  it("calculates course progress from completed required lessons", async () => {
+    const repository = createRepository();
+
+    const result = await recordVideoProgress(
+      createProgressInput({ watchedSecond: 180 }),
+      repository,
+      async (event) => ({
+        progressPercent: event.progressPercent ?? 0,
+        assignmentStatus: "IN_PROGRESS",
+        completed: false,
+      }),
+    );
+
+    expect(result.courseProgressPercent).toBe(50);
+  });
+
+  it("sends a native progress event below 100 percent", async () => {
+    const repository = createRepository();
+    const events: LearningEventInput[] = [];
+
+    await recordVideoProgress(
+      createProgressInput({
+        watchedSecond: 60,
+        positionSecond: 60,
+      }),
+      repository,
+      async (event) => {
+        events.push(event);
+        return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "IN_PROGRESS", completed: false };
+      },
+    );
+
+    expect(events).toEqual([
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        source: "NATIVE",
+        type: "PROGRESS",
+        progressPercent: 0,
+        occurredAt,
+        rawPayload: {
+          lessonId: "lesson_1",
+          positionSecond: 60,
+          watchedSecond: 90,
+          requiredLessonsCompleted: 0,
+          requiredLessonsTotal: 2,
+        },
+      },
+    ]);
+  });
+
+  it("sends a native completed event at 100 percent", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.videoProgress = [
+      {
+        lessonId: "lesson_1",
+        lastPositionSecond: 180,
+        maxWatchedSecond: 180,
+        completed: true,
+        lastWatchedAt: occurredAt,
+      },
+    ];
+    const repository = createRepository(assignment);
+    const events: LearningEventInput[] = [];
+
+    await recordVideoProgress(
+      createProgressInput({
+        lessonId: "lesson_2",
+        positionSecond: 120,
+        watchedSecond: 120,
+      }),
+      repository,
+      async (event) => {
+        events.push(event);
+        return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "COMPLETED", completed: true };
+      },
+    );
+
+    expect(events[0]).toMatchObject({
+      source: "NATIVE",
+      type: "COMPLETED",
+      progressPercent: 100,
+      rawPayload: {
+        lessonId: "lesson_2",
+        positionSecond: 120,
+        watchedSecond: 120,
+        requiredLessonsCompleted: 2,
+        requiredLessonsTotal: 2,
+      },
+    });
+  });
+});
