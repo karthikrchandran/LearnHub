@@ -250,16 +250,108 @@ async function main() {
     },
   });
 
+  const leadershipTag = await prisma.courseTag.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: organization.id,
+        slug: "leadership",
+      },
+    },
+    update: {
+      name: "Leadership",
+    },
+    create: {
+      organizationId: organization.id,
+      name: "Leadership",
+      slug: "leadership",
+    },
+  });
+
+  const coachingCourse = await prisma.course.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: organization.id,
+        slug: "manager-coaching-basics",
+      },
+    },
+    update: {
+      title: "Manager Coaching Basics",
+      description: "Demo published course for manager assignment flows.",
+      status: "PUBLISHED",
+      type: "NATIVE_VIDEO",
+      estimatedCompletionBusinessDays: 3,
+      expectedDurationMinutes: 30,
+      categoryId: category.id,
+    },
+    create: {
+      organizationId: organization.id,
+      title: "Manager Coaching Basics",
+      slug: "manager-coaching-basics",
+      description: "Demo published course for manager assignment flows.",
+      status: "PUBLISHED",
+      type: "NATIVE_VIDEO",
+      estimatedCompletionBusinessDays: 3,
+      expectedDurationMinutes: 30,
+      categoryId: category.id,
+    },
+  });
+
+  await prisma.courseTagLink.upsert({
+    where: {
+      organizationId_courseId_tagId: {
+        organizationId: organization.id,
+        courseId: coachingCourse.id,
+        tagId: leadershipTag.id,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      courseId: coachingCourse.id,
+      tagId: leadershipTag.id,
+    },
+  });
+
+  await prisma.course.upsert({
+    where: {
+      organizationId_slug: {
+        organizationId: organization.id,
+        slug: "archived-policy-orientation",
+      },
+    },
+    update: {
+      title: "Archived Policy Orientation",
+      description: "Demo deprecated course for lifecycle gating.",
+      status: "DEPRECATED",
+      type: "SCORM_1_2",
+      estimatedCompletionBusinessDays: 5,
+      expectedDurationMinutes: 40,
+      categoryId: category.id,
+    },
+    create: {
+      organizationId: organization.id,
+      title: "Archived Policy Orientation",
+      slug: "archived-policy-orientation",
+      description: "Demo deprecated course for lifecycle gating.",
+      status: "DEPRECATED",
+      type: "SCORM_1_2",
+      estimatedCompletionBusinessDays: 5,
+      expectedDurationMinutes: 40,
+      categoryId: category.id,
+    },
+  });
+
   const startDate = new Date("2026-06-15T12:00:00.000Z");
 
   await prisma.courseAssignment.upsert({
     where: {
-      id: "seed-acme-learner-security-basics",
+      organizationId_courseId_membershipId: {
+        organizationId: organization.id,
+        courseId: course.id,
+        membershipId: learnerMembership.id,
+      },
     },
     update: {
-      organizationId: organization.id,
-      courseId: course.id,
-      membershipId: learnerMembership.id,
       assignedByMembershipId: adminMembership.id,
       startDate,
       dueDate: addBusinessDays(startDate, course.estimatedCompletionBusinessDays),

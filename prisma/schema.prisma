@@ -218,6 +218,7 @@ model CourseAssignment {
   @@index([organizationId, courseId])
   @@index([organizationId, membershipId])
   @@index([organizationId, assignedByMembershipId])
+  @@unique([organizationId, courseId, membershipId])
 }
 
 model AuditLog {

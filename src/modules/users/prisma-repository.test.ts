@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "@prisma/client";
 
 import { createPrismaUserImportRepository } from "./prisma-repository";
 
@@ -7,7 +8,7 @@ describe("createPrismaUserImportRepository", () => {
     const upsert = vi.fn(async () => ({ id: "user_1", email: "learner@acme.test" }));
     const repository = createPrismaUserImportRepository({
       $transaction: vi.fn(),
-      user: { upsert },
+      user: { upsert } as unknown as PrismaClient["user"],
       organizationMembership: {} as never,
       auditLog: {} as never,
       userInvitationToken: {} as never,
@@ -45,7 +46,7 @@ describe("createPrismaUserImportRepository", () => {
     const repository = createPrismaUserImportRepository({
       $transaction: vi.fn(),
       user: {} as never,
-      organizationMembership: { findFirst },
+      organizationMembership: { findFirst } as unknown as PrismaClient["organizationMembership"],
       auditLog: {} as never,
       userInvitationToken: {} as never,
       passwordResetToken: {} as never,

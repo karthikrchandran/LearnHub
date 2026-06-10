@@ -39,8 +39,22 @@ export function canManageOrganization(context: MembershipAuthContext, organizati
   return context.isPlatformOwner || hasOrganizationRole(context, organizationId, "ADMIN");
 }
 
+export function canManageCatalog(context: MembershipAuthContext, organizationId: string): boolean {
+  return canManageOrganization(context, organizationId);
+}
+
 export function canManageOrganizationUsers(context: MembershipAuthContext, organizationId: string): boolean {
   return canManageOrganization(context, organizationId);
+}
+
+export function canAssignDirectReport(context: MembershipAuthContext, target: TargetMembership): boolean {
+  if (context.isPlatformOwner || hasOrganizationRole(context, target.organizationId, "ADMIN")) {
+    return true;
+  }
+
+  const membership = membershipForOrganization(context, target.organizationId);
+
+  return Boolean(membership?.roles.includes("MANAGER") && target.managerMembershipId === membership.id);
 }
 
 export function canViewMembershipProgress(context: MembershipAuthContext, target: TargetMembership): boolean {
