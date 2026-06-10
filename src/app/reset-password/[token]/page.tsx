@@ -14,7 +14,7 @@ export default async function ResetPasswordPage({ params }: ResetPasswordPagePro
         <h1 className="text-3xl font-semibold text-slate-950">Choose new password</h1>
         <p className="text-sm text-slate-600">Set a new password for your LearnHub account.</p>
       </header>
-      <form method="post" className="space-y-4 rounded-md border border-slate-200 p-5">
+      <div className="space-y-4 rounded-md border border-slate-200 p-5">
         <input type="hidden" name="token" value={token} />
         <div className="space-y-2">
           <label htmlFor="password" className="block text-sm font-medium text-slate-800">
@@ -30,10 +30,10 @@ export default async function ResetPasswordPage({ params }: ResetPasswordPagePro
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950"
           />
         </div>
-        <button type="submit" className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white">
-          Reset password
+        <button type="button" disabled className="w-full rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-500">
+          Password reset coming soon
         </button>
-      </form>
+      </div>
     </main>
   );
 }

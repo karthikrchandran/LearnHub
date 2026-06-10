@@ -16,7 +16,7 @@ export default async function OrganizationUsersAdminPage({ params }: Organizatio
         <h1 className="text-3xl font-semibold text-slate-950">{slug} users</h1>
       </header>
       <section className="rounded-md border border-slate-200 p-5">
-        <form method="post" className="space-y-4">
+        <div className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="userCsv" className="block text-sm font-medium text-slate-800">
               CSV import
@@ -34,7 +34,11 @@ export default async function OrganizationUsersAdminPage({ params }: Organizatio
             Expected columns: <code className="font-mono text-slate-800">{expectedColumns}</code>
           </p>
           <div className="flex flex-wrap gap-3">
-            <button type="submit" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800">
+            <button
+              type="button"
+              disabled
+              className="rounded-md border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-500"
+            >
               Validate CSV
             </button>
             <button
@@ -46,7 +50,7 @@ export default async function OrganizationUsersAdminPage({ params }: Organizatio
               Import users
             </button>
           </div>
-        </form>
+        </div>
       </section>
     </main>
   );

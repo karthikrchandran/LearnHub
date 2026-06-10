@@ -14,19 +14,8 @@ export default async function InviteActivationPage({ params }: InviteActivationP
         <h1 className="text-3xl font-semibold text-slate-950">Activate account</h1>
         <p className="text-sm text-slate-600">Create a password to finish setting up your invited account.</p>
       </header>
-      <form method="post" className="space-y-4 rounded-md border border-slate-200 p-5">
+      <div className="space-y-4 rounded-md border border-slate-200 p-5">
         <input type="hidden" name="token" value={token} />
-        <div className="space-y-2">
-          <label htmlFor="invite-token" className="block text-sm font-medium text-slate-800">
-            Invitation token
-          </label>
-          <input
-            id="invite-token"
-            value={token}
-            readOnly
-            className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-          />
-        </div>
         <div className="space-y-2">
           <label htmlFor="password" className="block text-sm font-medium text-slate-800">
             New password
@@ -41,10 +30,10 @@ export default async function InviteActivationPage({ params }: InviteActivationP
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950"
           />
         </div>
-        <button type="submit" className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white">
-          Activate account
+        <button type="button" disabled className="w-full rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-500">
+          Activation coming soon
         </button>
-      </form>
+      </div>
     </main>
   );
 }

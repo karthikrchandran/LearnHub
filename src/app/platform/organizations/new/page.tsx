@@ -5,7 +5,7 @@ export default function NewOrganizationPage() {
         <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Platform Owner</p>
         <h1 className="text-3xl font-semibold text-slate-950">New organization</h1>
       </header>
-      <form method="post" className="grid gap-5 rounded-md border border-slate-200 p-5 md:grid-cols-2">
+      <div className="grid gap-5 rounded-md border border-slate-200 p-5 md:grid-cols-2">
         <div className="space-y-2 md:col-span-2">
           <label htmlFor="name" className="block text-sm font-medium text-slate-800">
             Organization name
@@ -100,11 +100,11 @@ export default function NewOrganizationPage() {
           Global library enabled
         </label>
         <div className="md:col-span-2">
-          <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white">
-            Create organization
+          <button type="button" disabled className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-500">
+            Organization creation coming soon
           </button>
         </div>
-      </form>
+      </div>
     </main>
   );
 }
