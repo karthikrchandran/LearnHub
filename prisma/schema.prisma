@@ -42,6 +42,28 @@ enum AssignmentStatus {
   OVERDUE
 }
 
+enum LearningEventSource {
+  NATIVE
+  SCORM
+}
+
+enum LearningEventType {
+  PROGRESS
+  COMPLETED
+  PASSED
+  FAILED
+}
+
+enum CredentialProviderName {
+  CREDLY
+}
+
+enum CredentialIssuanceStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
 model User {
   id              String                   @id @default(cuid())
   email           String                   @unique
@@ -73,6 +95,10 @@ model Organization {
   categories           CourseCategory[]
   tags                 CourseTag[]
   courses              Course[]
+  assignmentProgresses AssignmentProgress[]
+  learningEvents       LearningProgressEvent[]
+  certificates         Certificate[]
+  credentialIssuances  CredentialIssuance[]
   auditLogs            AuditLog[]
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
@@ -95,6 +121,7 @@ model OrganizationMembership {
   invitationTokens    UserInvitationToken[]
   learningAssignments CourseAssignment[]       @relation("LearnerAssignments")
   assignedAssignments CourseAssignment[]       @relation("AssignedByMembership")
+  certificates        Certificate[]            @relation("MembershipCertificates")
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -179,6 +206,7 @@ model Course {
   category                        CourseCategory?    @relation(fields: [organizationId, categoryId], references: [organizationId, id])
   tagLinks                        CourseTagLink[]
   assignments                     CourseAssignment[]
+  certificates                    Certificate[]
   createdAt                       DateTime           @default(now())
   updatedAt                       DateTime           @updatedAt
 
@@ -211,13 +239,95 @@ model CourseAssignment {
   course                 Course                  @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
   membership             OrganizationMembership  @relation("LearnerAssignments", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
   assignedByMembership   OrganizationMembership? @relation("AssignedByMembership", fields: [organizationId, assignedByMembershipId], references: [organizationId, id], onDelete: NoAction)
+  progress               AssignmentProgress?
+  learningEvents         LearningProgressEvent[]
+  certificate            Certificate?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
+  @@unique([organizationId, id])
   @@index([organizationId])
   @@index([organizationId, courseId])
   @@index([organizationId, membershipId])
   @@index([organizationId, assignedByMembershipId])
+}
+
+model AssignmentProgress {
+  id              String           @id @default(cuid())
+  organizationId  String
+  assignmentId    String
+  progressPercent Int              @default(0)
+  lastEventAt     DateTime?
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment      CourseAssignment @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([organizationId, assignmentId])
+  @@index([organizationId])
+}
+
+model LearningProgressEvent {
+  id              String              @id @default(cuid())
+  organizationId  String
+  assignmentId    String
+  source          LearningEventSource
+  type            LearningEventType
+  progressPercent Int?
+  rawPayload      Json                @default("{}")
+  occurredAt      DateTime
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment      CourseAssignment    @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+
+  @@index([organizationId, assignmentId])
+  @@index([organizationId, occurredAt])
+}
+
+model Certificate {
+  id                  String                 @id @default(cuid())
+  organizationId      String
+  assignmentId        String
+  courseId            String
+  membershipId        String
+  userId              String
+  learnerName         String
+  learnerEmail        String
+  courseTitle         String
+  verificationCode    String                 @unique
+  verificationUrl     String
+  issuedAt            DateTime
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment          CourseAssignment       @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  course              Course                 @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
+  membership          OrganizationMembership @relation("MembershipCertificates", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  credentialIssuances CredentialIssuance[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@unique([organizationId, assignmentId])
+  @@index([organizationId])
+  @@index([organizationId, membershipId])
+  @@index([organizationId, courseId])
+  @@index([userId])
+}
+
+model CredentialIssuance {
+  id                   String                   @id @default(cuid())
+  organizationId       String
+  certificateId        String
+  provider             CredentialProviderName
+  status               CredentialIssuanceStatus @default(PENDING)
+  providerCredentialId String?
+  providerUrl          String?
+  errorMessage         String?
+  attemptedAt          DateTime                 @default(now())
+  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  certificate          Certificate              @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([certificateId])
+  @@index([organizationId, provider, status])
 }
 
 model AuditLog {
