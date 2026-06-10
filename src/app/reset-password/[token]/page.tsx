@@ -1,3 +1,6 @@
+import { completePasswordResetFormAction } from "../actions";
+import { ResetPasswordCompletionForm } from "../reset-password-forms";
+
 type ResetPasswordPageProps = {
   params: Promise<{
     token: string;
@@ -14,26 +17,7 @@ export default async function ResetPasswordPage({ params }: ResetPasswordPagePro
         <h1 className="text-3xl font-semibold text-slate-950">Choose new password</h1>
         <p className="text-sm text-slate-600">Set a new password for your LearnHub account.</p>
       </header>
-      <div className="space-y-4 rounded-md border border-slate-200 p-5">
-        <input type="hidden" name="token" value={token} />
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium text-slate-800">
-            New password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={12}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950"
-          />
-        </div>
-        <button type="button" disabled className="w-full rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-500">
-          Password reset coming soon
-        </button>
-      </div>
+      <ResetPasswordCompletionForm token={token} action={completePasswordResetFormAction} />
     </main>
   );
 }

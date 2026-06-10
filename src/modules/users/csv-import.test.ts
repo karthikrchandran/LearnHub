@@ -163,6 +163,35 @@ learner@acme.test,Leela,Learner,LEARNER,ExistingManager@Acme.TEST,EMP-1,Operatio
     expect(existingManagerPlan.rows[0].managerEmail).toBe("existingmanager@acme.test");
   });
 
+  it("requires manager email to point to a manager row when the manager is in the same import", () => {
+    const plan = parseAndValidateUserImportCsv({
+      csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status
+admin@acme.test,Asha,Admin,ADMIN,,ADM-1,Learning,Admin,ACTIVE
+learner@acme.test,Leela,Learner,LEARNER,admin@acme.test,EMP-1,Operations,Specialist,`,
+      allowedEmailDomains: ["acme.test"],
+    });
+
+    expect(plan.errors).toContainEqual({
+      rowNumber: 3,
+      field: "managerEmail",
+      message: "Manager email must match a manager row in this import or an existing manager",
+    });
+    expect(plan.rows).toEqual([
+      {
+        rowNumber: 2,
+        email: "admin@acme.test",
+        firstName: "Asha",
+        lastName: "Admin",
+        role: "ADMIN",
+        managerEmail: null,
+        employeeId: "ADM-1",
+        department: "Learning",
+        title: "Admin",
+        status: "ACTIVE",
+      },
+    ]);
+  });
+
   it("does not allow invalid imported rows to satisfy manager references", () => {
     const plan = parseAndValidateUserImportCsv({
       csv: `email,firstName,lastName,role,managerEmail,employeeId,department,title,status
@@ -179,7 +208,7 @@ learner@acme.test,Leela,Learner,LEARNER,manager@other.test,EMP-1,Operations,Spec
     expect(plan.errors).toContainEqual({
       rowNumber: 3,
       field: "managerEmail",
-      message: "Manager email must match a row in this import or an existing manager",
+      message: "Manager email must match a manager row in this import or an existing manager",
     });
     expect(plan.rows).toEqual([]);
   });
@@ -195,12 +224,12 @@ learner@acme.test,Leela,Learner,LEARNER,manager@acme.test,EMP-1,Operations,Speci
     expect(plan.errors).toContainEqual({
       rowNumber: 2,
       field: "managerEmail",
-      message: "Manager email must match a row in this import or an existing manager",
+      message: "Manager email must match a manager row in this import or an existing manager",
     });
     expect(plan.errors).toContainEqual({
       rowNumber: 3,
       field: "managerEmail",
-      message: "Manager email must match a row in this import or an existing manager",
+      message: "Manager email must match a manager row in this import or an existing manager",
     });
     expect(plan.rows).toEqual([]);
   });
