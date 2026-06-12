@@ -1,6 +1,6 @@
 # Live vs Placeholder Capabilities
 
-Date: 2026-06-11
+Date: 2026-06-12
 
 ## Live Contracts
 
@@ -9,22 +9,29 @@ Date: 2026-06-11
 - Native video lesson, module, chapter, transcript, transcript search, runtime launch, and progress commit services.
 - SCORM 1.2 package metadata, registration launch, CMI commit, progress calculation, and package/runtime repository contracts.
 - Progress events, assignment progress, certificate issuance, and provider failure tolerance.
+- Browser runtime endpoints for native video launch/progress and SCORM launch/commit.
+- Admin native video content forms for lesson metadata, chapter replacement, and transcript replacement.
+- Admin SCORM package metadata form with separate zip `storageKey` and runtime `contentRootKey`.
+- Learner native video browser player client with lesson, chapter, transcript, and progress-save wiring.
+- Learner SCORM iframe host with a minimal SCORM 1.2 JavaScript API bridge.
+- Local development SCORM content route constrained to the project-local `.learnhub/scorm` content root.
+- Progress reporting pages and CSV export foundations.
 - Prisma schema, migrations, seed data, focused service tests, adapter query-shape tests, page-shell tests, lint, typecheck, and build gates.
 
-## Placeholder UI Shells
+## Remaining UI Gaps
 
-- Learner video page shells do not yet contain a production browser video player.
-- SCORM learner page shells do not yet contain the SCORM JavaScript API bridge or iframe launch host.
-- Admin catalog/content/upload pages are present as shells and service-backed foundations, not full production workflows.
-- Reporting dashboards and audit log browsers are not yet wired as live user-facing pages.
+- Audit log browsing is still a lightweight future UI, although audit records are written by services.
+- Report dashboards are intentionally simple; charting, PDF export, and scheduled delivery remain outside the current wave.
+- The admin media UI records metadata and local runtime contracts; it is not a production Mux/R2 upload console.
 
 ## Deferred Production Capabilities
 
 - Video provider upload/transcoding workflow.
-- SCORM zip extraction worker and content serving middleware.
+- SCORM zip extraction worker, manifest parsing, and storage-object publication.
 - Signed URL or equivalent protected media delivery.
-- Route handlers/server actions for live player commits and SCORM API calls.
-- Admin upload UI, progress reporting UI, report exports, and audit-log filtering.
+- Cloud storage adapters for production SCORM content and media files.
+- Rich report exports, scheduled report emails, and audit-log filtering.
+- Notification jobs for assignments, reminders, escalations, and certificates.
 - Storage malware scanning, manifest validation hardening, and operational retention policies.
 
 ## References

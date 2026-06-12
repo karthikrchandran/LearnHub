@@ -4,7 +4,7 @@
 
 **Goal:** Replace remaining Wave 3 media/player placeholders with live admin authoring forms, browser player clients, local SCORM content serving foundations, and updated documentation.
 
-**Architecture:** Keep the existing modular monolith pattern. Server pages authorize and render, app-local server actions bridge forms to module services, browser clients call existing Wave 2 runtime endpoints, and local SCORM content serving is constrained to a configured root.
+**Architecture:** Keep the existing modular monolith pattern. Server pages authorize and render, app-local server actions bridge forms to module services, browser clients call existing Wave 2 runtime endpoints, and local SCORM content serving is constrained to the project-local `.learnhub/scorm` root.
 
 **Tech Stack:** Next.js App Router, React client components, TypeScript, Prisma repositories, Vitest with jsdom, existing LearnHub module services.
 
@@ -531,7 +531,7 @@ Expected: fails because the route does not exist.
 
 - [ ] **Step 3: Implement constrained route**
 
-Use `LEARNHUB_SCORM_CONTENT_DIR` when set; otherwise use `.learnhub/scorm` under `process.cwd()`. Reject empty path segments, `..`, absolute paths, null bytes, and directories. Serve content types for `.html`, `.js`, `.css`, `.json`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, and default to `application/octet-stream`.
+Use `.learnhub/scorm` under `process.cwd()` so Turbopack can statically scope the local development route. Reject empty path segments, `..`, absolute paths, null bytes, and directories. Serve content types for `.html`, `.js`, `.css`, `.json`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, and default to `application/octet-stream`.
 
 - [ ] **Step 4: Run route tests**
 

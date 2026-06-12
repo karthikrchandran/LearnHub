@@ -104,7 +104,7 @@ The bridge intentionally supports only the server-allowed CMI keys. Unsupported 
 Wave 3 adds a constrained local serving foundation:
 
 - Runtime launch URLs remain `/scorm/{contentRootKey}/{launchPath}`.
-- A route handler serves files under a configured local SCORM content directory for development.
+- A route handler serves files under the project-local `.learnhub/scorm` content directory for development.
 - The route rejects absolute paths, `..`, missing content roots, and directory paths.
 - The local route returns `404` when content is not present rather than pretending extraction succeeded.
 
@@ -128,7 +128,7 @@ Tests cover:
 - Video player client renders launch data and posts progress using endpoint contracts.
 - SCORM learner page includes the client component and live endpoint wiring without disabled placeholder controls.
 - SCORM API bridge stores allowed CMI values, rejects unsupported writes, and commits to the endpoint.
-- Local SCORM serving rejects traversal and serves only files under the configured content root.
+- Local SCORM serving rejects traversal and serves only files under the project-local `.learnhub/scorm` content root.
 - Live-vs-placeholder documentation no longer claims Wave 2 endpoints or Wave 3 player surfaces are missing after implementation.
 
 ## Completion Criteria

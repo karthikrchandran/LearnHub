@@ -10,28 +10,30 @@ function readPage(relativePath: string): string {
 }
 
 describe("SCORM page shells", () => {
-  it("includes the expected admin upload sections and disabled controls", () => {
+  it("includes live admin upload form and server action wiring", () => {
     const page = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/scorm/page.tsx");
 
     expect(page).toContain("requireOrganizationUsersAdminBySlug");
+    expect(page).toContain("uploadScormPackageFormAction");
+    expect(page).toContain("<form action={uploadPackageAction}");
     expect(page).toContain("SCORM package");
     expect(page).toContain("Upload zip");
     expect(page).toContain("Launch path");
-    expect(page).toContain("disabled");
+    expect(page).toContain("contentRootKey");
+    expect(page).not.toContain("disabled");
   });
 
-  it("includes the expected learner launch sections and disabled controls", () => {
+  it("includes live learner SCORM player wiring", () => {
     const page = readPage("src/app/org/[slug]/learn/[courseSlug]/scorm/page.tsx");
 
     expect(page).toContain("requireOrganizationMemberBySlug");
+    expect(page).toContain("ScormPlayer");
     expect(page).toContain("data-scorm-launch-path");
     expect(page).toContain("data-scorm-commit-path");
     expect(page).toContain("/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/scorm/launch");
     expect(page).toContain("Assigned course required to launch this runtime.");
-    expect(page).toContain("SCORM player");
-    expect(page).toContain("Launch");
-    expect(page).toContain("Progress");
-    expect(page).toContain("Score");
-    expect(page).toContain("disabled");
+    expect(page).toContain("initialProgressPercent");
+    expect(page).toContain("initialScore");
+    expect(page).not.toContain("disabled");
   });
 });
