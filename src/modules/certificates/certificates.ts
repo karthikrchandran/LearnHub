@@ -10,6 +10,12 @@ export type CertificateAssignment = {
   learnerName: string;
   learnerEmail: string;
   courseTitle: string;
+  issuerName: string;
+  issuerLogoUrl: string | null;
+  issuerPrimaryColor: string;
+  issuerAccentColor: string;
+  credentialProvider: "CREDLY" | null;
+  credentialTemplateId: string | null;
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
 };
 
@@ -29,6 +35,10 @@ export type CreateCertificateInput = {
   learnerName: string;
   learnerEmail: string;
   courseTitle: string;
+  issuerName: string;
+  issuerLogoUrl: string | null;
+  issuerPrimaryColor: string;
+  issuerAccentColor: string;
   verificationCode: string;
   verificationUrl: string;
   issuedAt: Date;
@@ -52,6 +62,7 @@ export interface CertificateRepository {
     providerCredentialId?: string;
     providerUrl?: string;
     errorMessage?: string;
+    attemptedAt?: Date;
   }): Promise<void>;
   recordNotificationEnqueueFailure?(input: NotificationEnqueueFailureInput): Promise<void>;
 }
@@ -119,6 +130,10 @@ export async function issueCertificateForCompletedAssignment(
     learnerName: assignment.learnerName,
     learnerEmail: assignment.learnerEmail,
     courseTitle: assignment.courseTitle,
+    issuerName: assignment.issuerName,
+    issuerLogoUrl: assignment.issuerLogoUrl,
+    issuerPrimaryColor: assignment.issuerPrimaryColor,
+    issuerAccentColor: assignment.issuerAccentColor,
     verificationCode,
     verificationUrl: buildVerificationUrl(input.appBaseUrl, verificationCode),
     issuedAt: input.now,
@@ -158,7 +173,14 @@ export async function issueCertificateForCompletedAssignment(
     }
   }
 
-  if (input.credentialProvider && input.credentialProviderTemplateId && repository.recordCredentialIssuance) {
+  const credentialProviderTemplateId = input.credentialProviderTemplateId ?? assignment.credentialTemplateId ?? undefined;
+
+  if (
+    input.credentialProvider &&
+    assignment.credentialProvider === "CREDLY" &&
+    credentialProviderTemplateId &&
+    repository.recordCredentialIssuance
+  ) {
     try {
       const result = await input.credentialProvider.issueCredential({
         organizationId: assignment.organizationId,
@@ -166,7 +188,7 @@ export async function issueCertificateForCompletedAssignment(
         learnerEmail: assignment.learnerEmail,
         learnerName: assignment.learnerName,
         issuedAt: input.now,
-        providerTemplateId: input.credentialProviderTemplateId,
+        providerTemplateId: credentialProviderTemplateId,
       });
 
       await repository.recordCredentialIssuance({
@@ -176,6 +198,7 @@ export async function issueCertificateForCompletedAssignment(
         status: "SUCCEEDED",
         providerCredentialId: result.providerCredentialId,
         providerUrl: result.providerUrl,
+        attemptedAt: input.now,
       });
     } catch (error) {
       await repository.recordCredentialIssuance({
@@ -184,6 +207,7 @@ export async function issueCertificateForCompletedAssignment(
         provider: "CREDLY",
         status: "FAILED",
         errorMessage: error instanceof Error ? error.message : "Credential provider failed",
+        attemptedAt: input.now,
       });
     }
   }

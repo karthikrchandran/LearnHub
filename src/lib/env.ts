@@ -44,6 +44,7 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET_NAME: z.string().optional(),
   SCORM_EXTRACTION_JOB_SECRET: z.string().optional(),
+  CREDLY_BASE_URL: z.string().url().optional(),
   CREDLY_ORGANIZATION_ID: z.string().optional(),
   CREDLY_API_TOKEN: z.string().optional(),
 }).superRefine((value, context) => {
@@ -119,6 +120,7 @@ const buildEnvSource = (source: NodeJS.ProcessEnv) => {
     R2_SECRET_ACCESS_KEY: source.R2_SECRET_ACCESS_KEY,
     R2_BUCKET_NAME: source.R2_BUCKET_NAME,
     SCORM_EXTRACTION_JOB_SECRET: source.SCORM_EXTRACTION_JOB_SECRET,
+    CREDLY_BASE_URL: source.CREDLY_BASE_URL,
     CREDLY_ORGANIZATION_ID: source.CREDLY_ORGANIZATION_ID,
     CREDLY_API_TOKEN: source.CREDLY_API_TOKEN,
   };

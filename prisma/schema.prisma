@@ -274,6 +274,8 @@ model Course {
   categoryId                      String?
   isGlobalLibraryCourse           Boolean            @default(false)
   globalLibrarySourceCourseId     String?
+  credentialProvider              CredentialProviderName?
+  credentialTemplateId            String?
   organization                    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   category                        CourseCategory?    @relation(fields: [organizationId, categoryId], references: [organizationId, id])
   globalLibrarySourceCourse       Course?            @relation("GlobalLibraryCourseCopies", fields: [globalLibrarySourceCourseId], references: [id], onDelete: SetNull)
@@ -624,6 +626,12 @@ model Certificate {
   learnerName         String
   learnerEmail        String
   courseTitle         String
+  issuerName          String                 @default("LearnHub")
+  issuerLogoUrl       String?
+  issuerPrimaryColor  String                 @default("#2563eb")
+  issuerAccentColor   String                 @default("#14b8a6")
+  artifactStorageKey  String?
+  artifactContentType String                 @default("text/html")
   verificationCode    String                 @unique
   verificationUrl     String
   issuedAt            DateTime
@@ -656,10 +664,12 @@ model CredentialIssuance {
   attemptedAt          DateTime                 @default(now())
   organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   certificate          Certificate              @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  updatedAt            DateTime                 @updatedAt
 
   @@index([organizationId])
   @@index([certificateId])
   @@index([organizationId, provider, status])
+  @@unique([organizationId, certificateId, provider])
 }
 
 model NotificationJob {
