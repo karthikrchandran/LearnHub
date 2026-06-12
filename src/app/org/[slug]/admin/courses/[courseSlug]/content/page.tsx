@@ -100,6 +100,12 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
         <p className="mt-2 text-sm text-slate-600">
           {slug} / {courseSlug}
         </p>
+        <a
+          href={`/org/${encodeURIComponent(slug)}/admin/courses/${encodeURIComponent(courseSlug)}/checks`}
+          className="mt-4 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
+        >
+          Manage knowledge checks
+        </a>
       </header>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">

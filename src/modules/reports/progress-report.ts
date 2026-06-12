@@ -18,6 +18,8 @@ export type ProgressReportRow = {
   courseType: "NATIVE_VIDEO" | "SCORM_1_2";
   assignmentStatus: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
   progressPercent: number;
+  latestRequiredCheckAverageScore: number | null;
+  bestRequiredCheckAverageScore: number | null;
   dueDate: Date;
   lastEventAt: Date | null;
   certificateUrl: string | null;
@@ -75,6 +77,8 @@ export function formatProgressReportCsv(rows: ProgressReportRow[]): string {
     "Course Type",
     "Assignment Status",
     "Progress Percent",
+    "Latest Required Check Average Score",
+    "Best Required Check Average Score",
     "Due Date",
     "Completed",
     "Certificate URL",
@@ -87,6 +91,8 @@ export function formatProgressReportCsv(rows: ProgressReportRow[]): string {
     row.courseType,
     row.assignmentStatus,
     row.progressPercent,
+    row.latestRequiredCheckAverageScore ?? "",
+    row.bestRequiredCheckAverageScore ?? "",
     row.dueDate.toISOString(),
     row.assignmentStatus === "COMPLETED",
     row.certificateUrl ?? "",
@@ -96,6 +102,51 @@ export function formatProgressReportCsv(rows: ProgressReportRow[]): string {
   return [header, ...body]
     .map((values) => values.map((value) => formatCsvValue(value)).join(","))
     .join("\r\n");
+}
+
+export type RequiredCheckAttemptSummary = {
+  requiredActiveCheckIds: string[];
+  attempts: Array<{
+    questionId: string;
+    scorePercent: number;
+    submittedAt: Date;
+  }>;
+};
+
+export function summarizeRequiredCheckScores(input: RequiredCheckAttemptSummary): {
+  latestRequiredCheckAverageScore: number | null;
+  bestRequiredCheckAverageScore: number | null;
+} {
+  const attemptedRequiredIds = input.requiredActiveCheckIds.filter((questionId) =>
+    input.attempts.some((attempt) => attempt.questionId === questionId),
+  );
+
+  if (attemptedRequiredIds.length === 0) {
+    return {
+      latestRequiredCheckAverageScore: null,
+      bestRequiredCheckAverageScore: null,
+    };
+  }
+
+  const latestScores = attemptedRequiredIds.map((questionId) =>
+    [...input.attempts]
+      .filter((attempt) => attempt.questionId === questionId)
+      .sort((left, right) => right.submittedAt.getTime() - left.submittedAt.getTime())[0].scorePercent,
+  );
+  const bestScores = attemptedRequiredIds.map((questionId) =>
+    Math.max(...input.attempts
+      .filter((attempt) => attempt.questionId === questionId)
+      .map((attempt) => attempt.scorePercent)),
+  );
+
+  return {
+    latestRequiredCheckAverageScore: averageScore(latestScores),
+    bestRequiredCheckAverageScore: averageScore(bestScores),
+  };
+}
+
+function averageScore(scores: number[]): number {
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
 }
 
 function formatCsvValue(value: string | number | boolean): string {

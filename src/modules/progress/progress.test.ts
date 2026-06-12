@@ -111,4 +111,40 @@ describe("recordLearningEvent", () => {
 
     expect(result).toEqual({ progressPercent: 100, assignmentStatus: "COMPLETED", completed: true });
   });
+
+  it("keeps native completion source-compatible when raw payload includes knowledge check counts", async () => {
+    const repository = createRepository({
+      id: "assignment_2",
+      organizationId: "org_1",
+      courseType: "NATIVE_VIDEO",
+      status: "IN_PROGRESS",
+      currentProgressPercent: 67,
+    });
+
+    const result = await recordLearningEvent(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_2",
+        source: "NATIVE",
+        type: "COMPLETED",
+        progressPercent: 100,
+        occurredAt: new Date("2026-06-09T11:05:00.000Z"),
+        rawPayload: {
+          requiredLessonsCompleted: 2,
+          requiredLessonsTotal: 2,
+          requiredChecksCompleted: 1,
+          requiredChecksTotal: 1,
+        },
+      },
+      repository,
+    );
+
+    expect(result).toEqual({ progressPercent: 100, assignmentStatus: "COMPLETED", completed: true });
+    expect(repository.events[0].rawPayload).toEqual({
+      requiredLessonsCompleted: 2,
+      requiredLessonsTotal: 2,
+      requiredChecksCompleted: 1,
+      requiredChecksTotal: 1,
+    });
+  });
 });

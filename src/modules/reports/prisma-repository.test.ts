@@ -13,7 +13,11 @@ function createProgressReportClient() {
           course: {
             title: "Course One",
             type: "NATIVE_VIDEO",
+            knowledgeCheckQuestions: [{ id: "check_1" }],
           },
+          knowledgeCheckAttempts: [
+            { questionId: "check_1", scorePercent: 100, submittedAt: new Date("2026-06-12T12:04:00.000Z") },
+          ],
           membership: {
             user: {
               firstName: "Ada",
@@ -117,7 +121,15 @@ describe("createPrismaProgressReportRepository", () => {
           select: {
             title: true,
             type: true,
+            knowledgeCheckQuestions: {
+              where: { active: true, required: true },
+              select: { id: true },
+            },
           },
+        },
+        knowledgeCheckAttempts: {
+          orderBy: [{ questionId: "asc" }, { submittedAt: "desc" }],
+          select: { questionId: true, scorePercent: true, submittedAt: true },
         },
         membership: {
           select: {
@@ -160,6 +172,8 @@ describe("createPrismaProgressReportRepository", () => {
         dueDate: new Date("2026-06-20T00:00:00.000Z"),
         lastEventAt: new Date("2026-06-12T12:05:00.000Z"),
         certificateUrl: "https://learnhub.test/certificates/ABC123",
+        latestRequiredCheckAverageScore: 100,
+        bestRequiredCheckAverageScore: 100,
       },
     ]);
   });
@@ -171,7 +185,8 @@ describe("createPrismaProgressReportRepository", () => {
         id: "assignment_2",
         status: "ASSIGNED",
         dueDate: new Date("2026-06-25T00:00:00.000Z"),
-        course: { title: "Course Two", type: "SCORM_1_2" },
+        course: { title: "Course Two", type: "SCORM_1_2", knowledgeCheckQuestions: [] },
+        knowledgeCheckAttempts: [],
         membership: {
           user: {
             firstName: "Grace",
@@ -199,6 +214,8 @@ describe("createPrismaProgressReportRepository", () => {
         progressPercent: 0,
         lastEventAt: null,
         certificateUrl: null,
+        latestRequiredCheckAverageScore: null,
+        bestRequiredCheckAverageScore: null,
       },
     ]);
   });

@@ -78,6 +78,7 @@ const nativeAssignment: VideoRuntimeAssignment = {
         transcriptCues: [],
       },
     ],
+    knowledgeChecks: [],
   },
   videoProgress: [
     {
@@ -88,6 +89,7 @@ const nativeAssignment: VideoRuntimeAssignment = {
       lastWatchedAt: new Date("2026-06-10T09:00:00.000Z"),
     },
   ],
+  knowledgeCheckAttempts: [],
 };
 
 class FakeVideoRuntimeRepository implements VideoRuntimeRepository {
@@ -234,6 +236,63 @@ describe("launchVideoRuntime", () => {
     expect(runtime.courseProgressPercent).toBe(0);
   });
 
+  it("returns active learner-safe knowledge checks grouped by lesson", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.course.knowledgeChecks = [
+      {
+        id: "check_1",
+        lessonId: "lesson_1",
+        prompt: "Which response is best?",
+        questionType: "SINGLE_CHOICE",
+        required: true,
+        active: true,
+        explanation: "Use neutral language.",
+        answers: [
+          { id: "answer_1", text: "What happened?", correct: true },
+          { id: "answer_2", text: "Why did you fail?", correct: false },
+        ],
+      },
+      {
+        id: "check_inactive",
+        lessonId: "lesson_1",
+        prompt: "Inactive",
+        questionType: "TRUE_FALSE",
+        required: true,
+        active: false,
+        explanation: null,
+        answers: [
+          { id: "true", text: "True", correct: true },
+          { id: "false", text: "False", correct: false },
+        ],
+      },
+    ];
+
+    const runtime = await launchVideoRuntime(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+      },
+      createRepository(assignment),
+    );
+
+    expect(runtime.lessons[0].knowledgeChecks).toEqual([
+      {
+        id: "check_1",
+        lessonId: "lesson_1",
+        prompt: "Which response is best?",
+        questionType: "SINGLE_CHOICE",
+        required: true,
+        explanation: null,
+        latestAttempt: null,
+        answers: [
+          { id: "answer_1", text: "What happened?" },
+          { id: "answer_2", text: "Why did you fail?" },
+        ],
+      },
+    ]);
+    expect(runtime.currentLesson.knowledgeChecks[0].answers[0]).not.toHaveProperty("correct");
+  });
+
   it("blocks launch while a Mux asset is not ready", async () => {
     const assignment = structuredClone(nativeAssignment);
     assignment.course.lessons[0] = {
@@ -326,6 +385,8 @@ describe("recordVideoProgress", () => {
           watchedSecond: 90,
           requiredLessonsCompleted: 0,
           requiredLessonsTotal: 2,
+          requiredChecksCompleted: 0,
+          requiredChecksTotal: 0,
         },
       },
     ]);
@@ -363,6 +424,112 @@ describe("recordVideoProgress", () => {
         watchedSecond: 120,
         requiredLessonsCompleted: 2,
         requiredLessonsTotal: 2,
+        requiredChecksCompleted: 0,
+        requiredChecksTotal: 0,
+      },
+    });
+  });
+
+  it("does not complete a native course until required active knowledge checks are correct", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.course.knowledgeChecks = [
+      {
+        id: "check_1",
+        lessonId: "lesson_1",
+        prompt: "Which response is best?",
+        questionType: "SINGLE_CHOICE",
+        required: true,
+        active: true,
+        explanation: null,
+        answers: [
+          { id: "answer_1", text: "What happened?", correct: true },
+          { id: "answer_2", text: "Why did you fail?", correct: false },
+        ],
+      },
+    ];
+    assignment.videoProgress = [
+      {
+        lessonId: "lesson_1",
+        lastPositionSecond: 180,
+        maxWatchedSecond: 180,
+        completed: true,
+        lastWatchedAt: occurredAt,
+      },
+    ];
+    const repository = createRepository(assignment);
+
+    await recordVideoProgress(
+      createProgressInput({
+        lessonId: "lesson_2",
+        positionSecond: 120,
+        watchedSecond: 120,
+      }),
+      repository,
+    );
+
+    expect(repository.learningEvents[0]).toMatchObject({
+      type: "PROGRESS",
+      progressPercent: 67,
+      rawPayload: {
+        requiredLessonsCompleted: 2,
+        requiredLessonsTotal: 2,
+        requiredChecksCompleted: 0,
+        requiredChecksTotal: 1,
+      },
+    });
+  });
+
+  it("requires required active knowledge checks for native course completion", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.course.knowledgeChecks = [
+      {
+        id: "check_1",
+        lessonId: "lesson_1",
+        prompt: "Which response is best?",
+        questionType: "SINGLE_CHOICE",
+        required: true,
+        active: true,
+        explanation: null,
+        answers: [
+          { id: "answer_1", text: "What happened?", correct: true },
+          { id: "answer_2", text: "Why did you fail?", correct: false },
+        ],
+      },
+    ];
+    assignment.knowledgeCheckAttempts = [
+      {
+        questionId: "check_1",
+        correct: true,
+        scorePercent: 100,
+        selectedAnswerIds: ["answer_1"],
+      },
+    ];
+    assignment.videoProgress = [
+      {
+        lessonId: "lesson_1",
+        lastPositionSecond: 180,
+        maxWatchedSecond: 180,
+        completed: true,
+        lastWatchedAt: occurredAt,
+      },
+    ];
+    const repository = createRepository(assignment);
+
+    await recordVideoProgress(
+      createProgressInput({
+        lessonId: "lesson_2",
+        positionSecond: 120,
+        watchedSecond: 120,
+      }),
+      repository,
+    );
+
+    expect(repository.learningEvents[0]).toMatchObject({
+      type: "COMPLETED",
+      progressPercent: 100,
+      rawPayload: {
+        requiredChecksCompleted: 1,
+        requiredChecksTotal: 1,
       },
     });
   });

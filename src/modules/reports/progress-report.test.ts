@@ -5,6 +5,7 @@ import {
   formatProgressReportCsv,
   progressReportWhere,
   resolveProgressReportScope,
+  summarizeRequiredCheckScores,
   type ProgressReportRow,
 } from "./progress-report";
 
@@ -69,6 +70,8 @@ const rows: ProgressReportRow[] = [
     dueDate: new Date("2026-06-20T00:00:00.000Z"),
     lastEventAt: new Date("2026-06-12T12:00:00.000Z"),
     certificateUrl: "https://learnhub.test/certificates/ABC123",
+    latestRequiredCheckAverageScore: 75,
+    bestRequiredCheckAverageScore: 100,
   },
 ];
 
@@ -138,9 +141,39 @@ describe("progress report read model", () => {
   it("formats CSV with quoted values and report fields", () => {
     expect(formatProgressReportCsv(rows)).toBe(
       [
-        "Learner Name,Learner Email,Course Title,Course Type,Assignment Status,Progress Percent,Due Date,Completed,Certificate URL,Last Event Date",
-        '"Ada, Lovelace",ada@example.com,"Safety ""Basics""",NATIVE_VIDEO,COMPLETED,100,2026-06-20T00:00:00.000Z,true,https://learnhub.test/certificates/ABC123,2026-06-12T12:00:00.000Z',
+        "Learner Name,Learner Email,Course Title,Course Type,Assignment Status,Progress Percent,Latest Required Check Average Score,Best Required Check Average Score,Due Date,Completed,Certificate URL,Last Event Date",
+        '"Ada, Lovelace",ada@example.com,"Safety ""Basics""",NATIVE_VIDEO,COMPLETED,100,75,100,2026-06-20T00:00:00.000Z,true,https://learnhub.test/certificates/ABC123,2026-06-12T12:00:00.000Z',
       ].join("\r\n"),
     );
+  });
+
+  it("calculates assignment-level latest and best required-check average scores", () => {
+    expect(
+      summarizeRequiredCheckScores({
+        requiredActiveCheckIds: ["q1", "q2"],
+        attempts: [
+          { questionId: "q1", scorePercent: 0, submittedAt: new Date("2026-06-13T10:00:00.000Z") },
+          { questionId: "q1", scorePercent: 100, submittedAt: new Date("2026-06-13T11:00:00.000Z") },
+          { questionId: "q2", scorePercent: 50, submittedAt: new Date("2026-06-13T12:00:00.000Z") },
+        ],
+      }),
+    ).toEqual({
+      latestRequiredCheckAverageScore: 75,
+      bestRequiredCheckAverageScore: 75,
+    });
+  });
+
+  it("returns null assignment-level scores until a required active check is attempted", () => {
+    expect(
+      summarizeRequiredCheckScores({
+        requiredActiveCheckIds: ["q1"],
+        attempts: [
+          { questionId: "optional_q", scorePercent: 100, submittedAt: new Date("2026-06-13T10:00:00.000Z") },
+        ],
+      }),
+    ).toEqual({
+      latestRequiredCheckAverageScore: null,
+      bestRequiredCheckAverageScore: null,
+    });
   });
 });
