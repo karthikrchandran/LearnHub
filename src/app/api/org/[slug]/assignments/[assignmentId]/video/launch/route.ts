@@ -1,5 +1,4 @@
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
-import { prisma } from "@/lib/prisma";
 import { createPrismaRuntimeRouteRepository } from "@/modules/runtime/prisma-repository";
 import {
   RuntimeRouteError,
@@ -19,6 +18,7 @@ export async function GET(_request: Request, { params }: VideoLaunchRouteContext
   try {
     const { slug, assignmentId } = await params;
     const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
+    const { prisma } = await import("@/lib/prisma");
 
     await requireLearnerLaunchAssignment({
       organizationId,
