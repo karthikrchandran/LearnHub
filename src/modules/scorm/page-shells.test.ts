@@ -12,14 +12,28 @@ function readPage(relativePath: string): string {
 describe("SCORM page shells", () => {
   it("includes live admin upload form and server action wiring", () => {
     const page = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/scorm/page.tsx");
+    const uploadForm = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/scorm/scorm-package-upload-form.tsx");
 
     expect(page).toContain("requireOrganizationUsersAdminBySlug");
     expect(page).toContain("uploadScormPackageFormAction");
-    expect(page).toContain("<form action={uploadPackageAction}");
+    expect(page).toContain("ScormPackageUploadForm");
+    expect(uploadForm).toContain("<form");
+    expect(uploadForm).toContain("action={action}");
     expect(page).toContain("SCORM package");
-    expect(page).toContain("Upload zip");
-    expect(page).toContain("Launch path");
+    expect(uploadForm).toContain("Upload zip");
+    expect(uploadForm).toContain('type="hidden"');
+    expect(uploadForm).toContain('name="storageKey"');
+    expect(uploadForm).toContain("data-scorm-upload-url");
+    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/storage/upload");
+    expect(uploadForm).toContain('data-scorm-upload-purpose="scorm_zip"');
+    expect(page).toContain("packageId={`pkg_${course.id}`}");
+    expect(uploadForm).toContain("data-scorm-package-id={packageId}");
+    expect(uploadForm).not.toContain("Storage key");
+    expect(uploadForm).not.toContain('name="storageKey" placeholder');
+    expect(uploadForm).toContain("Launch path");
     expect(page).toContain("contentRootKey");
+    expect(page).toContain("Extraction status");
+    expect(page).toContain("Malware scan");
     expect(page).not.toContain("disabled");
   });
 

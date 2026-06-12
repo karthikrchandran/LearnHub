@@ -1,9 +1,8 @@
-const allowedZipContentTypes = new Set([
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/octet-stream",
-]);
-const maxPackageSizeBytes = 512 * 1024 * 1024;
+import {
+  normalizeScormLaunchPath,
+  validateScormUploadMetadata,
+} from "./scorm-manifest";
+import { assertTenantScopedKey, scormZipKey } from "../storage/storage-keys";
 
 export type ScormPackageCourse = {
   id: string;
@@ -18,6 +17,7 @@ export type UploadScormPackageInput = {
   originalFileName: string;
   contentType: string;
   byteSize: number;
+  storageKey?: string | null;
   launchPath: string;
   manifestTitle?: string | null;
 };
@@ -34,6 +34,8 @@ export type UploadScormPackageData = {
   launchPath: string;
   manifestTitle: string | null;
   uploadedByUserId: string;
+  extractionStatus: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+  malwareScanStatus: "PENDING" | "PASSED" | "FAILED";
 };
 
 export type ScormPackageRepository = {
@@ -56,10 +58,12 @@ export async function uploadScormPackage(
   const organizationId = requireValue(input.organizationId, "Organization id is required");
   const courseId = requireValue(input.courseId, "Course id is required");
   const actorId = requireValue(input.actorId, "Actor id is required");
-  const originalFileName = normalizeFileName(input.originalFileName);
-  const contentType = normalizeContentType(input.contentType);
-  const launchPath = normalizeLaunchPath(input.launchPath);
-  const byteSize = normalizeByteSize(input.byteSize);
+  const { originalFileName, contentType, byteSize } = validateScormUploadMetadata({
+    originalFileName: input.originalFileName,
+    contentType: input.contentType,
+    byteSize: input.byteSize,
+  });
+  const launchPath = normalizeScormLaunchPath(input.launchPath);
   const course = await repository.findCourse({ organizationId, courseId });
 
   if (!course) {
@@ -72,7 +76,12 @@ export async function uploadScormPackage(
 
   const packageId = `pkg_${courseId}`;
   const packageRootKey = `org/${organizationId}/courses/${courseId}/scorm/${packageId}`;
-  const storageKey = `${packageRootKey}/${originalFileName}`;
+  const expectedStorageKey = scormZipKey({ organizationId, courseId, packageId, fileName: originalFileName });
+  const storageKey = resolveStorageKey({
+    organizationId,
+    providedStorageKey: input.storageKey,
+    expectedStorageKey,
+  });
   const contentRootKey = `${packageRootKey}/content`;
 
   return repository.runInTransaction(async () => {
@@ -88,6 +97,8 @@ export async function uploadScormPackage(
       launchPath,
       manifestTitle: normalizeNullable(input.manifestTitle),
       uploadedByUserId: actorId,
+      extractionStatus: "PENDING",
+      malwareScanStatus: "PENDING",
     });
 
     await repository.recordAuditLog({
@@ -102,46 +113,22 @@ export async function uploadScormPackage(
   });
 }
 
-function normalizeFileName(value: string): string {
-  const fileName = requireValue(value, "SCORM package file name is required");
-
-  if (!fileName.toLowerCase().endsWith(".zip")) {
-    throw new Error("SCORM package must be a zip file");
+function resolveStorageKey(input: {
+  organizationId: string;
+  providedStorageKey: string | null | undefined;
+  expectedStorageKey: string;
+}): string {
+  if (!input.providedStorageKey?.trim()) {
+    throw new Error("SCORM signed upload storage key is required");
   }
 
-  return fileName.replace(/[\\/]/g, "");
-}
+  const normalized = assertTenantScopedKey(input.providedStorageKey, input.organizationId);
 
-function normalizeContentType(value: string): string {
-  const contentType = requireValue(value, "SCORM package content type is required").toLowerCase();
-
-  if (!allowedZipContentTypes.has(contentType)) {
-    throw new Error("SCORM package content type must be zip-compatible");
+  if (normalized !== input.expectedStorageKey) {
+    throw new Error("SCORM storage key must match the signed upload key");
   }
 
-  return contentType;
-}
-
-function normalizeByteSize(value: number): number {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error("SCORM package size must be positive");
-  }
-
-  if (value > maxPackageSizeBytes) {
-    throw new Error("SCORM package exceeds the maximum size");
-  }
-
-  return value;
-}
-
-function normalizeLaunchPath(value: string): string {
-  const launchPath = requireValue(value, "SCORM launch path is required").replace(/\\/g, "/");
-
-  if (launchPath.startsWith("/") || launchPath.includes("..")) {
-    throw new Error("SCORM launch path must be relative");
-  }
-
-  return launchPath;
+  return normalized;
 }
 
 function normalizeNullable(value: string | null | undefined): string | null {

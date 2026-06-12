@@ -24,6 +24,8 @@ const assignment: ScormRuntimeAssignment = {
       storageKey: "org/org_1/courses/course_1/scorm/package_1/policy.zip",
       contentRootKey: "org/org_1/courses/course_1/scorm/package_1/content",
       manifestTitle: "Policy Orientation",
+      extractionStatus: "READY",
+      malwareScanStatus: "PASSED",
     },
   },
   scormRegistration: {
@@ -174,6 +176,34 @@ describe("launchScormRegistration", () => {
       launchCount: 2,
       launchedAt: now,
     });
+  });
+
+  it("blocks launch until extraction is ready and malware has passed", async () => {
+    const pendingExtraction = structuredClone(assignment);
+    pendingExtraction.course.scormPackage = {
+      ...pendingExtraction.course.scormPackage!,
+      extractionStatus: "PENDING",
+      malwareScanStatus: "PASSED",
+    };
+    const failedMalware = structuredClone(assignment);
+    failedMalware.course.scormPackage = {
+      ...failedMalware.course.scormPackage!,
+      extractionStatus: "READY",
+      malwareScanStatus: "FAILED",
+    };
+
+    await expect(
+      launchScormRegistration(
+        { organizationId: "org_1", assignmentId: "assignment_1", occurredAt: now },
+        createRepository({ assignment: pendingExtraction }),
+      ),
+    ).rejects.toThrow("SCORM package is not ready");
+    await expect(
+      launchScormRegistration(
+        { organizationId: "org_1", assignmentId: "assignment_1", occurredAt: now },
+        createRepository({ assignment: failedMalware }),
+      ),
+    ).rejects.toThrow("SCORM package malware scan has not passed");
   });
 });
 

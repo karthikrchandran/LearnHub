@@ -61,6 +61,8 @@ describe("createPrismaScormRepository", () => {
                 storageKey: true,
                 contentRootKey: true,
                 manifestTitle: true,
+                extractionStatus: true,
+                malwareScanStatus: true,
               },
             },
           },
@@ -180,6 +182,8 @@ describe("createPrismaScormRepository", () => {
       launchPath: "index.html",
       manifestTitle: "Policy",
       uploadedByUserId: "user_1",
+      extractionStatus: "PENDING",
+      malwareScanStatus: "PENDING",
     });
 
     expect(upsert).toHaveBeenCalledWith({
@@ -192,11 +196,15 @@ describe("createPrismaScormRepository", () => {
       update: expect.objectContaining({
         storageKey: "org/org_1/courses/course_1/scorm/package_1/policy.zip",
         contentRootKey: "org/org_1/courses/course_1/scorm/package_1/content",
+        extractionStatus: "PENDING",
+        malwareScanStatus: "PENDING",
       }),
       create: expect.objectContaining({
         id: "package_1",
         storageKey: "org/org_1/courses/course_1/scorm/package_1/policy.zip",
         contentRootKey: "org/org_1/courses/course_1/scorm/package_1/content",
+        extractionStatus: "PENDING",
+        malwareScanStatus: "PENDING",
       }),
       select: { id: true, storageKey: true },
     });

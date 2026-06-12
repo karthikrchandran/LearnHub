@@ -61,6 +61,10 @@ describe("createPrismaVideoRepository", () => {
                 required: true,
                 playbackUrl: true,
                 providerAssetId: true,
+                providerUploadId: true,
+                providerPlaybackId: true,
+                providerStatus: true,
+                providerError: true,
                 chapters: {
                   orderBy: { sortOrder: "asc" },
                   select: {

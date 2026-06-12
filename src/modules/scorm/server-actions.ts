@@ -32,6 +32,7 @@ export function createScormPackageActions(dependencies: ScormPackageActionDepend
             originalFileName: readFormString(formData, "originalFileName"),
             contentType: readFormString(formData, "contentType"),
             byteSize: readInteger(formData, "byteSize"),
+            storageKey: readOptionalFormString(formData, "storageKey"),
             launchPath: readFormString(formData, "launchPath"),
             manifestTitle: readOptionalFormString(formData, "manifestTitle"),
           },

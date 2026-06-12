@@ -72,6 +72,7 @@ describe("SCORM package server actions", () => {
           originalFileName: "policy.zip",
           contentType: "application/zip",
           byteSize: "1024",
+          storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy.zip",
           launchPath: "index.html",
           manifestTitle: "Policy",
         }),
@@ -85,11 +86,13 @@ describe("SCORM package server actions", () => {
       originalFileName: "policy.zip",
       contentType: "application/zip",
       byteSize: 1024,
-      storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/policy.zip",
+      storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy.zip",
       contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
       launchPath: "index.html",
       manifestTitle: "Policy",
       uploadedByUserId: "actor_1",
+      extractionStatus: "PENDING",
+      malwareScanStatus: "PENDING",
     });
   });
 
@@ -110,5 +113,26 @@ describe("SCORM package server actions", () => {
         }),
       ),
     ).resolves.toEqual({ status: "error", message: "SCORM package must be a zip file" });
+  });
+
+  it("returns an error when the signed upload storage key is missing", async () => {
+    const dependencies = createDependencies();
+    const actions = createScormPackageActions(dependencies);
+
+    await expect(
+      actions.uploadPackage(
+        "acme",
+        "policy",
+        formData({
+          originalFileName: "policy.zip",
+          contentType: "application/zip",
+          byteSize: "1024",
+          launchPath: "index.html",
+          manifestTitle: "Policy",
+        }),
+      ),
+    ).resolves.toEqual({ status: "error", message: "SCORM signed upload storage key is required" });
+
+    expect(dependencies.repository.upsertPackage).not.toHaveBeenCalled();
   });
 });

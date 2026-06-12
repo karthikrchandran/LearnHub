@@ -38,6 +38,10 @@ const nativeAssignment: VideoRuntimeAssignment = {
         required: true,
         playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
         providerAssetId: null,
+        providerUploadId: null,
+        providerPlaybackId: null,
+        providerStatus: "READY",
+        providerError: null,
         chapters: [
           {
             id: "chapter_1",
@@ -66,6 +70,10 @@ const nativeAssignment: VideoRuntimeAssignment = {
         required: true,
         playbackUrl: "https://video.learnhub.local/demo/follow-up.mp4",
         providerAssetId: null,
+        providerUploadId: null,
+        providerPlaybackId: null,
+        providerStatus: "READY",
+        providerError: null,
         chapters: [],
         transcriptCues: [],
       },
@@ -224,6 +232,29 @@ describe("launchVideoRuntime", () => {
       },
     });
     expect(runtime.courseProgressPercent).toBe(0);
+  });
+
+  it("blocks launch while a Mux asset is not ready", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.course.lessons[0] = {
+      ...assignment.course.lessons[0],
+      playbackUrl: null,
+      providerAssetId: "asset_1",
+      providerUploadId: "upload_1",
+      providerPlaybackId: null,
+      providerStatus: "PROCESSING",
+      providerError: null,
+    };
+
+    await expect(
+      launchVideoRuntime(
+        {
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+        },
+        createRepository(assignment),
+      ),
+    ).rejects.toThrow("Video asset is not ready");
   });
 });
 

@@ -41,6 +41,10 @@ export type VideoRuntimeLesson = {
   required: boolean;
   playbackUrl: string | null;
   providerAssetId: string | null;
+  providerUploadId: string | null;
+  providerPlaybackId: string | null;
+  providerStatus: "UPLOAD_CREATED" | "PROCESSING" | "READY" | "FAILED";
+  providerError: string | null;
   chapters: VideoRuntimeChapter[];
   transcriptCues: VideoRuntimeTranscriptCue[];
 };
@@ -125,6 +129,7 @@ export async function launchVideoRuntime(
   repository: VideoRuntimeRepository,
 ): Promise<VideoRuntimeLaunch> {
   const assignment = await loadNativeAssignment(input, repository);
+  assertProviderAssetsReady(assignment);
   const lessons = buildLessonViews(assignment);
   const currentLesson = selectCurrentLesson(lessons, input.lessonId);
 
@@ -228,6 +233,16 @@ function buildLessonViews(assignment: VideoRuntimeAssignment): VideoRuntimeLesso
     transcriptCues: [...lesson.transcriptCues].sort((left, right) => left.startSecond - right.startSecond),
     progress: existingProgressForLesson(assignment.videoProgress, lesson.id),
   }));
+}
+
+function assertProviderAssetsReady(assignment: VideoRuntimeAssignment): void {
+  const unavailableLesson = assignment.course.lessons.find(
+    (lesson) => lesson.providerAssetId && lesson.providerStatus !== "READY",
+  );
+
+  if (unavailableLesson) {
+    throw new Error("Video asset is not ready");
+  }
 }
 
 function selectCurrentLesson(

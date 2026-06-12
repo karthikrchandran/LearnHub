@@ -8,6 +8,8 @@ export type ScormRuntimePackage = {
   storageKey: string;
   contentRootKey: string;
   manifestTitle: string | null;
+  extractionStatus: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+  malwareScanStatus: "PENDING" | "PASSED" | "FAILED";
 };
 
 export type ScormRegistrationState = {
@@ -194,6 +196,14 @@ async function loadScormAssignment(
 function requirePackage(assignment: ScormRuntimeAssignment): ScormRuntimePackage {
   if (!assignment.course.scormPackage) {
     throw new Error("SCORM package was not found");
+  }
+
+  if (assignment.course.scormPackage.extractionStatus !== "READY") {
+    throw new Error("SCORM package is not ready");
+  }
+
+  if (assignment.course.scormPackage.malwareScanStatus !== "PASSED") {
+    throw new Error("SCORM package malware scan has not passed");
   }
 
   return assignment.course.scormPackage;

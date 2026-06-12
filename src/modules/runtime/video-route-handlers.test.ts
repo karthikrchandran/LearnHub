@@ -155,6 +155,10 @@ describe("native video runtime route handlers", () => {
           required: true,
           playbackUrl: "https://cdn.example/video.mp4",
           providerAssetId: null,
+          providerUploadId: null,
+          providerPlaybackId: null,
+          providerStatus: "READY",
+          providerError: null,
           chapters: [],
           transcriptCues: [],
           progress: {
@@ -176,6 +180,10 @@ describe("native video runtime route handlers", () => {
         required: true,
         playbackUrl: "https://cdn.example/video.mp4",
         providerAssetId: null,
+        providerUploadId: null,
+        providerPlaybackId: null,
+        providerStatus: "READY",
+        providerError: null,
         chapters: [],
         transcriptCues: [],
         progress: {
