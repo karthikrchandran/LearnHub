@@ -9,8 +9,15 @@ export type StoredObject = {
   url: string;
 };
 
+export type SignedWriteUrlInput = {
+  key: string;
+  contentType: string;
+  expiresInSeconds?: number;
+};
+
 export interface ObjectStorageProvider {
   putObject(input: PutObjectInput): Promise<StoredObject>;
+  getSignedWriteUrl(input: SignedWriteUrlInput): Promise<string>;
   getSignedReadUrl(key: string): Promise<string>;
   deleteObject(key: string): Promise<void>;
 }

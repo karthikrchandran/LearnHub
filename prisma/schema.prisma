@@ -59,6 +59,26 @@ enum LearningEventType {
   FAILED
 }
 
+enum VideoAssetStatus {
+  UPLOAD_CREATED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum ScormExtractionStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum MalwareScanStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
 enum CredentialProviderName {
   CREDLY
 }
@@ -306,6 +326,10 @@ model VideoLesson {
   durationSeconds    Int
   required           Boolean               @default(true)
   providerAssetId    String?
+  providerUploadId   String?
+  providerPlaybackId String?
+  providerStatus     VideoAssetStatus      @default(READY)
+  providerError      String?
   playbackUrl        String?
   transcriptLanguage String                @default("en")
   organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -321,6 +345,8 @@ model VideoLesson {
   @@unique([organizationId, id])
   @@unique([organizationId, courseId, id])
   @@index([organizationId, courseId, moduleId, sortOrder])
+  @@index([organizationId, providerUploadId])
+  @@index([organizationId, providerAssetId])
 }
 
 model VideoChapter {
@@ -400,6 +426,10 @@ model ScormPackage {
   contentRootKey   String
   launchPath       String
   manifestTitle    String?
+  extractionStatus ScormExtractionStatus @default(PENDING)
+  extractionError  String?
+  malwareScanStatus MalwareScanStatus @default(PENDING)
+  malwareScanError String?
   uploadedByUserId String?
   active           Boolean      @default(true)
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -412,6 +442,8 @@ model ScormPackage {
   @@unique([organizationId, courseId])
   @@unique([organizationId, id])
   @@index([organizationId, courseId])
+  @@index([organizationId, extractionStatus])
+  @@index([organizationId, malwareScanStatus])
   @@index([uploadedByUserId])
 }
 

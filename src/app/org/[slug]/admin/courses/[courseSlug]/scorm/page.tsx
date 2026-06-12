@@ -37,6 +37,10 @@ export default async function ScormAdminPage({ params }: ScormAdminPageProps) {
           contentRootKey: true,
           launchPath: true,
           manifestTitle: true,
+          extractionStatus: true,
+          extractionError: true,
+          malwareScanStatus: true,
+          malwareScanError: true,
           updatedAt: true,
         },
       },
@@ -123,6 +127,16 @@ export default async function ScormAdminPage({ params }: ScormAdminPageProps) {
               <div className="rounded-md bg-slate-50 p-3">
                 <dt className="font-medium text-slate-500">Manifest</dt>
                 <dd className="mt-1 text-slate-950">{activePackage.manifestTitle ?? "Not recorded"}</dd>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="font-medium text-slate-500">Extraction status</dt>
+                <dd className="mt-1 text-slate-950">{activePackage.extractionStatus}</dd>
+                {activePackage.extractionError ? <dd className="mt-1 text-xs text-red-700">{activePackage.extractionError}</dd> : null}
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <dt className="font-medium text-slate-500">Malware scan</dt>
+                <dd className="mt-1 text-slate-950">{activePackage.malwareScanStatus}</dd>
+                {activePackage.malwareScanError ? <dd className="mt-1 text-xs text-red-700">{activePackage.malwareScanError}</dd> : null}
               </div>
             </dl>
           ) : (

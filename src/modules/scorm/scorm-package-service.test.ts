@@ -99,6 +99,8 @@ describe("uploadScormPackage", () => {
         launchPath: "index.html",
         manifestTitle: "Policy Orientation",
         uploadedByUserId: "actor_1",
+        extractionStatus: "PENDING",
+        malwareScanStatus: "PENDING",
       },
     ]);
     expect(repository.auditLogs).toEqual([

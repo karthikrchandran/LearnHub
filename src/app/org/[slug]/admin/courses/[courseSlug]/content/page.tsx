@@ -43,6 +43,10 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
           required: true,
           playbackUrl: true,
           providerAssetId: true,
+          providerUploadId: true,
+          providerPlaybackId: true,
+          providerStatus: true,
+          providerError: true,
           chapters: {
             orderBy: { sortOrder: "asc" },
             select: { title: true, startSecond: true, endSecond: true },
@@ -241,6 +245,11 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
                   </p>
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <dt className="font-medium text-slate-500">Provider status</dt>
+                    <dd className="mt-1 text-slate-950">{lesson.providerStatus}</dd>
+                    {lesson.providerError ? <dd className="mt-1 text-xs text-red-700">{lesson.providerError}</dd> : null}
+                  </div>
                   <div className="rounded-md bg-slate-50 p-3">
                     <dt className="font-medium text-slate-500">Chapters</dt>
                     <dd className="mt-1 text-slate-950">{lesson.chapters.length}</dd>

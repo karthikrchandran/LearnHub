@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 import type { ScormPackageRepository } from "./scorm-package-service";
+import type { ScormPackageJobRepository } from "./scorm-package-jobs";
 import type {
   ScormRegistrationState,
   ScormRuntimeAssignment,
@@ -19,7 +20,7 @@ type PrismaScormClient = Pick<
   | "auditLog"
 >;
 
-export type PrismaScormRepository = ScormPackageRepository & ScormRuntimeRepository;
+export type PrismaScormRepository = ScormPackageRepository & ScormRuntimeRepository & ScormPackageJobRepository;
 
 const registrationSelect = {
   id: true,
@@ -106,6 +107,10 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
           contentRootKey: data.contentRootKey,
           launchPath: data.launchPath,
           manifestTitle: data.manifestTitle,
+          extractionStatus: data.extractionStatus,
+          extractionError: null,
+          malwareScanStatus: data.malwareScanStatus,
+          malwareScanError: null,
           uploadedByUserId: data.uploadedByUserId,
           active: true,
         },
@@ -120,6 +125,10 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
           contentRootKey: data.contentRootKey,
           launchPath: data.launchPath,
           manifestTitle: data.manifestTitle,
+          extractionStatus: data.extractionStatus,
+          extractionError: null,
+          malwareScanStatus: data.malwareScanStatus,
+          malwareScanError: null,
           uploadedByUserId: data.uploadedByUserId,
           active: true,
         },
@@ -159,6 +168,8 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
                   storageKey: true,
                   contentRootKey: true,
                   manifestTitle: true,
+                  extractionStatus: true,
+                  malwareScanStatus: true,
                 },
               },
             },
@@ -226,6 +237,60 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
         },
         select: registrationSelect,
       }).then(mapRegistration);
+    },
+    async claimNextPendingPackage() {
+      return activeClient().scormPackage.findFirst({
+        where: {
+          active: true,
+          extractionStatus: "PENDING",
+        },
+        orderBy: { updatedAt: "asc" },
+        select: {
+          id: true,
+          organizationId: true,
+          courseId: true,
+          storageKey: true,
+          contentRootKey: true,
+        },
+      });
+    },
+    async markExtractionProcessing(packageId) {
+      await activeClient().scormPackage.update({
+        where: { id: packageId },
+        data: {
+          extractionStatus: "PROCESSING",
+          extractionError: null,
+        },
+      });
+    },
+    async markMalwareScanStatus(input) {
+      await activeClient().scormPackage.update({
+        where: { id: input.packageId },
+        data: {
+          malwareScanStatus: input.status,
+          malwareScanError: input.error,
+        },
+      });
+    },
+    async markExtractionReady(input) {
+      await activeClient().scormPackage.update({
+        where: { id: input.packageId },
+        data: {
+          extractionStatus: "READY",
+          extractionError: null,
+          manifestTitle: input.manifestTitle,
+          launchPath: input.launchPath,
+        },
+      });
+    },
+    async markExtractionFailed(input) {
+      await activeClient().scormPackage.update({
+        where: { id: input.packageId },
+        data: {
+          extractionStatus: "FAILED",
+          extractionError: input.error,
+        },
+      });
     },
     async findAssignmentForProgress(input) {
       const assignment = await activeClient().courseAssignment.findFirst({

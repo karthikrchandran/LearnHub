@@ -20,6 +20,8 @@ describe("SCORM page shells", () => {
     expect(page).toContain("Upload zip");
     expect(page).toContain("Launch path");
     expect(page).toContain("contentRootKey");
+    expect(page).toContain("Extraction status");
+    expect(page).toContain("Malware scan");
     expect(page).not.toContain("disabled");
   });
 

@@ -90,6 +90,8 @@ describe("SCORM package server actions", () => {
       launchPath: "index.html",
       manifestTitle: "Policy",
       uploadedByUserId: "actor_1",
+      extractionStatus: "PENDING",
+      malwareScanStatus: "PENDING",
     });
   });
 

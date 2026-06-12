@@ -22,6 +22,7 @@ describe("native video page shells", () => {
     expect(page).toContain("<form action={replaceTranscriptAction}");
     expect(page).toContain("Modules");
     expect(page).toContain("Video lessons");
+    expect(page).toContain("Provider status");
     expect(page).toContain("Chapters");
     expect(page).toContain("Transcript");
     expect(page).not.toContain("disabled");
