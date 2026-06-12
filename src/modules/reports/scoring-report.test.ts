@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import { buildQuizDifficultyReportRows, buildScoringReportRows } from "./scoring-report";
 
 describe("scoring reports", () => {
-  it("aggregates average score by course", () => {
+  it("aggregates average, best, latest, and pass rate by course", () => {
     expect(
       buildScoringReportRows(
         [
-          { organizationId: "org_1", courseId: "course_1", courseTitle: "Course", scorePercent: 100 },
-          { organizationId: "org_1", courseId: "course_1", courseTitle: "Course", scorePercent: 0 },
-          { organizationId: "org_2", courseId: "course_1", courseTitle: "Other", scorePercent: 100 },
+          { organizationId: "org_1", courseId: "course_1", courseTitle: "Course", scorePercent: 100, submittedAt: new Date("2026-06-12T10:00:00.000Z") },
+          { organizationId: "org_1", courseId: "course_1", courseTitle: "Course", scorePercent: 40, submittedAt: new Date("2026-06-12T11:00:00.000Z") },
+          { organizationId: "org_2", courseId: "course_1", courseTitle: "Other", scorePercent: 100, submittedAt: new Date("2026-06-12T12:00:00.000Z") },
         ],
         "org_1",
       ),
@@ -19,7 +19,10 @@ describe("scoring reports", () => {
         courseId: "course_1",
         courseTitle: "Course",
         attemptCount: 2,
-        averageScore: 50,
+        averageScore: 70,
+        bestScore: 100,
+        latestScore: 40,
+        passRate: 50,
       },
     ]);
   });

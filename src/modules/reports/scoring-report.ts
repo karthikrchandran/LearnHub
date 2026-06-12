@@ -1,10 +1,12 @@
 import { aggregateQuizDifficulty } from "@/modules/assessments/scoring";
+import { formatCsv } from "./csv";
 
 export type ScoringAttemptRow = {
   organizationId: string;
   courseId: string;
   courseTitle: string;
   scorePercent: number;
+  submittedAt: Date;
 };
 
 export type DifficultyAttemptRow = {
@@ -29,6 +31,10 @@ export function buildScoringReportRows(rows: ScoringAttemptRow[], organizationId
     courseTitle: courseRows[0].courseTitle,
     attemptCount: courseRows.length,
     averageScore: Math.round(courseRows.reduce((sum, row) => sum + row.scorePercent, 0) / courseRows.length),
+    bestScore: Math.max(...courseRows.map((row) => row.scorePercent)),
+    latestScore: [...courseRows].sort((left, right) => right.submittedAt.getTime() - left.submittedAt.getTime())[0]
+      .scorePercent,
+    passRate: Math.round((courseRows.filter((row) => row.scorePercent >= 70).length / courseRows.length) * 100),
   }));
 }
 
@@ -40,4 +46,18 @@ export function buildQuizDifficultyReportRows(rows: DifficultyAttemptRow[], orga
     ...row,
     prompt: promptByQuestion.get(row.questionId) ?? row.questionId,
   }));
+}
+
+export function formatScoringReportCsv(rows: ReturnType<typeof buildScoringReportRows>): string {
+  return formatCsv([
+    ["Course Title", "Attempts", "Average Score", "Best Score", "Latest Score", "Pass Rate"],
+    ...rows.map((row) => [
+      row.courseTitle,
+      row.attemptCount,
+      row.averageScore,
+      row.bestScore,
+      row.latestScore,
+      row.passRate,
+    ]),
+  ]);
 }

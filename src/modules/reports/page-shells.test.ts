@@ -21,7 +21,15 @@ describe("progress report page shells", () => {
     expect(page).toContain("Status");
     expect(page).toContain("Progress");
     expect(page).toContain("Certificate");
-    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/reports/progress.csv");
+    expect(page).toContain('"completions.csv"');
+    expect(page).toContain('"scoring.csv"');
+    expect(page).toContain('"timing.csv"');
+    expect(page).toContain('"satisfaction.csv"');
+    expect(page).toContain('"quiz-difficulty.csv"');
+    expect(page).toContain('"certificates.csv"');
+    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/reports/${path}");
+    expect(page).toContain("Course completion");
+    expect(page).toContain("Quiz difficulty");
     expect(page).toContain("No progress records match your report scope.");
   });
 
@@ -36,7 +44,15 @@ describe("progress report page shells", () => {
     expect(page).toContain("Course");
     expect(page).toContain("Due");
     expect(page).toContain("Last event");
-    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/reports/progress.csv");
+    expect(page).toContain('"completions.csv"');
+    expect(page).toContain('"scoring.csv"');
+    expect(page).toContain('"timing.csv"');
+    expect(page).toContain('"satisfaction.csv"');
+    expect(page).toContain('"quiz-difficulty.csv"');
+    expect(page).toContain('"certificates.csv"');
+    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/reports/${path}");
+    expect(page).toContain("Course completion");
+    expect(page).toContain("Certificates and credentials");
     expect(page).toContain("No progress records for this organization yet.");
   });
 });
