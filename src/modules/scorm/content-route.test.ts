@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     R2_ACCESS_KEY_ID: undefined as string | undefined,
     R2_SECRET_ACCESS_KEY: undefined as string | undefined,
     R2_BUCKET_NAME: undefined as string | undefined,
+    NEXTAUTH_SECRET: "test-secret" as string | undefined,
   },
   getSignedReadUrl: vi.fn(),
 }));
@@ -35,6 +37,7 @@ beforeEach(async () => {
     R2_ACCESS_KEY_ID: undefined,
     R2_SECRET_ACCESS_KEY: undefined,
     R2_BUCKET_NAME: undefined,
+    NEXTAUTH_SECRET: "test-secret",
   };
   contentRoot = join(process.cwd(), ".learnhub", "scorm");
   testRoot = join(contentRoot, "test-route");
@@ -42,6 +45,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await rm(testRoot, { recursive: true, force: true });
 });
 
@@ -75,16 +79,14 @@ describe("SCORM content route", () => {
     expect(response.status).toBe(404);
   });
 
-  it("redirects production SCORM content reads through the storage provider when R2 is configured", async () => {
+  it("rejects production SCORM content reads without a launch token before signing storage access", async () => {
     mocks.env = {
       R2_ACCOUNT_ID: "account",
       R2_ACCESS_KEY_ID: "access",
       R2_SECRET_ACCESS_KEY: "secret",
       R2_BUCKET_NAME: "learnhub-media",
+      NEXTAUTH_SECRET: "test-secret",
     };
-    mocks.getSignedReadUrl.mockResolvedValueOnce(
-      "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html?X-Amz-Signature=signed",
-    );
 
     const response = await GET(
       new Request("http://learnhub.test/scorm/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html"),
@@ -95,12 +97,90 @@ describe("SCORM content route", () => {
       },
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(
+    expect(response.status).toBe(403);
+    expect(mocks.getSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it("rejects launch tokens scoped to a different SCORM content root", async () => {
+    mocks.env = {
+      R2_ACCOUNT_ID: "account",
+      R2_ACCESS_KEY_ID: "access",
+      R2_SECRET_ACCESS_KEY: "secret",
+      R2_BUCKET_NAME: "learnhub-media",
+      NEXTAUTH_SECRET: "test-secret",
+    };
+    const requestUrl = signedScormContentUrl({
+      objectKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
+      contentRootKey: "org/org_1/courses/course_1/scorm/pkg_other/content",
+    });
+
+    const response = await GET(new Request(requestUrl), {
+      params: Promise.resolve({
+        path: ["org", "org_1", "courses", "course_1", "scorm", "pkg_course_1", "content", "index.html"],
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(mocks.getSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it("proxies authorized production SCORM content through signed storage access", async () => {
+    mocks.env = {
+      R2_ACCOUNT_ID: "account",
+      R2_ACCESS_KEY_ID: "access",
+      R2_SECRET_ACCESS_KEY: "secret",
+      R2_BUCKET_NAME: "learnhub-media",
+      NEXTAUTH_SECRET: "test-secret",
+    };
+    mocks.getSignedReadUrl.mockResolvedValueOnce(
       "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html?X-Amz-Signature=signed",
     );
+    const fetchStorage = vi.fn().mockResolvedValue(
+      new Response("<html>Launch</html>", {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchStorage);
+    const requestUrl = signedScormContentUrl({
+      objectKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
+      contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
+    });
+
+    const response = await GET(
+      new Request(requestUrl),
+      {
+        params: Promise.resolve({
+          path: ["org", "org_1", "courses", "course_1", "scorm", "pkg_course_1", "content", "index.html"],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("set-cookie")).toContain("learnhub_scorm_access=");
+    await expect(response.text()).resolves.toContain("Launch");
     expect(mocks.getSignedReadUrl).toHaveBeenCalledWith(
       "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
     );
+    expect(fetchStorage).toHaveBeenCalledWith(
+      "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html?X-Amz-Signature=signed",
+    );
   });
 });
+
+function signedScormContentUrl(input: {
+  objectKey: string;
+  contentRootKey: string;
+  expiresAtSeconds?: number;
+}): string {
+  const expiresAtSeconds = input.expiresAtSeconds ?? 4_102_444_800;
+  const token = createHmac("sha256", "test-secret")
+    .update(`${input.contentRootKey}:${expiresAtSeconds}`)
+    .digest("base64url");
+  const url = new URL(`http://learnhub.test/scorm/${input.objectKey}`);
+  url.searchParams.set("lh_scorm_expires", String(expiresAtSeconds));
+  url.searchParams.set("lh_scorm_token", token);
+  return url.toString();
+}

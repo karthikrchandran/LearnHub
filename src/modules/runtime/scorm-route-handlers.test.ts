@@ -129,13 +129,18 @@ describe("SCORM runtime route handlers", () => {
     const response = await launchScorm(new Request("http://learnhub.test"), routeContext);
 
     expect(response.status).toBe(200);
-    expect(await json(response)).toMatchObject({
+    const body = (await json(response)) as { launchUrl: string };
+    const launchUrl = new URL(body.launchUrl, "http://learnhub.test");
+
+    expect(body).toMatchObject({
       assignmentId: "assignment_1",
       packageId: "package_1",
-      launchUrl: "/scorm/org/org_1/courses/course_1/scorm/package_1/content/index.html",
       cmiData: { "cmi.core.lesson_status": "incomplete" },
       launchCount: 2,
     });
+    expect(launchUrl.pathname).toBe("/scorm/org/org_1/courses/course_1/scorm/package_1/content/index.html");
+    expect(launchUrl.searchParams.get("lh_scorm_expires")).toEqual(expect.any(String));
+    expect(launchUrl.searchParams.get("lh_scorm_token")).toEqual(expect.any(String));
     expect(requireLearnerLaunchAssignment).toHaveBeenCalledWith({
       organizationId: "org_1",
       assignmentId: "assignment_1",

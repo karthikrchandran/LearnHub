@@ -33,6 +33,7 @@ export function createR2ObjectStorageProvider(config: R2ObjectStorageProviderCon
         config,
         method: "PUT",
         key: normalizeObjectKey(input.key),
+        contentType: input.contentType,
         expiresInSeconds: input.expiresInSeconds,
       });
     },
@@ -75,6 +76,7 @@ type SignedUrlInput = {
   config: R2ObjectStorageProviderConfig;
   method: "GET" | "PUT" | "DELETE";
   key: string;
+  contentType?: string;
   expiresInSeconds?: number;
 };
 
@@ -87,12 +89,16 @@ function createSignedUrl(input: SignedUrlInput): string {
   const credential = `${input.config.accessKeyId}/${credentialScope}`;
   const host = `${input.config.accountId}.r2.cloudflarestorage.com`;
   const canonicalUri = `/${encodePathSegment(input.config.bucketName)}/${encodeObjectKey(input.key)}`;
+  const canonicalHeaders = signedHeadersForRequest({
+    host,
+    contentType: input.method === "PUT" ? input.contentType : undefined,
+  });
   const query = new URLSearchParams({
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": credential,
     "X-Amz-Date": amzDate,
     "X-Amz-Expires": expiresInSeconds,
-    "X-Amz-SignedHeaders": "host",
+    "X-Amz-SignedHeaders": canonicalHeaders.signedHeaders,
   });
   const canonicalQuery = [...query.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
@@ -102,8 +108,8 @@ function createSignedUrl(input: SignedUrlInput): string {
     input.method,
     canonicalUri,
     canonicalQuery,
-    `host:${host}\n`,
-    "host",
+    canonicalHeaders.canonicalHeaders,
+    canonicalHeaders.signedHeaders,
     "UNSIGNED-PAYLOAD",
   ].join("\n");
   const stringToSign = [
@@ -117,6 +123,27 @@ function createSignedUrl(input: SignedUrlInput): string {
   query.set("X-Amz-Signature", signature);
 
   return `https://${host}${canonicalUri}?${query.toString()}`;
+}
+
+function signedHeadersForRequest(input: { host: string; contentType?: string }): {
+  canonicalHeaders: string;
+  signedHeaders: string;
+} {
+  const headers = input.contentType
+    ? [
+        ["content-type", normalizeHeaderValue(input.contentType)],
+        ["host", input.host],
+      ]
+    : [["host", input.host]];
+
+  return {
+    canonicalHeaders: headers.map(([name, value]) => `${name}:${value}\n`).join(""),
+    signedHeaders: headers.map(([name]) => name).join(";"),
+  };
+}
+
+function normalizeHeaderValue(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
 }
 
 function signingKey(secretAccessKey: string, datestamp: string): Buffer {

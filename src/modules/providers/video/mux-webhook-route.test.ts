@@ -92,4 +92,27 @@ describe("Mux webhook route", () => {
     expect(response.status).toBe(400);
     expect(mocks.videoLessonUpdateMany).not.toHaveBeenCalled();
   });
+
+  it("does not acknowledge processed when no tenant-scoped video lesson matches the webhook", async () => {
+    mocks.videoLessonUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const response = await POST(
+      signedRequest({
+        type: "video.asset.ready",
+        data: {
+          id: "asset_1",
+          upload_id: "upload_1",
+          playback_ids: [{ id: "playback_1" }],
+          passthrough: JSON.stringify({
+            organizationId: "org_1",
+            courseId: "course_1",
+            lessonId: "lesson_1",
+          }),
+        },
+      }),
+    );
+
+    await expect(response.json()).resolves.toEqual({ error: "Mux webhook target was not found" });
+    expect(response.status).toBe(404);
+  });
 });

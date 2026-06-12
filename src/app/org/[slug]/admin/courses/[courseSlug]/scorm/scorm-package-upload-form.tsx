@@ -45,6 +45,7 @@ export function ScormPackageUploadForm({
         uploadUrl,
         fileName: packageFile.name,
         contentType,
+        byteSize: packageFile.size,
         courseId,
         packageId,
       });
@@ -111,6 +112,7 @@ async function createSignedUpload(input: {
   uploadUrl: string;
   fileName: string;
   contentType: string;
+  byteSize: number;
   courseId: string;
   packageId: string;
 }): Promise<{ key: string; uploadUrl: string }> {
@@ -121,6 +123,7 @@ async function createSignedUpload(input: {
       purpose: "scorm_zip",
       fileName: input.fileName,
       contentType: input.contentType,
+      byteSize: input.byteSize,
       courseId: input.courseId,
       packageId: input.packageId,
     }),

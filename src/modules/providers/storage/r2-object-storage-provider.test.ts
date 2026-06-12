@@ -24,6 +24,7 @@ describe("createR2ObjectStorageProvider", () => {
     expect(readUrl).toContain("X-Amz-Algorithm=AWS4-HMAC-SHA256");
     expect(readUrl).toContain("X-Amz-Credential=access_key%2F20260613%2Fauto%2Fs3%2Faws4_request");
     expect(readUrl).toContain("X-Amz-SignedHeaders=host");
+    expect(writeUrl).toContain("X-Amz-SignedHeaders=content-type%3Bhost");
     expect(writeUrl).toContain("X-Amz-Signature=");
   });
 

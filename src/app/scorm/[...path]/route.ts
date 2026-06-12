@@ -6,6 +6,15 @@ import {
   createR2ObjectStorageProvider,
   type R2ObjectStorageProviderConfig,
 } from "@/modules/providers/storage/r2-object-storage-provider";
+import {
+  createScormContentAccessCookie,
+  parseScormContentAccessCookie,
+  type ScormContentAccessGrant,
+  SCORM_CONTENT_EXPIRES_PARAM,
+  SCORM_CONTENT_TOKEN_PARAM,
+  scormContentRootKeyFromObjectKey,
+  verifyScormContentAccessGrant,
+} from "@/modules/scorm/scorm-content-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,20 +25,23 @@ type ScormContentRouteContext = {
   }>;
 };
 
-export async function GET(_request: Request, { params }: ScormContentRouteContext): Promise<Response> {
+export async function GET(request: Request, { params }: ScormContentRouteContext): Promise<Response> {
   const { path } = await params;
 
   if (!isSafePath(path)) {
     return new Response("Invalid SCORM content path", { status: 400 });
   }
 
-  const storageConfig = optionalR2Config(getEnv());
+  const env = getEnv();
+  const storageConfig = optionalR2Config(env);
 
   if (storageConfig) {
-    const provider = createR2ObjectStorageProvider(storageConfig);
-    const signedReadUrl = await provider.getSignedReadUrl(path.join("/"));
-
-    return Response.redirect(signedReadUrl, 307);
+    return serveR2ScormContent({
+      request,
+      path,
+      storageConfig,
+      secret: env.NEXTAUTH_SECRET,
+    });
   }
 
   const contentRoot = resolve(join(process.cwd(), ".learnhub", "scorm"));
@@ -61,6 +73,82 @@ export async function GET(_request: Request, { params }: ScormContentRouteContex
 
     return new Response("SCORM content read failed", { status: 500 });
   }
+}
+
+async function serveR2ScormContent(input: {
+  request: Request;
+  path: string[];
+  storageConfig: R2ObjectStorageProviderConfig;
+  secret: string;
+}): Promise<Response> {
+  const objectKey = input.path.join("/");
+  const contentRootKey = scormContentRootKeyFromObjectKey(objectKey);
+
+  if (!contentRootKey) {
+    return new Response("Invalid SCORM content path", { status: 400 });
+  }
+
+  const now = new Date();
+  const url = new URL(input.request.url);
+  const queryGrant = readScormContentQueryGrant(url);
+  const cookieGrant = parseScormContentAccessCookie(input.request.headers.get("cookie"));
+  const grant = queryGrant ?? cookieGrant;
+
+  if (
+    !grant ||
+    !verifyScormContentAccessGrant({
+      contentRootKey,
+      expiresAtSeconds: grant.expiresAtSeconds,
+      token: grant.token,
+      secret: input.secret,
+      now,
+    })
+  ) {
+    return new Response("SCORM content access token is required", { status: 403 });
+  }
+
+  const provider = createR2ObjectStorageProvider(input.storageConfig);
+  const signedReadUrl = await provider.getSignedReadUrl(objectKey);
+  const storageResponse = await fetch(signedReadUrl);
+
+  if (storageResponse.status === 404) {
+    return new Response("SCORM content not found", { status: 404 });
+  }
+
+  if (!storageResponse.ok) {
+    return new Response("SCORM content read failed", { status: 502 });
+  }
+
+  const headers = new Headers({
+    "content-type": storageResponse.headers.get("content-type") ?? contentTypeForPath(objectKey),
+  });
+
+  if (queryGrant) {
+    headers.append(
+      "set-cookie",
+      createScormContentAccessCookie({
+        grant: queryGrant,
+        contentRootKey,
+        now,
+      }),
+    );
+  }
+
+  return new Response(storageResponse.body, {
+    status: storageResponse.status,
+    headers,
+  });
+}
+
+function readScormContentQueryGrant(url: URL): ScormContentAccessGrant | null {
+  const expiresAtSeconds = Number(url.searchParams.get(SCORM_CONTENT_EXPIRES_PARAM));
+  const token = url.searchParams.get(SCORM_CONTENT_TOKEN_PARAM);
+
+  if (!Number.isInteger(expiresAtSeconds) || !token) {
+    return null;
+  }
+
+  return { expiresAtSeconds, token };
 }
 
 function isSafePath(path: string[]): boolean {

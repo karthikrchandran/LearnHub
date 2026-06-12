@@ -1,6 +1,7 @@
 import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
 import { getEnv } from "@/lib/env";
 import { createR2ObjectStorageProvider } from "@/modules/providers/storage/r2-object-storage-provider";
+import { validateScormUploadMetadata } from "@/modules/scorm/scorm-manifest";
 import {
   certificateArtifactKey,
   csvExportKey,
@@ -28,6 +29,7 @@ type StorageUploadRequest = {
   certificateId?: string;
   reportName?: string;
   exportId?: string;
+  byteSize?: number;
 };
 
 export async function POST(request: Request, { params }: StorageUploadRouteContext): Promise<Response> {
@@ -146,6 +148,12 @@ async function validateScormZipUpload(input: {
     throw new Error("packageId must match the SCORM course package id");
   }
 
+  validateScormUploadMetadata({
+    originalFileName: required(input.body.fileName, "fileName is required"),
+    contentType: required(input.body.contentType, "contentType is required"),
+    byteSize: normalizeByteSize(input.body.byteSize),
+  });
+
   const course = await input.prisma.course.findFirst({
     where: {
       id: courseId,
@@ -204,6 +212,10 @@ function required(value: string | undefined, message: string): string {
   }
 
   return value.trim();
+}
+
+function normalizeByteSize(value: number | undefined): number {
+  return typeof value === "number" ? value : Number.NaN;
 }
 
 function requiredR2Config() {

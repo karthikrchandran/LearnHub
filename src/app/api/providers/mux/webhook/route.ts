@@ -52,39 +52,30 @@ export async function POST(request: Request): Promise<Response> {
         providerAssetId: event.providerAssetId,
       };
 
-  if (event.type === "asset.ready") {
-    await prisma.videoLesson.updateMany({
-      where,
-      data: {
-        providerAssetId: event.providerAssetId,
-        providerPlaybackId: event.playbackId,
-        providerStatus: "READY",
-        providerError: null,
-        playbackUrl: event.playbackUrl,
-      },
-    });
-  }
+  const data =
+    event.type === "asset.ready"
+      ? {
+          providerAssetId: event.providerAssetId,
+          providerPlaybackId: event.playbackId,
+          providerStatus: "READY" as const,
+          providerError: null,
+          playbackUrl: event.playbackUrl,
+        }
+      : event.type === "asset.failed"
+        ? {
+            providerAssetId: event.providerAssetId,
+            providerStatus: "FAILED" as const,
+            providerError: event.errorMessage,
+          }
+        : {
+            providerAssetId: event.providerAssetId,
+            providerStatus: "PROCESSING" as const,
+            providerError: null,
+          };
+  const updateResult = await prisma.videoLesson.updateMany({ where, data });
 
-  if (event.type === "asset.failed") {
-    await prisma.videoLesson.updateMany({
-      where,
-      data: {
-        providerAssetId: event.providerAssetId,
-        providerStatus: "FAILED",
-        providerError: event.errorMessage,
-      },
-    });
-  }
-
-  if (event.type === "upload.asset_created") {
-    await prisma.videoLesson.updateMany({
-      where,
-      data: {
-        providerAssetId: event.providerAssetId,
-        providerStatus: "PROCESSING",
-        providerError: null,
-      },
-    });
+  if (updateResult.count === 0) {
+    return Response.json({ error: "Mux webhook target was not found" }, { status: 404 });
   }
 
   return Response.json({ status: "processed", event: event.type });

@@ -74,6 +74,7 @@ describe("storage upload route", () => {
         purpose: "scorm_zip",
         fileName: "policy.zip",
         contentType: "application/zip",
+        byteSize: 1024,
         courseId: "course_1",
         packageId: "pkg_course_1",
       }),
@@ -112,6 +113,43 @@ describe("storage upload route", () => {
     );
 
     await expect(response.json()).resolves.toEqual({ error: "packageId must match the SCORM course package id" });
+    expect(response.status).toBe(400);
+    expect(mocks.createR2ObjectStorageProvider).not.toHaveBeenCalled();
+    expect(mocks.getSignedWriteUrl).not.toHaveBeenCalled();
+  });
+
+  it("rejects SCORM signed upload requests without package size metadata", async () => {
+    const response = await POST(
+      uploadRequest({
+        purpose: "scorm_zip",
+        fileName: "policy.zip",
+        contentType: "application/zip",
+        courseId: "course_1",
+        packageId: "pkg_course_1",
+      }),
+      routeContext,
+    );
+
+    await expect(response.json()).resolves.toEqual({ error: "SCORM package size must be positive" });
+    expect(response.status).toBe(400);
+    expect(mocks.createR2ObjectStorageProvider).not.toHaveBeenCalled();
+    expect(mocks.getSignedWriteUrl).not.toHaveBeenCalled();
+  });
+
+  it("rejects SCORM signed upload requests with non-zip content metadata", async () => {
+    const response = await POST(
+      uploadRequest({
+        purpose: "scorm_zip",
+        fileName: "policy.pdf",
+        contentType: "application/pdf",
+        byteSize: 1024,
+        courseId: "course_1",
+        packageId: "pkg_course_1",
+      }),
+      routeContext,
+    );
+
+    await expect(response.json()).resolves.toEqual({ error: "SCORM package must be a zip file" });
     expect(response.status).toBe(400);
     expect(mocks.createR2ObjectStorageProvider).not.toHaveBeenCalled();
     expect(mocks.getSignedWriteUrl).not.toHaveBeenCalled();
