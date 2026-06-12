@@ -1,6 +1,6 @@
 CREATE TYPE "NotificationJobType" AS ENUM ('ASSIGNMENT_ASSIGNED', 'ASSIGNMENT_DUE_SOON', 'ASSIGNMENT_OVERDUE', 'MANAGER_ESCALATION', 'CERTIFICATE_ISSUED');
 CREATE TYPE "NotificationJobStatus" AS ENUM ('PENDING', 'PROCESSING', 'SENT', 'FAILED', 'SKIPPED');
-CREATE TYPE "NotificationEnqueueFailureStatus" AS ENUM ('PENDING', 'RESOLVED');
+CREATE TYPE "NotificationEnqueueFailureStatus" AS ENUM ('PENDING', 'PROCESSING', 'RESOLVED');
 
 CREATE TABLE "NotificationJob" (
   "id" TEXT NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE "NotificationEnqueueFailure" (
   "payload" JSONB NOT NULL,
   "status" "NotificationEnqueueFailureStatus" NOT NULL DEFAULT 'PENDING',
   "attempts" INTEGER NOT NULL DEFAULT 0,
-  "lastError" TEXT NOT NULL,
+  "lastError" TEXT,
   "failedAt" TIMESTAMP(3) NOT NULL,
   "retryAt" TIMESTAMP(3) NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
-import type { NotificationJobUpsert, NotificationJobWriteRepository } from "./notification-jobs";
-import type { NotificationDeliveryJob, NotificationSchedulerRepository } from "./scheduler";
+import type { NotificationEnqueueOperation, NotificationJobUpsert, NotificationJobWriteRepository } from "./notification-jobs";
+import type { NotificationDeliveryJob, NotificationEnqueueFailureRetry, NotificationSchedulerRepository } from "./scheduler";
 
 type PrismaNotificationClient = Pick<PrismaClient, "$transaction" | "notificationJob" | "notificationEnqueueFailure">;
 
@@ -100,6 +100,13 @@ type ClaimedNotificationJobRow = {
   attempts: number;
 };
 
+type ClaimedNotificationEnqueueFailureRow = {
+  id: string;
+  operation: NotificationEnqueueOperation;
+  payload: unknown;
+  attempts: number;
+};
+
 export function createPrismaNotificationRepository(
   client: PrismaNotificationClient,
 ): NotificationJobWriteRepository & NotificationSchedulerRepository & NotificationInspectionRepository {
@@ -165,6 +172,36 @@ export function createPrismaNotificationRepository(
         `,
       );
     },
+    async claimDueNotificationEnqueueFailures(input): Promise<NotificationEnqueueFailureRetry[]> {
+      const leaseExpiresAt = new Date(input.now.getTime() + input.processingTimeoutMs);
+
+      return client.$transaction((transaction) =>
+        transaction.$queryRaw<ClaimedNotificationEnqueueFailureRow[]>`
+          WITH candidates AS (
+            SELECT "id"
+            FROM "NotificationEnqueueFailure"
+            WHERE "status" IN ('PENDING', 'PROCESSING')
+              AND "retryAt" <= ${input.now}
+              AND "attempts" < ${input.maxAttempts}
+            ORDER BY "retryAt" ASC, "createdAt" ASC
+            FOR UPDATE SKIP LOCKED
+            LIMIT ${input.batchSize}
+          )
+          UPDATE "NotificationEnqueueFailure" AS failure
+          SET
+            "status" = 'PROCESSING',
+            "retryAt" = ${leaseExpiresAt},
+            "updatedAt" = ${input.now}
+          FROM candidates
+          WHERE failure."id" = candidates."id"
+          RETURNING
+            failure."id",
+            failure."operation",
+            failure."payload",
+            failure."attempts"
+        `,
+      );
+    },
     async markNotificationJobSent(input) {
       await client.notificationJob.update({
         where: { id: input.id },
@@ -194,6 +231,27 @@ export function createPrismaNotificationRepository(
           status: "SKIPPED",
           sentAt: input.skippedAt,
           lastError: input.reason,
+        },
+      });
+    },
+    async markNotificationEnqueueFailureResolved(input) {
+      await client.notificationEnqueueFailure.update({
+        where: { id: input.id },
+        data: {
+          status: "RESOLVED",
+          retryAt: input.resolvedAt,
+          lastError: null,
+        },
+      });
+    },
+    async markNotificationEnqueueFailureFailed(input) {
+      await client.notificationEnqueueFailure.update({
+        where: { id: input.id },
+        data: {
+          status: "PENDING",
+          attempts: input.attempts,
+          lastError: input.lastError,
+          retryAt: input.retryAt,
         },
       });
     },
@@ -291,7 +349,7 @@ function mapEnqueueFailureInspectionJob(failure: {
   attempts: number;
   retryAt: Date;
   failedAt: Date;
-  lastError: string;
+  lastError: string | null;
   payload: unknown;
   organization?: { name: string; slug: string } | null;
   assignment?: { course?: { title: string } | null } | null;

@@ -1,5 +1,13 @@
 import type { EmailProvider } from "../providers/email/email-provider";
-import type { NotificationJobType } from "./notification-jobs";
+import {
+  scheduleAssignmentNotifications,
+  scheduleCertificateNotification,
+  type AssignmentNotificationScheduleInput,
+  type CertificateNotificationScheduleInput,
+  type NotificationEnqueueOperation,
+  type NotificationJobType,
+  type NotificationJobWriteRepository,
+} from "./notification-jobs";
 
 export type NotificationDeliveryJob = {
   id: string;
@@ -19,7 +27,30 @@ export type NotificationProcessResult = {
   skipped: number;
 };
 
-export interface NotificationSchedulerRepository {
+export type NotificationEnqueueFailureRetry = {
+  id: string;
+  operation: NotificationEnqueueOperation;
+  payload: unknown;
+  attempts: number;
+};
+
+export interface NotificationSchedulerRepository extends NotificationJobWriteRepository {
+  claimDueNotificationEnqueueFailures(input: {
+    now: Date;
+    batchSize: number;
+    maxAttempts: number;
+    processingTimeoutMs: number;
+  }): Promise<NotificationEnqueueFailureRetry[]>;
+  markNotificationEnqueueFailureResolved(input: {
+    id: string;
+    resolvedAt: Date;
+  }): Promise<void>;
+  markNotificationEnqueueFailureFailed(input: {
+    id: string;
+    attempts: number;
+    lastError: string;
+    retryAt: Date;
+  }): Promise<void>;
   claimDueNotificationJobs(input: {
     now: Date;
     batchSize: number;
@@ -50,11 +81,21 @@ export async function processNotificationJobs(
   provider: EmailProvider,
 ): Promise<NotificationProcessResult> {
   const batchSize = clampBatchSize(input.batchSize);
+  const processingTimeoutMs = input.processingTimeoutMs ?? 15 * 60 * 1000;
+  await processNotificationEnqueueFailures(
+    {
+      now: input.now,
+      batchSize,
+      maxAttempts: input.maxAttempts,
+      processingTimeoutMs,
+    },
+    repository,
+  );
   const jobs = await repository.claimDueNotificationJobs({
     now: input.now,
     batchSize,
     maxAttempts: input.maxAttempts,
-    processingTimeoutMs: input.processingTimeoutMs ?? 15 * 60 * 1000,
+    processingTimeoutMs,
   });
   let sent = 0;
   let failed = 0;
@@ -105,6 +146,81 @@ export async function processNotificationJobs(
   };
 }
 
+async function processNotificationEnqueueFailures(
+  input: { now: Date; batchSize: number; maxAttempts: number; processingTimeoutMs: number },
+  repository: NotificationSchedulerRepository,
+): Promise<void> {
+  const failures = await repository.claimDueNotificationEnqueueFailures(input);
+
+  for (const failure of failures) {
+    try {
+      await replayNotificationEnqueueFailure(failure, repository);
+      await repository.markNotificationEnqueueFailureResolved({
+        id: failure.id,
+        resolvedAt: input.now,
+      });
+    } catch (error) {
+      const attempts = failure.attempts + 1;
+
+      await repository.markNotificationEnqueueFailureFailed({
+        id: failure.id,
+        attempts,
+        lastError: error instanceof Error ? error.message : "Notification enqueue retry failed",
+        retryAt: addMinutes(input.now, retryDelayMinutes(attempts)),
+      });
+    }
+  }
+}
+
+async function replayNotificationEnqueueFailure(
+  failure: NotificationEnqueueFailureRetry,
+  repository: NotificationSchedulerRepository,
+): Promise<void> {
+  if (failure.operation === "ASSIGNMENT_NOTIFICATIONS") {
+    await scheduleAssignmentNotifications(parseAssignmentNotificationPayload(failure.payload), repository);
+    return;
+  }
+
+  if (failure.operation === "CERTIFICATE_NOTIFICATION") {
+    await scheduleCertificateNotification(parseCertificateNotificationPayload(failure.payload), repository);
+    return;
+  }
+
+  throw new Error("Unsupported notification enqueue operation");
+}
+
+function parseAssignmentNotificationPayload(payload: unknown): AssignmentNotificationScheduleInput {
+  const value = requireRecord(payload);
+
+  return {
+    organizationId: requireString(value, "organizationId"),
+    assignmentId: requireString(value, "assignmentId"),
+    learnerEmail: requireString(value, "learnerEmail"),
+    learnerName: requireString(value, "learnerName"),
+    courseTitle: requireString(value, "courseTitle"),
+    dueDate: requireDate(value, "dueDate"),
+    assignmentUrl: optionalString(value, "assignmentUrl") ?? "",
+    managerEmail: optionalString(value, "managerEmail"),
+    managerName: optionalString(value, "managerName"),
+    now: requireDate(value, "now"),
+  };
+}
+
+function parseCertificateNotificationPayload(payload: unknown): CertificateNotificationScheduleInput {
+  const value = requireRecord(payload);
+
+  return {
+    organizationId: requireString(value, "organizationId"),
+    assignmentId: requireString(value, "assignmentId"),
+    certificateId: requireString(value, "certificateId"),
+    learnerEmail: requireString(value, "learnerEmail"),
+    learnerName: requireString(value, "learnerName"),
+    courseTitle: requireString(value, "courseTitle"),
+    certificateUrl: requireString(value, "certificateUrl"),
+    now: requireDate(value, "now"),
+  };
+}
+
 function shouldSkipCompletedAssignmentNotification(job: NotificationDeliveryJob): boolean {
   return job.assignmentStatus === "COMPLETED" && isDelayedAssignmentNotification(job.type);
 }
@@ -127,4 +243,39 @@ function retryDelayMinutes(attempts: number): number {
 
 function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
+}
+
+function requireRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Notification enqueue payload is invalid");
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function requireString(value: Record<string, unknown>, key: string): string {
+  const candidate = value[key];
+
+  if (typeof candidate !== "string" || !candidate.trim()) {
+    throw new Error(`Notification enqueue payload is missing ${key}`);
+  }
+
+  return candidate.trim();
+}
+
+function optionalString(value: Record<string, unknown>, key: string): string | null {
+  const candidate = value[key];
+
+  return typeof candidate === "string" && candidate.trim() ? candidate.trim() : null;
+}
+
+function requireDate(value: Record<string, unknown>, key: string): Date {
+  const candidate = value[key];
+  const parsed = candidate instanceof Date ? candidate : typeof candidate === "string" ? new Date(candidate) : null;
+
+  if (!parsed || Number.isNaN(parsed.getTime())) {
+    throw new Error(`Notification enqueue payload has invalid ${key}`);
+  }
+
+  return parsed;
 }

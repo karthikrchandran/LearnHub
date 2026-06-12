@@ -87,6 +87,7 @@ enum NotificationJobStatus {
 
 enum NotificationEnqueueFailureStatus {
   PENDING
+  PROCESSING
   RESOLVED
 }
 
@@ -569,7 +570,7 @@ model NotificationEnqueueFailure {
   payload        Json
   status         NotificationEnqueueFailureStatus @default(PENDING)
   attempts       Int                              @default(0)
-  lastError      String
+  lastError      String?
   failedAt       DateTime
   retryAt        DateTime
   organization   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)

@@ -43,6 +43,7 @@ function createClient() {
     },
     notificationEnqueueFailure: {
       findMany: vi.fn(async (): Promise<Array<Record<string, unknown>>> => []),
+      update: vi.fn(),
     },
   };
 }
@@ -250,6 +251,87 @@ describe("Prisma notification repository", () => {
     expect(values).toContainEqual(new Date("2026-06-12T09:30:00.000Z"));
   });
 
+  it("claims due enqueue failures atomically and leases them for retry replay", async () => {
+    const client = createClient();
+    client.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "enqueue_failure_1",
+        operation: "ASSIGNMENT_NOTIFICATIONS",
+        payload: {
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+        },
+        attempts: 1,
+      },
+    ]);
+    const repository = createPrismaNotificationRepository(
+      client as unknown as Parameters<typeof createPrismaNotificationRepository>[0],
+    );
+
+    const failures = await repository.claimDueNotificationEnqueueFailures({
+      now: nextRunAt,
+      batchSize: 10,
+      maxAttempts: 3,
+      processingTimeoutMs: 15 * 60 * 1000,
+    });
+
+    const [sqlParts, ...values] = client.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = Array.from(sqlParts as TemplateStringsArray).join("?");
+    expect(sql).toContain('FROM "NotificationEnqueueFailure"');
+    expect(sql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(sql).toContain('UPDATE "NotificationEnqueueFailure"');
+    expect(sql).toContain('"status" = \'PROCESSING\'');
+    expect(sql).toContain("RETURNING");
+    expect(values).toContainEqual(new Date("2026-06-12T10:15:00.000Z"));
+    expect(failures).toEqual([
+      {
+        id: "enqueue_failure_1",
+        operation: "ASSIGNMENT_NOTIFICATIONS",
+        payload: {
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+        },
+        attempts: 1,
+      },
+    ]);
+  });
+
+  it("marks enqueue failures resolved or pending for retry", async () => {
+    const client = createClient();
+    const repository = createPrismaNotificationRepository(
+      client as unknown as Parameters<typeof createPrismaNotificationRepository>[0],
+    );
+
+    await repository.markNotificationEnqueueFailureResolved({
+      id: "enqueue_failure_1",
+      resolvedAt: nextRunAt,
+    });
+    await repository.markNotificationEnqueueFailureFailed({
+      id: "enqueue_failure_2",
+      attempts: 2,
+      lastError: "notification table unavailable",
+      retryAt: nextRunAt,
+    });
+
+    expect(client.notificationEnqueueFailure.update).toHaveBeenCalledWith({
+      where: { id: "enqueue_failure_1" },
+      data: {
+        status: "RESOLVED",
+        retryAt: nextRunAt,
+        lastError: null,
+      },
+    });
+    expect(client.notificationEnqueueFailure.update).toHaveBeenCalledWith({
+      where: { id: "enqueue_failure_2" },
+      data: {
+        status: "PENDING",
+        attempts: 2,
+        lastError: "notification table unavailable",
+        retryAt: nextRunAt,
+      },
+    });
+  });
+
   it("marks sent, failed, and skipped jobs", async () => {
     const client = createClient();
     const repository = createPrismaNotificationRepository(
@@ -308,7 +390,9 @@ describe("Prisma notification repository", () => {
     expect(schema).toContain(
       "certificate       Certificate?          @relation(fields: [organizationId, certificateId], references: [organizationId, id]",
     );
+    expect(schema).toContain("PROCESSING");
     expect(schema).toContain("@@unique([organizationId, id])");
+    expect(migration).toContain("CREATE TYPE \"NotificationEnqueueFailureStatus\" AS ENUM ('PENDING', 'PROCESSING', 'RESOLVED')");
     expect(migration).toContain(
       'FOREIGN KEY ("organizationId", "certificateId") REFERENCES "Certificate"("organizationId", "id")',
     );
