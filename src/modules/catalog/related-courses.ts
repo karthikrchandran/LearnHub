@@ -1,11 +1,13 @@
 import type { CourseStatus } from "@prisma/client";
 
 export type RelatedCourseCandidate = {
+  organizationId: string;
   id: string;
   title: string;
   status: CourseStatus;
   categoryId: string | null;
   tagIds: string[];
+  isGlobalLibraryCourse?: boolean;
 };
 
 export function rankRelatedCourses(
@@ -14,7 +16,13 @@ export function rankRelatedCourses(
   limit = 5,
 ): RelatedCourseCandidate[] {
   return candidates
-    .filter((candidate) => candidate.id !== source.id && candidate.status === "PUBLISHED")
+    .filter(
+      (candidate) =>
+        candidate.id !== source.id &&
+        candidate.organizationId === source.organizationId &&
+        candidate.status === "PUBLISHED" &&
+        candidate.isGlobalLibraryCourse !== true,
+    )
     .map((candidate) => {
       const sameCategory = source.categoryId !== null && candidate.categoryId === source.categoryId;
       const sharedTagCount = candidate.tagIds.filter((tagId) => source.tagIds.includes(tagId)).length;

@@ -219,8 +219,12 @@ model Course {
   estimatedCompletionBusinessDays Int                @default(5)
   expectedDurationMinutes         Int                @default(60)
   categoryId                      String?
+  isGlobalLibraryCourse           Boolean            @default(false)
+  globalLibrarySourceCourseId     String?
   organization                    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   category                        CourseCategory?    @relation(fields: [organizationId, categoryId], references: [organizationId, id])
+  globalLibrarySourceCourse       Course?            @relation("GlobalLibraryCourseCopies", fields: [globalLibrarySourceCourseId], references: [id], onDelete: SetNull)
+  globalLibraryCopies             Course[]           @relation("GlobalLibraryCourseCopies")
   tagLinks                        CourseTagLink[]
   assignments                     CourseAssignment[]
   modules                         CourseModule[]
@@ -233,6 +237,8 @@ model Course {
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
   @@index([organizationId, status])
+  @@index([isGlobalLibraryCourse, status])
+  @@index([organizationId, globalLibrarySourceCourseId])
 }
 
 model CourseTagLink {
