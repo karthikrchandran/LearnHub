@@ -45,23 +45,33 @@ describe("course catalog and assignment page shells", () => {
     expect(page).toContain("disabled");
   });
 
-  it("adds a non-destructive admin assignment shell", async () => {
+  it("wires a live admin and manager assignment shell", async () => {
     const page = await readPage(path.join("admin", "assignments"));
 
     expect(page).toContain("Course selector");
     expect(page).toContain("Learner or direct report");
     expect(page).toContain("Start date");
+    expect(page).toContain("publishedCourses");
+    expect(page).toContain("eligibleLearners");
+    expect(page).toContain("assignCourseAction");
+    expect(page).toContain('name="courseId"');
+    expect(page).toContain('name="learnerMembershipId"');
+    expect(page).toContain('name="startDate"');
     expect(page).toContain("managers only to direct reports");
-    expect(page).toContain("disabled");
   });
 
-  it("adds a non-destructive learner catalog shell", async () => {
+  it("wires a live learner catalog and self-enrollment shell", async () => {
     const page = await readPage("learn");
 
     expect(page).toContain("Assigned courses");
     expect(page).toContain("Available courses");
     expect(page).toContain("Related courses");
+    expect(page).toContain("assignedCourses");
+    expect(page).toContain("availableCourses");
+    expect(page).toContain("selfEnrollAction");
+    expect(page).toContain('name="courseId"');
+    expect(page).toContain('name="learnerMembershipId"');
+    expect(page).toContain('name="startDate"');
     expect(page).toContain("Self-enroll");
-    expect(page).toContain("disabled");
   });
 });
