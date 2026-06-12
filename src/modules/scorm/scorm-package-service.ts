@@ -119,7 +119,7 @@ function resolveStorageKey(input: {
   expectedStorageKey: string;
 }): string {
   if (!input.providedStorageKey?.trim()) {
-    return input.expectedStorageKey;
+    throw new Error("SCORM signed upload storage key is required");
   }
 
   const normalized = assertTenantScopedKey(input.providedStorageKey, input.organizationId);

@@ -21,6 +21,7 @@ const validInput: UploadScormPackageInput = {
   originalFileName: "policy-orientation.zip",
   contentType: "application/zip",
   byteSize: 1024,
+  storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy-orientation.zip",
   launchPath: "index.html",
   manifestTitle: "Policy Orientation",
 };
@@ -77,7 +78,16 @@ describe("uploadScormPackage", () => {
     ).rejects.toThrow("SCORM launch path must be relative");
   });
 
-  it("creates a deterministic source storage key and records upload audit", async () => {
+  it("rejects missing signed upload storage keys", async () => {
+    await expect(
+      uploadScormPackage({ ...validInput, storageKey: null }, createRepository()),
+    ).rejects.toThrow("SCORM signed upload storage key is required");
+    await expect(
+      uploadScormPackage({ ...validInput, storageKey: "" }, createRepository()),
+    ).rejects.toThrow("SCORM signed upload storage key is required");
+  });
+
+  it("uses the signed scorm_zip source storage key and records upload audit", async () => {
     const repository = createRepository();
 
     const result = await uploadScormPackage(validInput, repository);
@@ -115,7 +125,7 @@ describe("uploadScormPackage", () => {
     expect(repository.transactions).toBe(1);
   });
 
-  it("uses the signed upload storage key when it matches the expected scorm_zip key", async () => {
+  it("accepts the signed upload storage key when it matches the expected scorm_zip key", async () => {
     const repository = createRepository();
 
     await uploadScormPackage(

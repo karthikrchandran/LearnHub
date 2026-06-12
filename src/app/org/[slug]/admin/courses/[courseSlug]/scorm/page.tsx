@@ -1,6 +1,7 @@
 import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
 
 import { uploadScormPackageFormAction } from "./actions";
+import { ScormPackageUploadForm } from "./scorm-package-upload-form";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export default async function ScormAdminPage({ params }: ScormAdminPageProps) {
 
     await uploadScormPackageFormAction(slug, courseSlug, formData);
   };
+  const scormUploadUrl = `/api/org/${encodeURIComponent(slug)}/storage/upload`;
 
   if (!course) {
     return (
@@ -81,36 +83,12 @@ export default async function ScormAdminPage({ params }: ScormAdminPageProps) {
       </header>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <form action={uploadPackageAction} className="grid gap-4 rounded-md border border-slate-200 p-4 md:grid-cols-2">
-          <h2 className="text-lg font-semibold text-slate-950 md:col-span-2">Upload zip metadata</h2>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            Original file name
-            <input name="originalFileName" placeholder="package.zip" className="rounded-md border border-slate-300 px-3 py-2" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            Content type
-            <input name="contentType" defaultValue="application/zip" className="rounded-md border border-slate-300 px-3 py-2" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            Byte size
-            <input name="byteSize" type="number" min="1" className="rounded-md border border-slate-300 px-3 py-2" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            Storage key
-            <input name="storageKey" placeholder="org/acme/courses/course_1/scorm/pkg_course_1/source/package.zip" className="rounded-md border border-slate-300 px-3 py-2" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            Launch path
-            <input name="launchPath" placeholder="index.html" className="rounded-md border border-slate-300 px-3 py-2" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
-            Manifest title
-            <input name="manifestTitle" className="rounded-md border border-slate-300 px-3 py-2" />
-          </label>
-          <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white md:col-span-2">
-            Save package metadata
-          </button>
-        </form>
+        <ScormPackageUploadForm
+          action={uploadPackageAction}
+          courseId={course.id}
+          packageId={`pkg_${course.id}`}
+          uploadUrl={scormUploadUrl}
+        />
 
         <aside className="rounded-md border border-slate-200 p-4">
           <h2 className="text-lg font-semibold text-slate-950">Active package</h2>

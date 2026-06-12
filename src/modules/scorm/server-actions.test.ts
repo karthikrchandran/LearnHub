@@ -114,4 +114,25 @@ describe("SCORM package server actions", () => {
       ),
     ).resolves.toEqual({ status: "error", message: "SCORM package must be a zip file" });
   });
+
+  it("returns an error when the signed upload storage key is missing", async () => {
+    const dependencies = createDependencies();
+    const actions = createScormPackageActions(dependencies);
+
+    await expect(
+      actions.uploadPackage(
+        "acme",
+        "policy",
+        formData({
+          originalFileName: "policy.zip",
+          contentType: "application/zip",
+          byteSize: "1024",
+          launchPath: "index.html",
+          manifestTitle: "Policy",
+        }),
+      ),
+    ).resolves.toEqual({ status: "error", message: "SCORM signed upload storage key is required" });
+
+    expect(dependencies.repository.upsertPackage).not.toHaveBeenCalled();
+  });
 });
