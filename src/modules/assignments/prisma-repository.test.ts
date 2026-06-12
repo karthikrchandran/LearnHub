@@ -42,7 +42,9 @@ function createAssignmentClient() {
 describe("createPrismaAssignmentRepository", () => {
   it("scopes course, membership, organization, and duplicate lookups by organization", async () => {
     const client = createAssignmentClient();
-    const repository = createPrismaAssignmentRepository(client);
+    const repository = createPrismaAssignmentRepository(
+      client as unknown as Parameters<typeof createPrismaAssignmentRepository>[0],
+    );
 
     await repository.findCourse({ organizationId: "org_1", courseId: "course_1" });
     await repository.findMembership({ organizationId: "org_1", membershipId: "learner-membership" });
@@ -89,7 +91,9 @@ describe("createPrismaAssignmentRepository", () => {
 
   it("creates assignments and audit logs with service-provided values", async () => {
     const client = createAssignmentClient();
-    const repository = createPrismaAssignmentRepository(client);
+    const repository = createPrismaAssignmentRepository(
+      client as unknown as Parameters<typeof createPrismaAssignmentRepository>[0],
+    );
     const startDate = new Date("2026-06-12T12:00:00.000Z");
     const dueDate = new Date("2026-06-17T12:00:00.000Z");
 
@@ -137,7 +141,9 @@ describe("createPrismaAssignmentRepository", () => {
     const rootClient = createAssignmentClient();
     const transactionClient = createAssignmentClient();
     rootClient.$transaction.mockImplementationOnce(async (operation) => operation(transactionClient));
-    const repository = createPrismaAssignmentRepository(rootClient);
+    const repository = createPrismaAssignmentRepository(
+      rootClient as unknown as Parameters<typeof createPrismaAssignmentRepository>[0],
+    );
 
     await repository.runInTransaction(async () => {
       await repository.createAssignment({

@@ -39,7 +39,7 @@ function createRepository(): AssignmentRepository {
     findCourse: vi.fn(async () => ({
       id: "course_1",
       organizationId: "org_1",
-      status: "PUBLISHED",
+      status: "PUBLISHED" as const,
       estimatedCompletionBusinessDays: 3,
     })),
     findMembership: vi.fn(async () => ({
@@ -47,12 +47,12 @@ function createRepository(): AssignmentRepository {
       userId: "learner-user",
       organizationId: "org_1",
       managerMembershipId: null,
-      status: "ACTIVE",
-      roles: ["LEARNER"],
+      status: "ACTIVE" as const,
+      roles: ["LEARNER" as const],
     })),
     findOrganization: vi.fn(async () => ({
       id: "org_1",
-      enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
+      enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT" as const,
     })),
     assignmentExists: vi.fn(async () => false),
     createAssignment: vi.fn(async () => ({ id: "assignment_1" })),
@@ -81,8 +81,8 @@ function createSelfEnrollDependencies(): SelfEnrollActionDependencies & { reposi
           {
             id: "learner-membership",
             organizationId: "org_1",
-            roles: ["LEARNER"],
-            status: "ACTIVE",
+            roles: ["LEARNER" as const],
+            status: "ACTIVE" as const,
             managerMembershipId: null,
           },
         ],

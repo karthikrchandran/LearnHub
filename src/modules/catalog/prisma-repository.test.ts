@@ -43,7 +43,9 @@ const courseData: CreateCourseData = {
 describe("createPrismaCatalogRepository", () => {
   it("creates categories and tags with organization scope", async () => {
     const client = createCatalogClient();
-    const repository = createPrismaCatalogRepository(client);
+    const repository = createPrismaCatalogRepository(
+      client as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
 
     await repository.createCategory({ organizationId: "org_1", name: "Safety", slug: "safety" });
     await repository.createTag({ organizationId: "org_1", name: "Leadership", slug: "leadership" });
@@ -68,7 +70,9 @@ describe("createPrismaCatalogRepository", () => {
 
   it("writes service-provided course data without adding page concerns", async () => {
     const client = createCatalogClient();
-    const repository = createPrismaCatalogRepository(client);
+    const repository = createPrismaCatalogRepository(
+      client as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
 
     await repository.createCourse(courseData);
 
@@ -80,7 +84,9 @@ describe("createPrismaCatalogRepository", () => {
 
   it("replaces course tags inside the organization and course scope", async () => {
     const client = createCatalogClient();
-    const repository = createPrismaCatalogRepository(client);
+    const repository = createPrismaCatalogRepository(
+      client as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
 
     await repository.replaceCourseTags({
       organizationId: "org_1",
@@ -106,7 +112,9 @@ describe("createPrismaCatalogRepository", () => {
     const rootClient = createCatalogClient();
     const transactionClient = createCatalogClient();
     rootClient.$transaction.mockImplementationOnce(async (operation) => operation(transactionClient));
-    const repository = createPrismaCatalogRepository(rootClient);
+    const repository = createPrismaCatalogRepository(
+      rootClient as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
 
     await repository.runInTransaction(async () => {
       await repository.createCategory({ organizationId: "org_1", name: "Safety", slug: "safety" });

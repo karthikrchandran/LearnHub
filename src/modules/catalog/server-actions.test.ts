@@ -20,7 +20,7 @@ function createRepository(): CourseCatalogRepository & CatalogTaxonomyRepository
   return {
     runInTransaction: vi.fn(async (operation) => operation()),
     findCategoryById: vi.fn(async ({ categoryId }) => (categoryId === "category_1" ? { id: categoryId } : null)),
-    findTagsByIds: vi.fn(async ({ tagIds }) => tagIds.map((id) => ({ id }))),
+    findTagsByIds: vi.fn(async ({ tagIds }) => tagIds.map((id: string) => ({ id }))),
     createCategory: vi.fn(async ({ slug }) => ({ id: "category_1", slug })),
     createTag: vi.fn(async ({ slug }) => ({ id: "tag_1", slug })),
     createCourse: vi.fn(async ({ slug }) => ({ id: "course_1", slug })),
