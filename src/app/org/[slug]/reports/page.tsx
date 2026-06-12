@@ -20,11 +20,35 @@ export default async function ProgressReportsPage({ params }: ProgressReportsPag
   const { prisma } = await import("@/lib/prisma");
   const directReports = await loadDirectReportTargets(context, organizationId, prisma);
   const scope = resolveProgressReportScope(context, organizationId, directReports);
-  const rows = await createPrismaProgressReportRepository(prisma).listProgressRows({
-    organizationId,
-    scope,
-  });
-  const csvPath = `/api/org/${encodeURIComponent(slug)}/reports/progress.csv`;
+  const repository = createPrismaProgressReportRepository(prisma);
+  const [
+    rows,
+    completionRows,
+    scoringRows,
+    timingRows,
+    popularityRows,
+    satisfactionRows,
+    quizDifficultyRows,
+    certificateRows,
+  ] = await Promise.all([
+    repository.listProgressRows({ organizationId, scope }),
+    repository.listCourseCompletionRows({ organizationId, scope }),
+    repository.listScoringRows({ organizationId, scope }),
+    repository.listTimingRows({ organizationId, scope }),
+    repository.getPopularityRows({ organizationId, scope }),
+    repository.listSatisfactionRows({ organizationId, scope }),
+    repository.listQuizDifficultyRows({ organizationId, scope }),
+    repository.listCertificateCredentialRows({ organizationId, scope }),
+  ]);
+  const exportLinks = [
+    ["Progress", "progress.csv"],
+    ["Completions", "completions.csv"],
+    ["Scoring", "scoring.csv"],
+    ["Timing", "timing.csv"],
+    ["Satisfaction", "satisfaction.csv"],
+    ["Quiz difficulty", "quiz-difficulty.csv"],
+    ["Certificates", "certificates.csv"],
+  ];
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
@@ -33,12 +57,94 @@ export default async function ProgressReportsPage({ params }: ProgressReportsPag
           <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Progress report</p>
           <h1 className="text-3xl font-semibold text-slate-950">{slug} learning progress</h1>
         </div>
-        <a className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={csvPath}>
-          Export CSV
-        </a>
+        <div className="flex flex-wrap gap-2">
+          {exportLinks.map(([label, path]) => (
+            <a
+              key={path}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
+              href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
+            >
+              {label} CSV
+            </a>
+          ))}
+        </div>
       </header>
 
       <ProgressReportTable rows={rows} emptyMessage="No progress records match your report scope." />
+      <section className="grid gap-4 md:grid-cols-4">
+        <MetricCard label="Most viewed" value={popularityRows.mostViewed?.courseTitle ?? "None"} />
+        <MetricCard label="Most enrolled" value={popularityRows.mostEnrolled?.courseTitle ?? "None"} />
+        <MetricCard label="Most completed" value={popularityRows.mostCompleted?.courseTitle ?? "None"} />
+        <MetricCard label="Highest rated" value={popularityRows.highestRated?.courseTitle ?? "None"} />
+      </section>
+      <SimpleReportTable
+        title="Course completion"
+        headers={["Course", "Assigned", "Started", "Completed", "Overdue", "Rate"]}
+        rows={completionRows.map((row) => [
+          row.courseTitle,
+          row.assignedCount,
+          row.startedCount,
+          row.completedCount,
+          row.overdueCount,
+          `${row.completionRate}%`,
+        ])}
+        emptyMessage="No completion rows match your report scope."
+      />
+      <SimpleReportTable
+        title="Scoring"
+        headers={["Course", "Attempts", "Average", "Best", "Latest", "Pass rate"]}
+        rows={scoringRows.map((row) => [
+          row.courseTitle,
+          row.attemptCount,
+          row.averageScore,
+          row.bestScore,
+          row.latestScore,
+          `${row.passRate}%`,
+        ])}
+        emptyMessage="No scoring attempts match your report scope."
+      />
+      <SimpleReportTable
+        title="Timing"
+        headers={["Course", "Learners", "Average seconds", "Total seconds", "Last activity"]}
+        rows={timingRows.map((row) => [
+          row.courseTitle,
+          row.learnerCount,
+          row.averageTimeSeconds,
+          row.totalTimeSeconds,
+          row.lastActivityAt?.toLocaleString() ?? "None",
+        ])}
+        emptyMessage="No timing rows match your report scope."
+      />
+      <SimpleReportTable
+        title="Satisfaction"
+        headers={["Course", "Responses", "Average stars", "Latest feedback", "Submitted"]}
+        rows={satisfactionRows.map((row) => [
+          row.courseTitle,
+          row.responseCount,
+          row.averageStars,
+          row.latestFeedbackText ?? "None",
+          row.latestFeedbackAt?.toLocaleString() ?? "None",
+        ])}
+        emptyMessage="No satisfaction responses match your report scope."
+      />
+      <SimpleReportTable
+        title="Quiz difficulty"
+        headers={["Course", "Question", "Attempts", "Correct rate"]}
+        rows={quizDifficultyRows.map((row) => [row.courseTitle, row.prompt, row.attempts, `${row.correctRate}%`])}
+        emptyMessage="No quiz attempts match your report scope."
+      />
+      <SimpleReportTable
+        title="Certificates and credentials"
+        headers={["Learner", "Course", "Issued", "Credential", "Failure"]}
+        rows={certificateRows.map((row) => [
+          row.learnerName,
+          row.courseTitle,
+          row.issuedAt.toLocaleDateString(),
+          row.credentialProvider ? `${row.credentialProvider}: ${row.credentialStatus ?? "PENDING"}` : "Not issued",
+          row.failureMessage ?? "None",
+        ])}
+        emptyMessage="No certificates match your report scope."
+      />
     </main>
   );
 }
@@ -120,6 +226,65 @@ function ProgressReportTable({
                     <span className="text-slate-500">Not issued</span>
                   )}
                 </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 p-4">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function SimpleReportTable({
+  title,
+  headers,
+  rows,
+  emptyMessage,
+}: {
+  title: string;
+  headers: string[];
+  rows: Array<Array<string | number>>;
+  emptyMessage: string;
+}) {
+  return (
+    <section className="overflow-hidden rounded-md border border-slate-200">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+      </div>
+      <table className="w-full border-collapse text-left text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            {headers.map((header) => (
+              <th key={header} className="px-4 py-3 font-medium">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+          {rows.length === 0 ? (
+            <tr>
+              <td className="px-4 py-6 text-slate-500" colSpan={headers.length}>
+                {emptyMessage}
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, index) => (
+              <tr key={`${title}-${index}`}>
+                {row.map((value, cellIndex) => (
+                  <td key={`${title}-${index}-${cellIndex}`} className="px-4 py-3 text-slate-700">
+                    {value}
+                  </td>
+                ))}
               </tr>
             ))
           )}

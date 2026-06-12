@@ -4,6 +4,7 @@ import {
   getPlatformDashboardSummary,
 } from "@/modules/organizations/dashboard";
 import { createPrismaNotificationRepository } from "@/modules/notifications/prisma-repository";
+import { createPrismaProgressReportRepository } from "@/modules/reports/prisma-repository";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function PlatformPage() {
   const notificationFailures = await createPrismaNotificationRepository(prisma).listPlatformNotificationFailures({
     take: 10,
   });
+  const aggregateRows = await createPrismaProgressReportRepository(prisma).listPlatformAggregateRows();
   const cards = [
     { label: "Organizations", value: summary.organizations },
     { label: "Active users", value: summary.activeUsers },
@@ -55,6 +57,48 @@ export default async function PlatformPage() {
             <p className="mt-2 text-2xl font-semibold text-slate-950">{card.value}</p>
           </div>
         ))}
+      </section>
+
+      <section className="rounded-md border border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-950">Platform aggregate analytics</h2>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+              <tr className="text-left text-slate-500">
+                <th className="px-3 py-2 font-medium">Organization</th>
+                <th className="px-3 py-2 font-medium">Active learners</th>
+                <th className="px-3 py-2 font-medium">Courses</th>
+                <th className="px-3 py-2 font-medium">Assignments</th>
+                <th className="px-3 py-2 font-medium">Completions</th>
+                <th className="px-3 py-2 font-medium">Overdue</th>
+                <th className="px-3 py-2 font-medium">Certificates</th>
+                <th className="px-3 py-2 font-medium">Completion rate</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {aggregateRows.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4 text-slate-500" colSpan={8}>
+                    No aggregate analytics are available yet.
+                  </td>
+                </tr>
+              ) : (
+                aggregateRows.map((row) => (
+                  <tr key={row.organizationId}>
+                    <td className="px-3 py-3 font-medium text-slate-950">{row.organizationName}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.activeLearners}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.courseCount}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.assignmentCount}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.completionCount}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.overdueCount}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.certificateCount}</td>
+                    <td className="px-3 py-3 text-slate-700">{row.completionRate}%</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="rounded-md border border-slate-200 p-4">
