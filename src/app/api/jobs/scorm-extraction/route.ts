@@ -101,6 +101,7 @@ async function readResponseBytesWithLimit(response: Response, maxBytes: number):
     totalBytes += next.value.byteLength;
 
     if (totalBytes > maxBytes) {
+      await reader.cancel();
       throw new Error("SCORM package exceeds the maximum compressed size");
     }
 

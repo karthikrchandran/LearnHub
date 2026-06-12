@@ -111,14 +111,14 @@ describe("SCORM content route", () => {
       R2_BUCKET_NAME: "learnhub-media",
       NEXTAUTH_SECRET: "test-secret",
     };
-    const requestUrl = signedScormContentUrl({
+    const { url: requestUrl, path } = signedScormContentUrl({
       objectKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
       contentRootKey: "org/org_1/courses/course_1/scorm/pkg_other/content",
     });
 
     const response = await GET(new Request(requestUrl), {
       params: Promise.resolve({
-        path: ["org", "org_1", "courses", "course_1", "scorm", "pkg_course_1", "content", "index.html"],
+        path,
       }),
     });
 
@@ -145,7 +145,7 @@ describe("SCORM content route", () => {
       }),
     );
     vi.stubGlobal("fetch", fetchStorage);
-    const requestUrl = signedScormContentUrl({
+    const { url: requestUrl, path } = signedScormContentUrl({
       objectKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
       contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
     });
@@ -154,14 +154,14 @@ describe("SCORM content route", () => {
       new Request(requestUrl),
       {
         params: Promise.resolve({
-          path: ["org", "org_1", "courses", "course_1", "scorm", "pkg_course_1", "content", "index.html"],
+          path,
         }),
       },
     );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
-    expect(response.headers.get("set-cookie")).toContain("learnhub_scorm_access=");
+    expect(response.headers.get("set-cookie")).toBeNull();
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     const body = await response.text();
@@ -175,7 +175,7 @@ describe("SCORM content route", () => {
     );
   });
 
-  it("allows production SCORM asset reads with the package-root cookie after launch", async () => {
+  it("allows production SCORM asset reads when relative URLs inherit the path grant", async () => {
     mocks.env = {
       R2_ACCOUNT_ID: "account",
       R2_ACCESS_KEY_ID: "access",
@@ -194,32 +194,18 @@ describe("SCORM content route", () => {
       }),
     );
     vi.stubGlobal("fetch", fetchStorage);
-    const launchUrl = signedScormContentUrl({
+    const launch = signedScormContentUrl({
       objectKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
       contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
     });
-    const cookieValue = new URL(launchUrl).searchParams;
-    const cookie = `learnhub_scorm_access=${encodeURIComponent(
-      `${cookieValue.get("lh_scorm_expires")}.${cookieValue.get("lh_scorm_token")}`,
-    )}`;
+    const relativeAssetUrl = new URL("assets/app.js", launch.url);
+    const assetPath = relativeAssetUrl.pathname.replace(/^\/scorm\//, "").split("/");
 
     const response = await GET(
-      new Request("http://learnhub.test/scorm/org/org_1/courses/course_1/scorm/pkg_course_1/content/assets/app.js", {
-        headers: { cookie },
-      }),
+      new Request(relativeAssetUrl),
       {
         params: Promise.resolve({
-          path: [
-            "org",
-            "org_1",
-            "courses",
-            "course_1",
-            "scorm",
-            "pkg_course_1",
-            "content",
-            "assets",
-            "app.js",
-          ],
+          path: assetPath,
         }),
       },
     );
@@ -237,13 +223,13 @@ function signedScormContentUrl(input: {
   objectKey: string;
   contentRootKey: string;
   expiresAtSeconds?: number;
-}): string {
+}): { url: string; path: string[] } {
   const expiresAtSeconds = input.expiresAtSeconds ?? 4_102_444_800;
   const token = createHmac("sha256", "test-secret")
     .update(`${input.contentRootKey}:${expiresAtSeconds}`)
     .digest("base64url");
-  const url = new URL(`http://learnhub.test/scorm/${input.objectKey}`);
-  url.searchParams.set("lh_scorm_expires", String(expiresAtSeconds));
-  url.searchParams.set("lh_scorm_token", token);
-  return url.toString();
+  const path = ["_access", String(expiresAtSeconds), token, ...input.objectKey.split("/")];
+  const url = new URL(`http://learnhub.test/scorm/${path.join("/")}`);
+
+  return { url: url.toString(), path };
 }

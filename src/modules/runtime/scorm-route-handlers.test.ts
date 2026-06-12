@@ -138,9 +138,11 @@ describe("SCORM runtime route handlers", () => {
       cmiData: { "cmi.core.lesson_status": "incomplete" },
       launchCount: 2,
     });
-    expect(launchUrl.pathname).toBe("/scorm/org/org_1/courses/course_1/scorm/package_1/content/index.html");
-    expect(launchUrl.searchParams.get("lh_scorm_expires")).toEqual(expect.any(String));
-    expect(launchUrl.searchParams.get("lh_scorm_token")).toEqual(expect.any(String));
+    expect(launchUrl.pathname).toMatch(
+      /^\/scorm\/_access\/\d+\/[^/]+\/org\/org_1\/courses\/course_1\/scorm\/package_1\/content\/index\.html$/,
+    );
+    expect(launchUrl.searchParams.get("lh_scorm_expires")).toBeNull();
+    expect(launchUrl.searchParams.get("lh_scorm_token")).toBeNull();
     expect(requireLearnerLaunchAssignment).toHaveBeenCalledWith({
       organizationId: "org_1",
       assignmentId: "assignment_1",

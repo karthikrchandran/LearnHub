@@ -31,11 +31,16 @@ export function appendScormContentAccessToken(input: {
     now: input.now,
     ttlSeconds: input.ttlSeconds,
   });
+  const tokenizedPath = [
+    "",
+    "scorm",
+    "_access",
+    String(grant.expiresAtSeconds),
+    grant.token,
+    ...objectKey.split("/"),
+  ].join("/");
 
-  url.searchParams.set(SCORM_CONTENT_EXPIRES_PARAM, String(grant.expiresAtSeconds));
-  url.searchParams.set(SCORM_CONTENT_TOKEN_PARAM, grant.token);
-
-  return `${url.pathname}${url.search}${url.hash}`;
+  return `${tokenizedPath}${url.search}${url.hash}`;
 }
 
 export function createScormContentAccessGrant(input: {

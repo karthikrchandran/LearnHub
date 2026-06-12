@@ -32,20 +32,23 @@ export async function GET(request: Request, { params }: ScormContentRouteContext
     return new Response("Invalid SCORM content path", { status: 400 });
   }
 
+  const pathGrant = readScormContentPathGrant(path);
+  const contentPath = pathGrant?.path ?? path;
   const env = getEnv();
   const storageConfig = optionalR2Config(env);
 
   if (storageConfig) {
     return serveR2ScormContent({
       request,
-      path,
+      path: contentPath,
+      pathGrant: pathGrant?.grant ?? null,
       storageConfig,
       secret: env.NEXTAUTH_SECRET,
     });
   }
 
   const contentRoot = resolve(join(process.cwd(), ".learnhub", "scorm"));
-  const targetPath = resolve(contentRoot, ...path);
+  const targetPath = resolve(contentRoot, ...contentPath);
   const relativePath = relative(contentRoot, targetPath);
 
   if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
@@ -75,6 +78,7 @@ export async function GET(request: Request, { params }: ScormContentRouteContext
 async function serveR2ScormContent(input: {
   request: Request;
   path: string[];
+  pathGrant: ScormContentAccessGrant | null;
   storageConfig: R2ObjectStorageProviderConfig;
   secret: string;
 }): Promise<Response> {
@@ -89,7 +93,7 @@ async function serveR2ScormContent(input: {
   const url = new URL(input.request.url);
   const queryGrant = readScormContentQueryGrant(url);
   const cookieGrant = parseScormContentAccessCookie(input.request.headers.get("cookie"));
-  const grant = queryGrant ?? cookieGrant;
+  const grant = input.pathGrant ?? queryGrant ?? cookieGrant;
 
   if (
     !grant ||
@@ -119,7 +123,7 @@ async function serveR2ScormContent(input: {
   const contentType = storageResponse.headers.get("content-type") ?? contentTypeForPath(objectKey);
   const headers = scormContentHeaders(contentType);
 
-  if (queryGrant) {
+  if (queryGrant && !input.pathGrant) {
     headers.append(
       "set-cookie",
       createScormContentAccessCookie({
@@ -138,6 +142,28 @@ async function serveR2ScormContent(input: {
   }
 
   return new Response(storageResponse.body, { status: storageResponse.status, headers });
+}
+
+function readScormContentPathGrant(path: string[]): { path: string[]; grant: ScormContentAccessGrant } | null {
+  if (path[0] !== "_access") {
+    return null;
+  }
+
+  const expiresAtSeconds = Number(path[1]);
+  const token = path[2];
+  const contentPath = path.slice(3);
+
+  if (!Number.isInteger(expiresAtSeconds) || !token || contentPath.length === 0) {
+    return null;
+  }
+
+  return {
+    path: contentPath,
+    grant: {
+      expiresAtSeconds,
+      token,
+    },
+  };
 }
 
 function readScormContentQueryGrant(url: URL): ScormContentAccessGrant | null {
