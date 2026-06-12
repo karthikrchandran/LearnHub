@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request): Promise<Response> {
   const env = getEnv();
 
-  if (env.SCORM_EXTRACTION_JOB_SECRET && request.headers.get("x-learnhub-job-secret") !== env.SCORM_EXTRACTION_JOB_SECRET) {
+  if (!env.SCORM_EXTRACTION_JOB_SECRET || request.headers.get("x-learnhub-job-secret") !== env.SCORM_EXTRACTION_JOB_SECRET) {
     return Response.json({ error: "Not allowed to run SCORM extraction jobs" }, { status: 403 });
   }
 

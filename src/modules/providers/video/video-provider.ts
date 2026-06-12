@@ -1,6 +1,7 @@
 export type CreateVideoUploadInput = {
   organizationId: string;
   courseId: string;
+  lessonId?: string;
   title: string;
 };
 

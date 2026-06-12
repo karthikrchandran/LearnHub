@@ -1,14 +1,41 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "@/app/scorm/[...path]/route";
+
+const mocks = vi.hoisted(() => ({
+  env: {
+    R2_ACCOUNT_ID: undefined as string | undefined,
+    R2_ACCESS_KEY_ID: undefined as string | undefined,
+    R2_SECRET_ACCESS_KEY: undefined as string | undefined,
+    R2_BUCKET_NAME: undefined as string | undefined,
+  },
+  getSignedReadUrl: vi.fn(),
+}));
+
+vi.mock("@/lib/env", () => ({
+  getEnv: vi.fn(() => mocks.env),
+}));
+
+vi.mock("@/modules/providers/storage/r2-object-storage-provider", () => ({
+  createR2ObjectStorageProvider: vi.fn(() => ({
+    getSignedReadUrl: mocks.getSignedReadUrl,
+  })),
+}));
 
 let contentRoot: string;
 let testRoot: string;
 
 beforeEach(async () => {
+  vi.clearAllMocks();
+  mocks.env = {
+    R2_ACCOUNT_ID: undefined,
+    R2_ACCESS_KEY_ID: undefined,
+    R2_SECRET_ACCESS_KEY: undefined,
+    R2_BUCKET_NAME: undefined,
+  };
   contentRoot = join(process.cwd(), ".learnhub", "scorm");
   testRoot = join(contentRoot, "test-route");
   await rm(testRoot, { recursive: true, force: true });
@@ -46,5 +73,34 @@ describe("SCORM content route", () => {
     });
 
     expect(response.status).toBe(404);
+  });
+
+  it("redirects production SCORM content reads through the storage provider when R2 is configured", async () => {
+    mocks.env = {
+      R2_ACCOUNT_ID: "account",
+      R2_ACCESS_KEY_ID: "access",
+      R2_SECRET_ACCESS_KEY: "secret",
+      R2_BUCKET_NAME: "learnhub-media",
+    };
+    mocks.getSignedReadUrl.mockResolvedValueOnce(
+      "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html?X-Amz-Signature=signed",
+    );
+
+    const response = await GET(
+      new Request("http://learnhub.test/scorm/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html"),
+      {
+        params: Promise.resolve({
+          path: ["org", "org_1", "courses", "course_1", "scorm", "pkg_course_1", "content", "index.html"],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html?X-Amz-Signature=signed",
+    );
+    expect(mocks.getSignedReadUrl).toHaveBeenCalledWith(
+      "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
+    );
   });
 });

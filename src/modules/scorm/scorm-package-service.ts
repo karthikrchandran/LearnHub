@@ -2,6 +2,7 @@ import {
   normalizeScormLaunchPath,
   validateScormUploadMetadata,
 } from "./scorm-manifest";
+import { assertTenantScopedKey, scormZipKey } from "../storage/storage-keys";
 
 export type ScormPackageCourse = {
   id: string;
@@ -16,6 +17,7 @@ export type UploadScormPackageInput = {
   originalFileName: string;
   contentType: string;
   byteSize: number;
+  storageKey?: string | null;
   launchPath: string;
   manifestTitle?: string | null;
 };
@@ -74,7 +76,12 @@ export async function uploadScormPackage(
 
   const packageId = `pkg_${courseId}`;
   const packageRootKey = `org/${organizationId}/courses/${courseId}/scorm/${packageId}`;
-  const storageKey = `${packageRootKey}/${originalFileName}`;
+  const expectedStorageKey = scormZipKey({ organizationId, courseId, packageId, fileName: originalFileName });
+  const storageKey = resolveStorageKey({
+    organizationId,
+    providedStorageKey: input.storageKey,
+    expectedStorageKey,
+  });
   const contentRootKey = `${packageRootKey}/content`;
 
   return repository.runInTransaction(async () => {
@@ -104,6 +111,24 @@ export async function uploadScormPackage(
 
     return scormPackage;
   });
+}
+
+function resolveStorageKey(input: {
+  organizationId: string;
+  providedStorageKey: string | null | undefined;
+  expectedStorageKey: string;
+}): string {
+  if (!input.providedStorageKey?.trim()) {
+    return input.expectedStorageKey;
+  }
+
+  const normalized = assertTenantScopedKey(input.providedStorageKey, input.organizationId);
+
+  if (normalized !== input.expectedStorageKey) {
+    throw new Error("SCORM storage key must match the signed upload key");
+  }
+
+  return normalized;
 }
 
 function normalizeNullable(value: string | null | undefined): string | null {

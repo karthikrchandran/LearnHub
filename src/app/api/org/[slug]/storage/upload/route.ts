@@ -36,6 +36,10 @@ export async function POST(request: Request, { params }: StorageUploadRouteConte
     const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
     const body = (await request.json()) as StorageUploadRequest;
     const contentType = required(body.contentType, "contentType is required");
+    const { prisma } = await import("@/lib/prisma");
+
+    await validateUploadPurpose({ organizationId, body, prisma });
+
     const key = buildUploadKey(organizationId, body);
     const provider = createR2ObjectStorageProvider(requiredR2Config());
     const uploadUrl = await provider.getSignedWriteUrl({ key, contentType });
@@ -43,6 +47,116 @@ export async function POST(request: Request, { params }: StorageUploadRouteConte
     return Response.json({ key, uploadUrl });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Unable to create storage upload" }, { status: 400 });
+  }
+}
+
+type StorageUploadPrisma = {
+  course: {
+    findFirst(input: {
+      where: { id: string; organizationId: string; type: "SCORM_1_2" };
+      select: { id: true };
+    }): Promise<{ id: string } | null>;
+  };
+  videoLesson: {
+    findFirst(input: {
+      where: { id: string; organizationId: string; courseId: string };
+      select: { id: true };
+    }): Promise<{ id: string } | null>;
+  };
+  certificate: {
+    findFirst(input: {
+      where: { id: string; organizationId: string };
+      select: { id: true };
+    }): Promise<{ id: string } | null>;
+  };
+};
+
+async function validateUploadPurpose(input: {
+  organizationId: string;
+  body: StorageUploadRequest;
+  prisma: StorageUploadPrisma;
+}): Promise<void> {
+  switch (input.body.purpose) {
+    case "organization_logo":
+    case "csv_export":
+      return;
+    case "video_transcript":
+      await validateVideoTranscriptUpload(input);
+      return;
+    case "certificate":
+      await validateCertificateUpload(input);
+      return;
+    case "scorm_zip":
+      await validateScormZipUpload(input);
+      return;
+    default:
+      throw new Error("Unsupported storage upload purpose");
+  }
+}
+
+async function validateVideoTranscriptUpload(input: {
+  organizationId: string;
+  body: StorageUploadRequest;
+  prisma: StorageUploadPrisma;
+}): Promise<void> {
+  const courseId = required(input.body.courseId, "courseId is required");
+  const lessonId = required(input.body.lessonId, "lessonId is required");
+  const lesson = await input.prisma.videoLesson.findFirst({
+    where: {
+      id: lessonId,
+      organizationId: input.organizationId,
+      courseId,
+    },
+    select: { id: true },
+  });
+
+  if (!lesson) {
+    throw new Error("Video lesson not found");
+  }
+}
+
+async function validateCertificateUpload(input: {
+  organizationId: string;
+  body: StorageUploadRequest;
+  prisma: StorageUploadPrisma;
+}): Promise<void> {
+  const certificateId = required(input.body.certificateId, "certificateId is required");
+  const certificate = await input.prisma.certificate.findFirst({
+    where: {
+      id: certificateId,
+      organizationId: input.organizationId,
+    },
+    select: { id: true },
+  });
+
+  if (!certificate) {
+    throw new Error("Certificate not found");
+  }
+}
+
+async function validateScormZipUpload(input: {
+  organizationId: string;
+  body: StorageUploadRequest;
+  prisma: StorageUploadPrisma;
+}): Promise<void> {
+  const courseId = required(input.body.courseId, "courseId is required");
+  const packageId = required(input.body.packageId, "packageId is required");
+
+  if (packageId !== `pkg_${courseId}`) {
+    throw new Error("packageId must match the SCORM course package id");
+  }
+
+  const course = await input.prisma.course.findFirst({
+    where: {
+      id: courseId,
+      organizationId: input.organizationId,
+      type: "SCORM_1_2",
+    },
+    select: { id: true },
+  });
+
+  if (!course) {
+    throw new Error("SCORM course not found");
   }
 }
 

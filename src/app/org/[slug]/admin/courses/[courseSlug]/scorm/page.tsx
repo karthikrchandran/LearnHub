@@ -96,6 +96,10 @@ export default async function ScormAdminPage({ params }: ScormAdminPageProps) {
             <input name="byteSize" type="number" min="1" className="rounded-md border border-slate-300 px-3 py-2" />
           </label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Storage key
+            <input name="storageKey" placeholder="org/acme/courses/course_1/scorm/pkg_course_1/source/package.zip" className="rounded-md border border-slate-300 px-3 py-2" />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
             Launch path
             <input name="launchPath" placeholder="index.html" className="rounded-md border border-slate-300 px-3 py-2" />
           </label>

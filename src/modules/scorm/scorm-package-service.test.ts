@@ -77,14 +77,14 @@ describe("uploadScormPackage", () => {
     ).rejects.toThrow("SCORM launch path must be relative");
   });
 
-  it("creates a deterministic storage key and records upload audit", async () => {
+  it("creates a deterministic source storage key and records upload audit", async () => {
     const repository = createRepository();
 
     const result = await uploadScormPackage(validInput, repository);
 
     expect(result).toEqual({
       id: "pkg_course_1",
-      storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/policy-orientation.zip",
+      storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy-orientation.zip",
     });
     expect(repository.packages).toEqual([
       {
@@ -94,7 +94,7 @@ describe("uploadScormPackage", () => {
         originalFileName: "policy-orientation.zip",
         contentType: "application/zip",
         byteSize: 1024,
-        storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/policy-orientation.zip",
+        storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy-orientation.zip",
         contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
         launchPath: "index.html",
         manifestTitle: "Policy Orientation",
@@ -113,5 +113,33 @@ describe("uploadScormPackage", () => {
       },
     ]);
     expect(repository.transactions).toBe(1);
+  });
+
+  it("uses the signed upload storage key when it matches the expected scorm_zip key", async () => {
+    const repository = createRepository();
+
+    await uploadScormPackage(
+      {
+        ...validInput,
+        storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy-orientation.zip",
+      },
+      repository,
+    );
+
+    expect(repository.packages[0]?.storageKey).toBe(
+      "org/org_1/courses/course_1/scorm/pkg_course_1/source/policy-orientation.zip",
+    );
+  });
+
+  it("rejects storage keys that do not match the signed scorm_zip key", async () => {
+    await expect(
+      uploadScormPackage(
+        {
+          ...validInput,
+          storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/policy-orientation.zip",
+        },
+        createRepository(),
+      ),
+    ).rejects.toThrow("SCORM storage key must match the signed upload key");
   });
 });

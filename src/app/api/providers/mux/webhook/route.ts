@@ -33,10 +33,24 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ status: "ignored" });
   }
 
+  if (!hasTenantContext(event)) {
+    return Response.json({ error: "Mux webhook tenant context is required" }, { status: 400 });
+  }
+
   const { prisma } = await import("@/lib/prisma");
   const where = event.providerUploadId
-    ? { providerUploadId: event.providerUploadId }
-    : { providerAssetId: event.providerAssetId };
+    ? {
+        organizationId: event.organizationId,
+        courseId: event.courseId,
+        id: event.lessonId,
+        providerUploadId: event.providerUploadId,
+      }
+    : {
+        organizationId: event.organizationId,
+        courseId: event.courseId,
+        id: event.lessonId,
+        providerAssetId: event.providerAssetId,
+      };
 
   if (event.type === "asset.ready") {
     await prisma.videoLesson.updateMany({
@@ -74,4 +88,12 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   return Response.json({ status: "processed", event: event.type });
+}
+
+function hasTenantContext(event: ReturnType<typeof mapMuxWebhookEvent>): event is NonNullable<ReturnType<typeof mapMuxWebhookEvent>> & {
+  organizationId: string;
+  courseId: string;
+  lessonId: string;
+} {
+  return Boolean(event?.organizationId && event.courseId && event.lessonId);
 }

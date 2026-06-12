@@ -18,6 +18,7 @@ describe("SCORM page shells", () => {
     expect(page).toContain("<form action={uploadPackageAction}");
     expect(page).toContain("SCORM package");
     expect(page).toContain("Upload zip");
+    expect(page).toContain("Storage key");
     expect(page).toContain("Launch path");
     expect(page).toContain("contentRootKey");
     expect(page).toContain("Extraction status");

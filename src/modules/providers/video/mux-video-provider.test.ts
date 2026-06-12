@@ -31,6 +31,7 @@ describe("createMuxVideoProvider", () => {
     const result = await provider.createUpload({
       organizationId: "org_1",
       courseId: "course_1",
+      lessonId: "lesson_1",
       title: "Orientation",
     });
 
@@ -49,6 +50,7 @@ describe("createMuxVideoProvider", () => {
     expect(JSON.parse(muxRequestBody.new_asset_settings.passthrough)).toMatchObject({
       organizationId: "org_1",
       courseId: "course_1",
+      lessonId: "lesson_1",
       title: "Orientation",
     });
   });
@@ -127,10 +129,18 @@ describe("Mux webhook helpers", () => {
           upload_id: "upload_1",
           status: "ready",
           playback_ids: [{ id: "playback_1" }],
+          passthrough: JSON.stringify({
+            organizationId: "org_1",
+            courseId: "course_1",
+            lessonId: "lesson_1",
+          }),
         },
       }),
     ).toEqual({
       type: "asset.ready",
+      organizationId: "org_1",
+      courseId: "course_1",
+      lessonId: "lesson_1",
       providerAssetId: "asset_1",
       providerUploadId: "upload_1",
       playbackId: "playback_1",

@@ -221,3 +221,121 @@ Placeholder scan:
 Type consistency:
 
 - The status enums and field names are consistent across schema, runtime checks, jobs, and admin pages.
+
+---
+
+## Spec Compliance Correction Plan
+
+**Goal:** Close the post-review gaps without changing the Task 5 lane boundary or touching other workers' worktrees.
+
+**Architecture:** Keep production integrations behind the existing provider and route boundaries. Add route-level validation tests first, then implement the smallest changes to make upload, launch, webhook, and job execution paths fail closed and stay tenant-scoped.
+
+**Tech Stack:** Next.js route handlers, Prisma, Vitest, Mux direct uploads/webhooks, Cloudflare R2 signed URLs, SCORM 1.2 package metadata.
+
+### Correction Task 1: SCORM Runtime Content Reads Through Storage
+
+**Files:**
+- Modify: `src/modules/scorm/content-route.test.ts`
+- Modify: `src/app/scorm/[...path]/route.ts`
+
+- [x] Write RED tests in `src/modules/scorm/content-route.test.ts` that mock the R2 provider, request `/scorm/org_org_1/scorm/pkg_1/content/index.html`, and expect a redirect to the signed read URL while preserving the original launch path.
+- [x] Run `npm run test -- src/modules/scorm/content-route.test.ts`; expected FAIL because the route only checks `.learnhub/scorm`.
+- [x] Implement storage-provider resolution before local fallback when R2 env is configured.
+- [x] Run `npm run test -- src/modules/scorm/content-route.test.ts`; expected PASS.
+
+### Correction Task 2: SCORM Signed Upload Key Consistency
+
+**Files:**
+- Modify: `src/modules/scorm/scorm-package-service.test.ts`
+- Modify: `src/modules/scorm/server-actions.test.ts`
+- Modify: `src/modules/scorm/scorm-package-service.ts`
+- Modify: `src/modules/scorm/server-actions.ts`
+- Modify: `src/app/org/[slug]/admin/courses/[courseSlug]/scorm/page.tsx`
+
+- [x] Write RED tests that create packages with a caller-supplied `storageKey` equal to `scormZipKey({ organizationId, courseId, packageId, fileName })` and assert the stored key includes `/source/`.
+- [x] Add RED tests for mismatched `storageKey` rejection and action-form metadata forwarding.
+- [x] Run `npm run test -- src/modules/scorm/scorm-package-service.test.ts src/modules/scorm/server-actions.test.ts`; expected FAIL on missing `storageKey` support.
+- [x] Implement `storageKey` input validation against the tenant-scoped `scorm_zip` key and wire the admin action field.
+- [x] Run the same command; expected PASS.
+
+### Correction Task 3: Mux Upload Route And Tenant-Scoped Webhook Updates
+
+**Files:**
+- Create: `src/app/api/org/[slug]/courses/[courseSlug]/video/lessons/[lessonId]/mux-upload/route.ts`
+- Create: `src/modules/providers/video/mux-upload-route.test.ts`
+- Create: `src/modules/providers/video/mux-webhook-route.test.ts`
+- Modify: `src/modules/providers/video/video-provider.ts`
+- Modify: `src/modules/providers/video/mux-video-provider.ts`
+- Modify: `src/app/api/providers/mux/webhook/route.ts`
+- Modify: `src/app/org/[slug]/admin/courses/[courseSlug]/content/page.tsx`
+
+- [x] Write RED route tests that mock org admin authorization, Prisma, and `createMuxVideoProvider().createUpload()`, then assert the lesson is set to `PROCESSING` with `providerUploadId`.
+- [x] Write RED webhook tests asserting updates include `organizationId`, `courseId`, and `lessonId` from Mux passthrough and do not update cross-org lessons with the same provider ID.
+- [x] Run `npm run test -- src/modules/providers/video/mux-upload-route.test.ts src/modules/providers/video/mux-webhook-route.test.ts`; expected FAIL because the upload route does not exist and webhook updates by provider ID only.
+- [x] Implement the authorized Mux upload route, include `lessonId` in passthrough metadata, and require tenant/course/lesson context in webhook updates.
+- [x] Run the same command; expected PASS.
+
+### Correction Task 4: Storage Upload Route Child Resource Validation
+
+**Files:**
+- Create: `src/modules/storage/storage-upload-route.test.ts`
+- Modify: `src/app/api/org/[slug]/storage/upload/route.ts`
+
+- [x] Write RED tests for `scorm_zip` course validation, `video_transcript` lesson validation, certificate ownership validation, and provider non-invocation when validation fails.
+- [x] Run `npm run test -- src/modules/storage/storage-upload-route.test.ts`; expected FAIL because the route currently mints URLs without child-resource checks.
+- [x] Implement purpose-specific Prisma checks before storage key creation and signed URL minting.
+- [x] Run `npm run test -- src/modules/storage/storage-upload-route.test.ts`; expected PASS.
+
+### Correction Task 5: SCORM Job Secret Fails Closed
+
+**Files:**
+- Create: `src/modules/scorm/scorm-extraction-route.test.ts`
+- Modify: `src/app/api/jobs/scorm-extraction/route.ts`
+
+- [x] Write RED route tests where `SCORM_EXTRACTION_JOB_SECRET` is absent or mismatched and assert HTTP 403 with no package processing.
+- [x] Run `npm run test -- src/modules/scorm/scorm-extraction-route.test.ts`; expected FAIL because an absent secret currently allows execution.
+- [x] Require a configured secret and matching `x-learnhub-job-secret` header before importing runtime dependencies.
+- [x] Run `npm run test -- src/modules/scorm/scorm-extraction-route.test.ts`; expected PASS.
+
+### Correction Task 6: Verification And Fix Commit
+
+- [x] Run focused Task 5 tests:
+
+```powershell
+npm run test -- src/modules/providers/video/mux-video-provider.test.ts src/modules/providers/storage/r2-object-storage-provider.test.ts src/modules/storage/storage-keys.test.ts src/modules/scorm/scorm-manifest.test.ts src/modules/scorm/scorm-extraction.test.ts src/modules/scorm/scorm-package-jobs.test.ts src/modules/scorm/scorm-package-service.test.ts src/modules/scorm/scorm-runtime.test.ts src/modules/scorm/content-route.test.ts src/modules/scorm/server-actions.test.ts src/modules/providers/video/mux-upload-route.test.ts src/modules/providers/video/mux-webhook-route.test.ts src/modules/storage/storage-upload-route.test.ts src/modules/scorm/scorm-extraction-route.test.ts
+```
+
+- [x] Run final gates:
+
+```powershell
+npm run lint
+npx prisma validate
+npm run prisma:generate
+npx tsc --noEmit --incremental false
+npm run build
+git diff --check
+```
+
+- [x] Commit the fix:
+
+```powershell
+git add docs/superpowers/plans/2026-06-13-production-media-storage-scorm-operations-implementation.md src
+git commit -m "fix: close task 5 media storage compliance gaps"
+git rev-parse HEAD
+```
+
+Do not push. Do not merge.
+
+## Correction Self-Review
+
+Spec coverage:
+
+- The correction tasks map directly to the six review gaps: SCORM runtime storage reads, SCORM signed-upload key consistency, Mux upload integration, tenant-scoped Mux webhook updates, storage upload child-resource validation, and fail-closed extraction job authorization.
+
+Placeholder scan:
+
+- No correction task uses deferred placeholders. Each task lists concrete files, failing-test commands, implementation behavior, and verification commands.
+
+Type consistency:
+
+- The correction tasks reuse the existing Task 5 models and provider contracts, adding only `lessonId` passthrough metadata and optional SCORM `storageKey` input where needed.

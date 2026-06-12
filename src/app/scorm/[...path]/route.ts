@@ -1,6 +1,12 @@
 import { readFile, stat } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 
+import { getEnv, type Env } from "@/lib/env";
+import {
+  createR2ObjectStorageProvider,
+  type R2ObjectStorageProviderConfig,
+} from "@/modules/providers/storage/r2-object-storage-provider";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -15,6 +21,15 @@ export async function GET(_request: Request, { params }: ScormContentRouteContex
 
   if (!isSafePath(path)) {
     return new Response("Invalid SCORM content path", { status: 400 });
+  }
+
+  const storageConfig = optionalR2Config(getEnv());
+
+  if (storageConfig) {
+    const provider = createR2ObjectStorageProvider(storageConfig);
+    const signedReadUrl = await provider.getSignedReadUrl(path.join("/"));
+
+    return Response.redirect(signedReadUrl, 307);
   }
 
   const contentRoot = resolve(join(process.cwd(), ".learnhub", "scorm"));
@@ -62,6 +77,19 @@ function isSafePath(path: string[]): boolean {
         !isAbsolute(segment),
     )
   );
+}
+
+function optionalR2Config(env: Env): R2ObjectStorageProviderConfig | null {
+  if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_BUCKET_NAME) {
+    return null;
+  }
+
+  return {
+    accountId: env.R2_ACCOUNT_ID,
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    bucketName: env.R2_BUCKET_NAME,
+  };
 }
 
 function contentTypeForPath(path: string): string {

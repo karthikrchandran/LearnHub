@@ -20,31 +20,37 @@ export type MuxWebhookPayload = {
   data?: Record<string, unknown>;
 };
 
+export type MuxWebhookTenantContext = {
+  organizationId: string | null;
+  courseId: string | null;
+  lessonId: string | null;
+};
+
 export type MuxWebhookEvent =
-  | {
+  | ({
       type: "asset.ready";
       providerAssetId: string;
       providerUploadId: string | null;
       playbackId: string;
       playbackUrl: string;
       errorMessage: null;
-    }
-  | {
+    } & MuxWebhookTenantContext)
+  | ({
       type: "asset.failed";
       providerAssetId: string;
       providerUploadId: string | null;
       playbackId: null;
       playbackUrl: null;
       errorMessage: string;
-    }
-  | {
+    } & MuxWebhookTenantContext)
+  | ({
       type: "upload.asset_created";
       providerAssetId: string;
       providerUploadId: string | null;
       playbackId: null;
       playbackUrl: null;
       errorMessage: null;
-    };
+    } & MuxWebhookTenantContext);
 
 export function createMuxVideoProvider(config: MuxVideoProviderConfig): VideoProvider {
   const fetcher = config.fetch ?? fetch;
@@ -65,6 +71,7 @@ export function createMuxVideoProvider(config: MuxVideoProviderConfig): VideoPro
             passthrough: JSON.stringify({
               organizationId: input.organizationId,
               courseId: input.courseId,
+              lessonId: input.lessonId,
               title: input.title,
             }),
           },
@@ -139,6 +146,7 @@ export function mapMuxWebhookEvent(payload: MuxWebhookPayload): MuxWebhookEvent 
   const data = payload.data ?? {};
   const providerAssetId = optionalString(data.id);
   const providerUploadId = optionalString(data.upload_id);
+  const tenantContext = muxTenantContext(data);
 
   if (!providerAssetId) {
     return null;
@@ -154,6 +162,7 @@ export function mapMuxWebhookEvent(payload: MuxWebhookPayload): MuxWebhookEvent 
       playbackId,
       playbackUrl: playbackUrlForId(playbackId),
       errorMessage: null,
+      ...tenantContext,
     };
   }
 
@@ -165,6 +174,7 @@ export function mapMuxWebhookEvent(payload: MuxWebhookPayload): MuxWebhookEvent 
       playbackId: null,
       playbackUrl: null,
       errorMessage: muxErrorMessage(data),
+      ...tenantContext,
     };
   }
 
@@ -176,10 +186,31 @@ export function mapMuxWebhookEvent(payload: MuxWebhookPayload): MuxWebhookEvent 
       playbackId: null,
       playbackUrl: null,
       errorMessage: null,
+      ...tenantContext,
     };
   }
 
   return null;
+}
+
+function muxTenantContext(data: Record<string, unknown>): MuxWebhookTenantContext {
+  const passthrough = optionalString(data.passthrough);
+
+  if (!passthrough) {
+    return { organizationId: null, courseId: null, lessonId: null };
+  }
+
+  try {
+    const parsed = JSON.parse(passthrough) as Record<string, unknown>;
+
+    return {
+      organizationId: optionalString(parsed.organizationId),
+      courseId: optionalString(parsed.courseId),
+      lessonId: optionalString(parsed.lessonId),
+    };
+  } catch {
+    return { organizationId: null, courseId: null, lessonId: null };
+  }
 }
 
 function basicAuth(config: Pick<MuxVideoProviderConfig, "tokenId" | "tokenSecret">): string {
