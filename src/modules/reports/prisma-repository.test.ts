@@ -179,9 +179,9 @@ describe("createPrismaProgressReportRepository", () => {
             email: "grace@example.com",
           },
         },
-        progress: null,
+        progress: null as never,
         learningEvents: [],
-        certificate: null,
+        certificate: null as never,
       },
     ]);
     const repository = createPrismaProgressReportRepository(

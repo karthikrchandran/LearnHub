@@ -83,7 +83,7 @@ describe("createPrismaRuntimeRouteRepository", () => {
 
   it("returns null when the scoped assignment is not found", async () => {
     const client = createRuntimeRouteClient();
-    client.courseAssignment.findFirst.mockResolvedValueOnce(null);
+    client.courseAssignment.findFirst.mockResolvedValueOnce(null as never);
     const repository = createPrismaRuntimeRouteRepository(
       client as unknown as Parameters<typeof createPrismaRuntimeRouteRepository>[0],
     );
