@@ -60,6 +60,8 @@ describe("SCORM content route", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await response.text()).toContain("SCORM");
   });
 
@@ -160,12 +162,73 @@ describe("SCORM content route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(response.headers.get("set-cookie")).toContain("learnhub_scorm_access=");
-    await expect(response.text()).resolves.toContain("Launch");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    const body = await response.text();
+    expect(body).toContain("Launch");
+    expect(body).toContain("learnhub:scorm:cmi");
     expect(mocks.getSignedReadUrl).toHaveBeenCalledWith(
       "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
     );
     expect(fetchStorage).toHaveBeenCalledWith(
       "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html?X-Amz-Signature=signed",
+    );
+  });
+
+  it("allows production SCORM asset reads with the package-root cookie after launch", async () => {
+    mocks.env = {
+      R2_ACCOUNT_ID: "account",
+      R2_ACCESS_KEY_ID: "access",
+      R2_SECRET_ACCESS_KEY: "secret",
+      R2_BUCKET_NAME: "learnhub-media",
+      NEXTAUTH_SECRET: "test-secret",
+    };
+    mocks.getSignedReadUrl.mockResolvedValueOnce(
+      "https://account.r2.cloudflarestorage.com/learnhub-media/org/org_1/courses/course_1/scorm/pkg_course_1/content/assets/app.js?X-Amz-Signature=signed",
+    );
+    const fetchStorage = vi.fn().mockResolvedValue(
+      new Response("console.log('asset')", {
+        headers: {
+          "content-type": "text/javascript; charset=utf-8",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchStorage);
+    const launchUrl = signedScormContentUrl({
+      objectKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content/index.html",
+      contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
+    });
+    const cookieValue = new URL(launchUrl).searchParams;
+    const cookie = `learnhub_scorm_access=${encodeURIComponent(
+      `${cookieValue.get("lh_scorm_expires")}.${cookieValue.get("lh_scorm_token")}`,
+    )}`;
+
+    const response = await GET(
+      new Request("http://learnhub.test/scorm/org/org_1/courses/course_1/scorm/pkg_course_1/content/assets/app.js", {
+        headers: { cookie },
+      }),
+      {
+        params: Promise.resolve({
+          path: [
+            "org",
+            "org_1",
+            "courses",
+            "course_1",
+            "scorm",
+            "pkg_course_1",
+            "content",
+            "assets",
+            "app.js",
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    await expect(response.text()).resolves.toContain("asset");
+    expect(mocks.getSignedReadUrl).toHaveBeenCalledWith(
+      "org/org_1/courses/course_1/scorm/pkg_course_1/content/assets/app.js",
     );
   });
 });

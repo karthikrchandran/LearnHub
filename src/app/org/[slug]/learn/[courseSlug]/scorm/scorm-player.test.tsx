@@ -81,7 +81,10 @@ describe("ScormPlayer", () => {
 
     expect(container.textContent).toContain("Launch count 2");
     expect(container.textContent).toContain("incomplete");
-    expect(iframe?.getAttribute("src")).toBe("/scorm/org/org_1/course/index.html");
+    expect(iframe?.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups");
+    expect(iframe?.getAttribute("sandbox")).not.toContain("allow-same-origin");
+    expect(iframe?.getAttribute("src")).toContain("/scorm/org/org_1/course/index.html");
+    expect(iframe?.getAttribute("src")).toContain("lh_scorm_state=");
 
     const api = (window as Window & { API: TestScormApi }).API;
 
@@ -107,6 +110,71 @@ describe("ScormPlayer", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/commit", expect.objectContaining({ method: "POST" }));
     expect(container.textContent).toContain("completed");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("commits CMI values sent by the sandboxed iframe bridge", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/launch") {
+        return Response.json(launchPayload());
+      }
+
+      expect(url).toBe("/commit");
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        "cmi.core.lesson_status": "passed",
+        "cmi.core.score.raw": "88",
+      });
+
+      return Response.json({
+        progressPercent: 100,
+        completed: true,
+        registration: {
+          cmiData: {
+            "cmi.core.lesson_status": "passed",
+            "cmi.core.score.raw": "88",
+          },
+          lessonStatus: "passed",
+          scoreRaw: 88,
+          launchCount: 2,
+        },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, root } = await render(
+      <ScormPlayer launchPath="/launch" commitPath="/commit" initialProgressPercent={0} initialScore={null} />,
+    );
+    const iframe = container.querySelector("iframe");
+
+    expect(iframe?.contentWindow).toBeTruthy();
+
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            type: "learnhub:scorm:cmi",
+            cmiData: {
+              "cmi.core.lesson_status": "passed",
+              "cmi.core.score.raw": "88",
+            },
+            commit: true,
+          },
+          source: iframe?.contentWindow ?? null,
+          origin: "null",
+        }),
+      );
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/commit", expect.objectContaining({ method: "POST" }));
+    expect(container.textContent).toContain("passed");
+    expect(container.textContent).toContain("88");
 
     await act(async () => {
       root.unmount();

@@ -65,6 +65,7 @@ export function ScormPlayer({ launchPath, commitPath, initialProgressPercent, in
   const cmiDataRef = useRef<Record<string, string>>({});
   const initializedRef = useRef(false);
   const lastErrorCodeRef = useRef("0");
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const setScormError = useCallback((code: string) => {
     lastErrorCodeRef.current = code;
@@ -117,7 +118,10 @@ export function ScormPlayer({ launchPath, commitPath, initialProgressPercent, in
         }
 
         cmiDataRef.current = nextCmiData;
-        setLaunch(nextLaunch);
+        setLaunch({
+          ...nextLaunch,
+          launchUrl: scormBridgeLaunchUrl(nextLaunch.launchUrl, nextCmiData),
+        });
         setLessonStatus(nextCmiData["cmi.core.lesson_status"] ?? "not attempted");
         setScoreRaw(readScore(nextCmiData["cmi.core.score.raw"]) ?? initialScore);
         setStatusMessage("SCORM package ready");
@@ -231,6 +235,45 @@ export function ScormPlayer({ launchPath, commitPath, initialProgressPercent, in
     };
   }, [commitSession, launch, setScormError]);
 
+  useEffect(() => {
+    if (!launch) {
+      return;
+    }
+
+    function receiveScormBridgeMessage(event: MessageEvent) {
+      if (event.source !== iframeRef.current?.contentWindow || !isScormCmiMessage(event.data)) {
+        return;
+      }
+
+      const nextCmiData = stringsOnly(event.data.cmiData);
+
+      cmiDataRef.current = {
+        ...cmiDataRef.current,
+        ...nextCmiData,
+      };
+
+      if (nextCmiData["cmi.core.lesson_status"]) {
+        setLessonStatus(nextCmiData["cmi.core.lesson_status"]);
+      }
+
+      if (nextCmiData["cmi.core.score.raw"]) {
+        setScoreRaw(readScore(nextCmiData["cmi.core.score.raw"]));
+      }
+
+      setScormError("0");
+
+      if (event.data.commit) {
+        void commitSession();
+      }
+    }
+
+    window.addEventListener("message", receiveScormBridgeMessage);
+
+    return () => {
+      window.removeEventListener("message", receiveScormBridgeMessage);
+    };
+  }, [commitSession, launch, setScormError]);
+
   if (!launch) {
     return (
       <section className="rounded-md border border-slate-200 p-4">
@@ -242,8 +285,10 @@ export function ScormPlayer({ launchPath, commitPath, initialProgressPercent, in
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <iframe
+        ref={iframeRef}
         title="SCORM content"
         src={launch.launchUrl}
+        sandbox="allow-scripts allow-forms allow-popups"
         className="aspect-video w-full rounded-md border border-slate-200 bg-white"
       />
 
@@ -285,6 +330,34 @@ export function ScormPlayer({ launchPath, commitPath, initialProgressPercent, in
       </aside>
     </section>
   );
+}
+
+type ScormCmiBridgeMessage = {
+  type: "learnhub:scorm:cmi";
+  cmiData: Record<string, unknown>;
+  commit?: boolean;
+};
+
+function isScormCmiMessage(value: unknown): value is ScormCmiBridgeMessage {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    value.type === "learnhub:scorm:cmi" &&
+    "cmiData" in value &&
+    typeof value.cmiData === "object" &&
+    value.cmiData !== null
+  );
+}
+
+function scormBridgeLaunchUrl(launchUrl: string, cmiData: Record<string, string>): string {
+  const url = new URL(launchUrl, window.location.origin);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+
+  hash.set("lh_scorm_state", encodeURIComponent(JSON.stringify(cmiData)));
+  url.hash = hash.toString();
+
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function stringsOnly(input: Record<string, unknown>): Record<string, string> {

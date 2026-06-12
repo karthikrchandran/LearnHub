@@ -122,6 +122,7 @@ export function parseZipEntries(
 
   const buffer = Buffer.from(bytes);
   const entries: ScormPackageEntry[] = [];
+  let localEntryCount = 0;
   let totalUncompressedBytes = 0;
   let offset = 0;
 
@@ -134,6 +135,12 @@ export function parseZipEntries(
 
     if (offset + 30 > buffer.length) {
       throw new Error("ZIP entry header is truncated");
+    }
+
+    localEntryCount += 1;
+
+    if (localEntryCount > limits.maxEntries) {
+      throw new Error("SCORM zip contains too many entries");
     }
 
     const flags = buffer.readUInt16LE(offset + 6);
@@ -162,12 +169,16 @@ export function parseZipEntries(
     const path = normalizeZipEntryPath(buffer.subarray(fileNameStart, fileNameEnd).toString("utf8"));
 
     if (!path.endsWith("/")) {
-      if (entries.length + 1 > limits.maxEntries) {
-        throw new Error("SCORM zip contains too many entries");
-      }
-
       if (pathDepth(path) > limits.maxPathDepth) {
         throw new Error("SCORM zip entry path exceeds the maximum depth");
+      }
+
+      if (compressionMethod === 0 && compressedSize !== declaredUncompressedSize) {
+        throw new Error("Stored ZIP entry size metadata is inconsistent");
+      }
+
+      if (compressionMethod === 0 && compressedSize > limits.maxEntryBytes) {
+        throw new Error("SCORM zip entry exceeds the maximum extracted size");
       }
 
       if (declaredUncompressedSize > limits.maxEntryBytes) {

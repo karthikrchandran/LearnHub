@@ -136,6 +136,36 @@ describe("extractScormZip", () => {
     expect(writer.objects).toEqual([]);
   });
 
+  it("counts directory entries against the ZIP entry fanout limit", async () => {
+    const writer = new FakeWriter();
+
+    await expect(
+      extractScormZip({
+        organizationId: "org_1",
+        courseId: "course_1",
+        packageId: "pkg_1",
+        contentRootKey: "org/org_1/courses/course_1/scorm/pkg_1/content",
+        zipBytes: createStoredZip([
+          ["dir_1/", ""],
+          ["dir_2/", ""],
+          ["imsmanifest.xml", manifestXml],
+          ["index.html", "<html>Launch</html>"],
+        ]),
+        scanner: createPassThroughMalwareScanner("passed"),
+        writer,
+        limits: {
+          maxZipBytes: 4096,
+          maxEntries: 2,
+          maxEntryBytes: 1024,
+          maxTotalUncompressedBytes: 2048,
+          maxPathDepth: 8,
+        },
+      }),
+    ).rejects.toThrow("SCORM zip contains too many entries");
+
+    expect(writer.objects).toEqual([]);
+  });
+
   it("rejects oversized extracted entries before writing files", async () => {
     const writer = new FakeWriter();
 
@@ -188,6 +218,30 @@ describe("extractScormZip", () => {
     expect(writer.objects).toEqual([]);
   });
 
+  it("rejects stored ZIP entries with inconsistent compressed and extracted sizes", async () => {
+    const writer = new FakeWriter();
+
+    await expect(
+      extractScormZip({
+        organizationId: "org_1",
+        courseId: "course_1",
+        packageId: "pkg_1",
+        contentRootKey: "org/org_1/courses/course_1/scorm/pkg_1/content",
+        zipBytes: createStoredZip(
+          [
+            ["imsmanifest.xml", manifestXml],
+            ["index.html", "<html>Launch</html>"],
+          ],
+          { storedSizeMismatch: true },
+        ),
+        scanner: createPassThroughMalwareScanner("passed"),
+        writer,
+      }),
+    ).rejects.toThrow("Stored ZIP entry size metadata is inconsistent");
+
+    expect(writer.objects).toEqual([]);
+  });
+
   it("stores malware scan failures without extracting content", async () => {
     const writer = new FakeWriter();
 
@@ -216,7 +270,7 @@ describe("extractScormZip", () => {
 
 function createStoredZip(
   entries: Array<[string, string]>,
-  options: { dataDescriptor?: boolean } = {},
+  options: { dataDescriptor?: boolean; storedSizeMismatch?: boolean } = {},
 ): Uint8Array {
   const chunks: Buffer[] = [];
 
@@ -230,7 +284,7 @@ function createStoredZip(
     header.writeUInt16LE(0, 8);
     header.writeUInt32LE(0, 14);
     header.writeUInt32LE(contentBuffer.length, 18);
-    header.writeUInt32LE(contentBuffer.length, 22);
+    header.writeUInt32LE(options.storedSizeMismatch ? contentBuffer.length + 1 : contentBuffer.length, 22);
     header.writeUInt16LE(nameBuffer.length, 26);
     header.writeUInt16LE(0, 28);
     chunks.push(header, nameBuffer, contentBuffer);

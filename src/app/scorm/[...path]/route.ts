@@ -60,12 +60,9 @@ export async function GET(request: Request, { params }: ScormContentRouteContext
     }
 
     const file = await readFile(targetPath);
+    const contentType = contentTypeForPath(targetPath);
 
-    return new Response(new Uint8Array(file), {
-      headers: {
-        "content-type": contentTypeForPath(targetPath),
-      },
-    });
+    return scormContentResponse(file, contentType);
   } catch (error) {
     if (isNotFoundError(error)) {
       return new Response("SCORM content not found", { status: 404 });
@@ -119,9 +116,8 @@ async function serveR2ScormContent(input: {
     return new Response("SCORM content read failed", { status: 502 });
   }
 
-  const headers = new Headers({
-    "content-type": storageResponse.headers.get("content-type") ?? contentTypeForPath(objectKey),
-  });
+  const contentType = storageResponse.headers.get("content-type") ?? contentTypeForPath(objectKey);
+  const headers = scormContentHeaders(contentType);
 
   if (queryGrant) {
     headers.append(
@@ -134,10 +130,14 @@ async function serveR2ScormContent(input: {
     );
   }
 
-  return new Response(storageResponse.body, {
-    status: storageResponse.status,
-    headers,
-  });
+  if (isHtmlContent(contentType)) {
+    return new Response(injectScormBridgeBootstrap(await storageResponse.text()), {
+      status: storageResponse.status,
+      headers,
+    });
+  }
+
+  return new Response(storageResponse.body, { status: storageResponse.status, headers });
 }
 
 function readScormContentQueryGrant(url: URL): ScormContentAccessGrant | null {
@@ -203,6 +203,160 @@ function contentTypeForPath(path: string): string {
     default:
       return "application/octet-stream";
   }
+}
+
+function scormContentResponse(body: Buffer, contentType: string): Response {
+  if (isHtmlContent(contentType)) {
+    return new Response(injectScormBridgeBootstrap(body.toString("utf8")), {
+      headers: scormContentHeaders(contentType),
+    });
+  }
+
+  return new Response(new Uint8Array(body), {
+    headers: scormContentHeaders(contentType),
+  });
+}
+
+function scormContentHeaders(contentType: string): Headers {
+  return new Headers({
+    "content-type": contentType,
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+  });
+}
+
+function isHtmlContent(contentType: string): boolean {
+  return contentType.toLowerCase().includes("text/html");
+}
+
+function injectScormBridgeBootstrap(html: string): string {
+  const script = `<script>${scormBridgeBootstrapScript()}</script>`;
+
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${script}</head>`);
+  }
+
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${script}</body>`);
+  }
+
+  return `${script}${html}`;
+}
+
+function scormBridgeBootstrapScript(): string {
+  return `
+(() => {
+  if (window.API) return;
+
+  const allowedCmiKeys = new Set([
+    "cmi.core.lesson_status",
+    "cmi.core.score.raw",
+    "cmi.core.session_time",
+    "cmi.core.exit",
+    "cmi.core.lesson_location",
+    "cmi.suspend_data",
+    "cmi.comments",
+  ]);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  let cmiData = {};
+  let initialized = false;
+  let lastError = "0";
+
+  try {
+    const encoded = hash.get("lh_scorm_state");
+    const parsed = encoded ? JSON.parse(decodeURIComponent(encoded)) : {};
+    cmiData = Object.fromEntries(Object.entries(parsed).filter((entry) => typeof entry[1] === "string"));
+  } catch {
+    cmiData = {};
+  }
+
+  function sync(commit) {
+    window.parent.postMessage({
+      type: "learnhub:scorm:cmi",
+      cmiData,
+      commit: Boolean(commit),
+    }, "*");
+  }
+
+  function errorText(code) {
+    switch (code) {
+      case "0":
+        return "No error";
+      case "101":
+        return "General exception";
+      case "301":
+        return "Not initialized";
+      case "401":
+        return "Unsupported data model element";
+      default:
+        return "Unknown SCORM error";
+    }
+  }
+
+  window.API = {
+    LMSInitialize() {
+      initialized = true;
+      lastError = "0";
+      return "true";
+    },
+    LMSFinish() {
+      if (!initialized) {
+        lastError = "301";
+        return "false";
+      }
+
+      sync(true);
+      initialized = false;
+      lastError = "0";
+      return "true";
+    },
+    LMSGetValue(key) {
+      if (!allowedCmiKeys.has(key)) {
+        lastError = "401";
+        return "";
+      }
+
+      lastError = "0";
+      return cmiData[key] || "";
+    },
+    LMSSetValue(key, value) {
+      if (!initialized) {
+        lastError = "301";
+        return "false";
+      }
+
+      if (!allowedCmiKeys.has(key)) {
+        lastError = "401";
+        return "false";
+      }
+
+      cmiData = { ...cmiData, [key]: String(value) };
+      sync(false);
+      lastError = "0";
+      return "true";
+    },
+    LMSCommit() {
+      if (!initialized) {
+        lastError = "301";
+        return "false";
+      }
+
+      sync(true);
+      lastError = "0";
+      return "true";
+    },
+    LMSGetLastError() {
+      return lastError;
+    },
+    LMSGetErrorString(code) {
+      return errorText(code);
+    },
+    LMSGetDiagnostic(code) {
+      return errorText(code || lastError);
+    },
+  };
+})();
+`;
 }
 
 function isNotFoundError(error: unknown): boolean {

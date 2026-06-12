@@ -10,6 +10,8 @@ import { createPrismaScormRepository } from "@/modules/scorm/prisma-repository";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const maxScormPackageDownloadBytes = 512 * 1024 * 1024;
+
 export async function POST(request: Request): Promise<Response> {
   const env = getEnv();
 
@@ -56,12 +58,64 @@ function createJobStorage(config: ReturnType<typeof requiredR2Config>): ScormPac
         throw new Error(`SCORM package read failed with status ${response.status}`);
       }
 
-      return new Uint8Array(await response.arrayBuffer());
+      return readResponseBytesWithLimit(response, maxScormPackageDownloadBytes);
     },
     putObject(input) {
       return provider.putObject(input);
     },
   };
+}
+
+async function readResponseBytesWithLimit(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const contentLength = response.headers.get("content-length");
+
+  if (contentLength) {
+    const parsed = Number(contentLength);
+
+    if (!Number.isFinite(parsed) || parsed > maxBytes) {
+      throw new Error("SCORM package exceeds the maximum compressed size");
+    }
+  }
+
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+
+    if (bytes.byteLength > maxBytes) {
+      throw new Error("SCORM package exceeds the maximum compressed size");
+    }
+
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const next = await reader.read();
+
+    if (next.done) {
+      break;
+    }
+
+    totalBytes += next.value.byteLength;
+
+    if (totalBytes > maxBytes) {
+      throw new Error("SCORM package exceeds the maximum compressed size");
+    }
+
+    chunks.push(next.value);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return bytes;
 }
 
 function requiredR2Config(env: ReturnType<typeof getEnv>) {
