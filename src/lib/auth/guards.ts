@@ -3,6 +3,7 @@ import { canManageOrganizationUsers } from "../../modules/auth/permissions";
 import { redirect } from "next/navigation";
 
 export type GuardAuthContext = MembershipAuthContext;
+export type GuardOrganizationStatus = "ACTIVE" | "INACTIVE";
 
 export type GuardResult =
   | {
@@ -31,9 +32,14 @@ export function resolvePlatformOwnerGuard(context: GuardAuthContext | null): Gua
 export function resolveOrganizationUsersAdminGuard(
   context: GuardAuthContext | null,
   organizationId: string,
+  organizationStatus: GuardOrganizationStatus = "ACTIVE",
 ): GuardResult {
   if (!context) {
     return { allowed: false, redirectTo: "/login" };
+  }
+
+  if (organizationStatus !== "ACTIVE" && !context.isPlatformOwner) {
+    return { allowed: false, redirectTo: "/platform" };
   }
 
   if (!canManageOrganizationUsers(context, organizationId)) {
@@ -43,9 +49,17 @@ export function resolveOrganizationUsersAdminGuard(
   return { allowed: true };
 }
 
-export function resolveOrganizationMemberGuard(context: GuardAuthContext | null, organizationId: string): GuardResult {
+export function resolveOrganizationMemberGuard(
+  context: GuardAuthContext | null,
+  organizationId: string,
+  organizationStatus: GuardOrganizationStatus = "ACTIVE",
+): GuardResult {
   if (!context) {
     return { allowed: false, redirectTo: "/login" };
+  }
+
+  if (organizationStatus !== "ACTIVE" && !context.isPlatformOwner) {
+    return { allowed: false, redirectTo: "/platform" };
   }
 
   if (!context.isPlatformOwner && !hasActiveMembership(context, organizationId)) {
@@ -96,14 +110,16 @@ async function getCurrentAuthContext(): Promise<GuardAuthContext | null> {
   };
 }
 
-async function getOrganizationIdBySlug(slug: string): Promise<string | null> {
+async function getOrganizationBySlug(
+  slug: string,
+): Promise<{ id: string; status: GuardOrganizationStatus } | null> {
   const { prisma } = await import("../prisma");
   const organization = await prisma.organization.findUnique({
     where: { slug },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 
-  return organization?.id ?? null;
+  return organization ?? null;
 }
 
 function enforceGuard(result: GuardResult): void {
@@ -126,15 +142,15 @@ export async function requireOrganizationMemberBySlug(slug: string): Promise<{ c
     redirect("/login");
   }
 
-  const organizationId = await getOrganizationIdBySlug(slug);
+  const organization = await getOrganizationBySlug(slug);
 
-  if (!organizationId) {
+  if (!organization) {
     redirect("/platform");
   }
 
-  enforceGuard(resolveOrganizationMemberGuard(context, organizationId));
+  enforceGuard(resolveOrganizationMemberGuard(context, organization.id, organization.status));
 
-  return { context, organizationId };
+  return { context, organizationId: organization.id };
 }
 
 export async function requireOrganizationUsersAdminBySlug(
@@ -146,13 +162,13 @@ export async function requireOrganizationUsersAdminBySlug(
     redirect("/login");
   }
 
-  const organizationId = await getOrganizationIdBySlug(slug);
+  const organization = await getOrganizationBySlug(slug);
 
-  if (!organizationId) {
+  if (!organization) {
     redirect("/platform");
   }
 
-  enforceGuard(resolveOrganizationUsersAdminGuard(context, organizationId));
+  enforceGuard(resolveOrganizationUsersAdminGuard(context, organization.id, organization.status));
 
-  return { context, organizationId };
+  return { context, organizationId: organization.id };
 }

@@ -11,6 +11,11 @@ enum OrganizationEnrollmentPolicy {
   ASSIGNMENT_AND_SELF_ENROLLMENT
 }
 
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum OrganizationRole {
   ADMIN
   MANAGER
@@ -85,12 +90,14 @@ model Organization {
   id                   String                       @id @default(cuid())
   name                 String
   slug                 String                       @unique
+  status               OrganizationStatus           @default(ACTIVE)
   logoUrl              String?
   primaryColor         String                       @default("#2563eb")
   accentColor          String                       @default("#14b8a6")
   allowedEmailDomains  String[]                     @default([])
   enrollmentPolicy     OrganizationEnrollmentPolicy @default(ASSIGNMENT_ONLY)
   globalLibraryEnabled Boolean                      @default(false)
+  allowAdminBranding   Boolean                      @default(false)
   memberships          OrganizationMembership[]
   invitationTokens     UserInvitationToken[]
   categories           CourseCategory[]
@@ -110,6 +117,8 @@ model Organization {
   auditLogs            AuditLog[]
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
+
+  @@index([status])
 }
 
 model OrganizationMembership {
