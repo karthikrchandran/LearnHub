@@ -37,6 +37,8 @@ const row = {
   courseType: "NATIVE_VIDEO" as const,
   assignmentStatus: "IN_PROGRESS" as const,
   progressPercent: 40,
+  latestRequiredCheckAverageScore: null,
+  bestRequiredCheckAverageScore: null,
   dueDate: new Date("2026-06-20T00:00:00.000Z"),
   lastEventAt: new Date("2026-06-12T12:00:00.000Z"),
   certificateUrl: "https://learnhub.test/certificates/ABC123",
@@ -153,7 +155,7 @@ describe("progress report CSV export route", () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(
-      "Learner Name,Learner Email,Course Title,Course Type,Assignment Status,Progress Percent,Due Date,Completed,Certificate URL,Last Event Date",
+      "Learner Name,Learner Email,Course Title,Course Type,Assignment Status,Progress Percent,Latest Required Check Average Score,Best Required Check Average Score,Due Date,Completed,Certificate URL,Last Event Date",
     );
     expect(mocks.listProgressRows).toHaveBeenCalledWith({
       organizationId: "org_1",

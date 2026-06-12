@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 
 import {
   progressReportWhere,
+  summarizeRequiredCheckScores,
   type ProgressReportRow,
   type ProgressReportScope,
 } from "./progress-report";
@@ -22,7 +23,13 @@ type ProgressReportAssignmentRecord = {
   course: {
     title: string;
     type: ProgressReportRow["courseType"];
+    knowledgeCheckQuestions: Array<{ id: string }>;
   };
+  knowledgeCheckAttempts: Array<{
+    questionId: string;
+    scorePercent: number;
+    submittedAt: Date;
+  }>;
   membership: {
     user: {
       firstName: string;
@@ -58,7 +65,15 @@ export function createPrismaProgressReportRepository(
             select: {
               title: true,
               type: true,
+              knowledgeCheckQuestions: {
+                where: { active: true, required: true },
+                select: { id: true },
+              },
             },
+          },
+          knowledgeCheckAttempts: {
+            orderBy: [{ questionId: "asc" }, { submittedAt: "desc" }],
+            select: { questionId: true, scorePercent: true, submittedAt: true },
           },
           membership: {
             select: {
@@ -97,6 +112,10 @@ export function createPrismaProgressReportRepository(
 
 function mapProgressRow(assignment: ProgressReportAssignmentRecord): ProgressReportRow {
   const learnerName = `${assignment.membership.user.firstName} ${assignment.membership.user.lastName}`.trim();
+  const checkScores = summarizeRequiredCheckScores({
+    requiredActiveCheckIds: assignment.course.knowledgeCheckQuestions.map((question) => question.id),
+    attempts: assignment.knowledgeCheckAttempts,
+  });
 
   return {
     assignmentId: assignment.id,
@@ -106,6 +125,8 @@ function mapProgressRow(assignment: ProgressReportAssignmentRecord): ProgressRep
     courseType: assignment.course.type,
     assignmentStatus: assignment.status,
     progressPercent: assignment.progress?.progressPercent ?? 0,
+    latestRequiredCheckAverageScore: checkScores.latestRequiredCheckAverageScore,
+    bestRequiredCheckAverageScore: checkScores.bestRequiredCheckAverageScore,
     dueDate: assignment.dueDate,
     lastEventAt: assignment.learningEvents[0]?.occurredAt ?? assignment.progress?.lastEventAt ?? null,
     certificateUrl: assignment.certificate?.verificationUrl ?? null,
