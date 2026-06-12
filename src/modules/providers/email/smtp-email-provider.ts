@@ -16,6 +16,7 @@ export type SmtpSendInput = {
   subject: string;
   html: string;
   text: string;
+  timeoutMs: number;
 };
 
 export interface SmtpClient {
@@ -30,33 +31,41 @@ export type SmtpEmailProviderConfig = {
   from: string;
   secure?: boolean;
   client?: SmtpClient;
+  timeoutMs?: number;
 };
 
 export class SmtpEmailProvider implements EmailProvider {
   private readonly client: SmtpClient;
+  private readonly timeoutMs: number;
 
   constructor(private readonly config: SmtpEmailProviderConfig) {
     this.client = config.client ?? new NodeSmtpClient();
+    this.timeoutMs = config.timeoutMs ?? 10_000;
   }
 
   send(message: EmailMessage): Promise<EmailSendResult> {
-    return this.client.send({
-      host: this.config.host,
-      port: this.config.port,
-      secure: this.config.secure ?? false,
-      auth:
-        this.config.username && this.config.password
-          ? {
-              username: this.config.username,
-              password: this.config.password,
-            }
-          : undefined,
-      from: this.config.from,
-      to: message.to,
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
-    });
+    return withTimeout(
+      this.client.send({
+        host: this.config.host,
+        port: this.config.port,
+        secure: this.config.secure ?? false,
+        auth:
+          this.config.username && this.config.password
+            ? {
+                username: this.config.username,
+                password: this.config.password,
+              }
+            : undefined,
+        from: this.config.from,
+        to: message.to,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+        timeoutMs: this.timeoutMs,
+      }),
+      this.timeoutMs,
+      "SMTP send",
+    );
   }
 }
 
@@ -147,6 +156,9 @@ function connect(input: SmtpSendInput): Promise<net.Socket | tls.TLSSocket> {
       ? tls.connect({ port: input.port, host: input.host }, () => resolve(socket))
       : net.connect(input.port, input.host, () => resolve(socket));
 
+    socket.setTimeout(input.timeoutMs, () => {
+      socket.destroy(new Error(`SMTP send timed out after ${input.timeoutMs}ms`));
+    });
     socket.once("error", reject);
   });
 }
@@ -177,4 +189,20 @@ function addressOnly(value: string): string {
   const match = /<([^>]+)>/.exec(value);
 
   return match?.[1] ?? value;
+}
+
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([operation, timeoutPromise]).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  });
 }

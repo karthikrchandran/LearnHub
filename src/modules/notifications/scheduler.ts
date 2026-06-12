@@ -24,6 +24,7 @@ export interface NotificationSchedulerRepository {
     now: Date;
     batchSize: number;
     maxAttempts: number;
+    processingTimeoutMs: number;
   }): Promise<NotificationDeliveryJob[]>;
   markNotificationJobSent(input: {
     id: string;
@@ -44,7 +45,7 @@ export interface NotificationSchedulerRepository {
 }
 
 export async function processNotificationJobs(
-  input: { now: Date; batchSize: number; maxAttempts: number },
+  input: { now: Date; batchSize: number; maxAttempts: number; processingTimeoutMs?: number },
   repository: NotificationSchedulerRepository,
   provider: EmailProvider,
 ): Promise<NotificationProcessResult> {
@@ -53,6 +54,7 @@ export async function processNotificationJobs(
     now: input.now,
     batchSize,
     maxAttempts: input.maxAttempts,
+    processingTimeoutMs: input.processingTimeoutMs ?? 15 * 60 * 1000,
   });
   let sent = 0;
   let failed = 0;

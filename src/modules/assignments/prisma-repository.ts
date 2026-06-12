@@ -1,10 +1,16 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 import type { AssignmentRepository } from "./assignment-service";
 
 type PrismaAssignmentClient = Pick<
   PrismaClient,
-  "$transaction" | "course" | "organizationMembership" | "organization" | "courseAssignment" | "auditLog"
+  | "$transaction"
+  | "course"
+  | "organizationMembership"
+  | "organization"
+  | "courseAssignment"
+  | "auditLog"
+  | "notificationEnqueueFailure"
 >;
 
 export function createPrismaAssignmentRepository(client: PrismaAssignmentClient): AssignmentRepository {
@@ -121,6 +127,14 @@ export function createPrismaAssignmentRepository(client: PrismaAssignmentClient)
           action: input.action,
           targetType: input.targetType,
           targetId: input.targetId,
+        },
+      });
+    },
+    async recordNotificationEnqueueFailure(input) {
+      await activeClient().notificationEnqueueFailure.create({
+        data: {
+          ...input,
+          payload: input.payload as Prisma.InputJsonValue,
         },
       });
     },

@@ -38,6 +38,7 @@ describe("notification scheduler", () => {
       now,
       batchSize: 2,
       maxAttempts: 3,
+      processingTimeoutMs: 15 * 60 * 1000,
     });
     expect(provider.send).toHaveBeenCalledTimes(2);
     expect(repository.markNotificationJobSent).toHaveBeenCalledWith({
@@ -89,6 +90,7 @@ describe("notification scheduler", () => {
       now,
       batchSize: 50,
       maxAttempts: 3,
+      processingTimeoutMs: 15 * 60 * 1000,
     });
   });
 
@@ -109,7 +111,40 @@ describe("notification scheduler", () => {
       now,
       batchSize: 5,
       maxAttempts: 4,
+      processingTimeoutMs: 15 * 60 * 1000,
     });
+  });
+
+  it("sends only jobs returned by the atomic claim", async () => {
+    const repository: NotificationSchedulerRepository = {
+      claimDueNotificationJobs: vi.fn(async () => [
+        job({
+          id: "claimed-job",
+          recipientEmail: "claimed@example.com",
+        }),
+      ]),
+      markNotificationJobSent: vi.fn(),
+      markNotificationJobFailed: vi.fn(),
+      markNotificationJobSkipped: vi.fn(),
+    };
+    const provider: EmailProvider = {
+      send: vi.fn(async () => ({ providerMessageId: "provider_1" })),
+    };
+
+    const result = await processNotificationJobs({ now, batchSize: 2, maxAttempts: 3 }, repository, provider);
+
+    expect(result).toEqual({ processed: 1, sent: 1, failed: 0, skipped: 0 });
+    expect(provider.send).toHaveBeenCalledTimes(1);
+    expect(provider.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "claimed@example.com",
+      }),
+    );
+    expect(provider.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "stale-non-claimed@example.com",
+      }),
+    );
   });
 
   it("skips completed assignments for delayed reminder and escalation jobs", async () => {

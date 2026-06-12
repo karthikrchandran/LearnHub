@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 const defaultBatchSize = 25;
 const maxAttempts = 3;
+const processingTimeoutMs = 15 * 60 * 1000;
 
 export async function POST(request: Request): Promise<Response> {
   const [{ env }, { prisma }, { createPrismaNotificationRepository }] = await Promise.all([
@@ -33,6 +34,7 @@ export async function POST(request: Request): Promise<Response> {
       now: new Date(),
       batchSize: readBatchSize(request),
       maxAttempts,
+      processingTimeoutMs,
     },
     createPrismaNotificationRepository(prisma),
     createEmailProviderFromEnv(env, process.env.NODE_ENV),

@@ -2,16 +2,30 @@ import { describe, expect, it, vi } from "vitest";
 
 import { issueCertificateForCompletedAssignment, type CertificateRepository } from "./certificates";
 
+type NotificationEnqueueFailureRecord = {
+  organizationId: string;
+  assignmentId: string;
+  certificateId?: string | null;
+  operation: string;
+  payload: unknown;
+  lastError: string;
+  failedAt: Date;
+  retryAt: Date;
+};
+
 function createRepository(
   assignment: Awaited<ReturnType<CertificateRepository["findAssignmentForCertificate"]>>,
   existingCertificate: Awaited<ReturnType<CertificateRepository["findCertificateByAssignment"]>> = null,
 ): CertificateRepository & {
   createdCertificates: Parameters<CertificateRepository["createCertificate"]>[0][];
+  enqueueFailures: NotificationEnqueueFailureRecord[];
 } {
   const createdCertificates: Parameters<CertificateRepository["createCertificate"]>[0][] = [];
+  const enqueueFailures: NotificationEnqueueFailureRecord[] = [];
 
   return {
     createdCertificates,
+    enqueueFailures,
     async findAssignmentForCertificate() {
       return assignment;
     },
@@ -26,6 +40,9 @@ function createRepository(
         verificationUrl: data.verificationUrl,
         issuedAt: data.issuedAt,
       };
+    },
+    async recordNotificationEnqueueFailure(data: NotificationEnqueueFailureRecord) {
+      enqueueFailures.push(data);
     },
   };
 }
@@ -135,6 +152,23 @@ describe("issueCertificateForCompletedAssignment", () => {
       ).resolves.toMatchObject({ id: "certificate_1" });
 
       expect(repository.createdCertificates).toHaveLength(1);
+      expect(repository.enqueueFailures).toEqual([
+        expect.objectContaining({
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+          certificateId: "certificate_1",
+          operation: "CERTIFICATE_NOTIFICATION",
+          lastError: "Notification database unavailable",
+          failedAt: new Date("2026-06-09T12:00:00.000Z"),
+          retryAt: new Date("2026-06-09T12:05:00.000Z"),
+        }),
+      ]);
+      expect(repository.enqueueFailures[0]?.payload).toMatchObject({
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        certificateId: "certificate_1",
+        learnerEmail: "asha@example.com",
+      });
       expect(error).toHaveBeenCalledWith("Notification enqueue failed after certificate commit", {
         organizationId: "org_1",
         assignmentId: "assignment_1",

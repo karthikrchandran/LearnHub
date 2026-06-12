@@ -39,6 +39,17 @@ const selfEnrollmentOrganization: AssignmentOrganization = {
   enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
 };
 
+type NotificationEnqueueFailureRecord = {
+  organizationId: string;
+  assignmentId: string;
+  certificateId?: string | null;
+  operation: string;
+  payload: unknown;
+  lastError: string;
+  failedAt: Date;
+  retryAt: Date;
+};
+
 const adminActor: MembershipAuthContext = {
   userId: "admin-user",
   isPlatformOwner: false,
@@ -94,6 +105,7 @@ class FakeAssignmentRepository implements AssignmentRepository {
   calls: string[] = [];
   createdAssignments: Array<Parameters<AssignmentRepository["createAssignment"]>[0]> = [];
   auditLogs: Array<Parameters<AssignmentRepository["recordAuditLog"]>[0]> = [];
+  enqueueFailures: NotificationEnqueueFailureRecord[] = [];
 
   async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
     this.transactions += 1;
@@ -138,6 +150,11 @@ class FakeAssignmentRepository implements AssignmentRepository {
   async recordAuditLog(data: Parameters<AssignmentRepository["recordAuditLog"]>[0]): Promise<void> {
     this.calls.push(`audit:${data.action}`);
     this.auditLogs.push(data);
+  }
+
+  async recordNotificationEnqueueFailure(data: NotificationEnqueueFailureRecord): Promise<void> {
+    this.calls.push("notification-enqueue-failure");
+    this.enqueueFailures.push(data);
   }
 }
 
@@ -227,6 +244,23 @@ describe("assignment service", () => {
 
       expect(repository.createdAssignments).toHaveLength(1);
       expect(repository.auditLogs).toMatchObject([{ action: "assignment.created", targetId: "assignment_1" }]);
+      expect(repository.enqueueFailures).toEqual([
+        expect.objectContaining({
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+          certificateId: null,
+          operation: "ASSIGNMENT_NOTIFICATIONS",
+          lastError: "Notification database unavailable",
+          failedAt: new Date("2026-06-12T13:00:00.000Z"),
+          retryAt: new Date("2026-06-12T13:05:00.000Z"),
+        }),
+      ]);
+      expect(repository.enqueueFailures[0]?.payload).toMatchObject({
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        learnerEmail: "learner@example.com",
+        courseTitle: "Safety Basics",
+      });
       expect(error).toHaveBeenCalledWith("Notification enqueue failed after assignment commit", {
         organizationId: "org_1",
         assignmentId: "assignment_1",

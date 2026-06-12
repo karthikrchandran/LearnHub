@@ -9,7 +9,7 @@ import type {
 import { addBusinessDays } from "../../lib/dates/business-days";
 import { canAssignDirectReport, type MembershipAuthContext, type TargetMembership } from "../auth/permissions";
 import { assertCourseAssignable, assertCourseSelfEnrollable } from "../catalog/course-lifecycle";
-import type { AssignmentNotificationScheduleInput } from "../notifications/notification-jobs";
+import type { AssignmentNotificationScheduleInput, NotificationEnqueueFailureInput } from "../notifications/notification-jobs";
 
 export type AssignmentCourse = {
   id: string;
@@ -72,6 +72,7 @@ export type AssignmentRepository = {
     targetType: string;
     targetId: string;
   }): Promise<void>;
+  recordNotificationEnqueueFailure?(data: NotificationEnqueueFailureInput): Promise<void>;
 };
 
 export type AssignmentNotificationScheduler = {
@@ -229,20 +230,33 @@ async function createAssignmentWithAudit(input: {
   });
 
   if (input.notifications) {
+    const now = input.input.now ?? new Date();
+    const notificationInput = {
+      organizationId: input.input.organizationId,
+      assignmentId: created.assignment.id,
+      learnerEmail: input.learner.learnerEmail,
+      learnerName: input.learner.learnerName,
+      courseTitle: created.course.title,
+      dueDate: created.dueDate,
+      assignmentUrl: input.input.assignmentUrl ?? "",
+      managerEmail: input.learner.managerEmail,
+      managerName: input.learner.managerName,
+      now,
+    };
+
     try {
-      await input.notifications.scheduleAssignmentNotifications({
+      await input.notifications.scheduleAssignmentNotifications(notificationInput);
+    } catch (error) {
+      await recordNotificationEnqueueFailure(input.repository, {
         organizationId: input.input.organizationId,
         assignmentId: created.assignment.id,
-        learnerEmail: input.learner.learnerEmail,
-        learnerName: input.learner.learnerName,
-        courseTitle: created.course.title,
-        dueDate: created.dueDate,
-        assignmentUrl: input.input.assignmentUrl ?? "",
-        managerEmail: input.learner.managerEmail,
-        managerName: input.learner.managerName,
-        now: input.input.now ?? new Date(),
+        certificateId: null,
+        operation: "ASSIGNMENT_NOTIFICATIONS",
+        payload: notificationInput,
+        lastError: error instanceof Error ? error.message : "Notification enqueue failed",
+        failedAt: now,
+        retryAt: addMinutes(now, 5),
       });
-    } catch (error) {
       console.error("Notification enqueue failed after assignment commit", {
         organizationId: input.input.organizationId,
         assignmentId: created.assignment.id,
@@ -252,6 +266,29 @@ async function createAssignmentWithAudit(input: {
   }
 
   return created.assignment;
+}
+
+async function recordNotificationEnqueueFailure(
+  repository: AssignmentRepository,
+  failure: NotificationEnqueueFailureInput,
+): Promise<void> {
+  if (!repository.recordNotificationEnqueueFailure) {
+    return;
+  }
+
+  try {
+    await repository.recordNotificationEnqueueFailure(failure);
+  } catch (error) {
+    console.error("Notification enqueue failure persistence failed", {
+      organizationId: failure.organizationId,
+      assignmentId: failure.assignmentId,
+      error: error instanceof Error ? error.message : "Notification enqueue failure persistence failed",
+    });
+  }
+}
+
+function addMinutes(date: Date, minutes: number): Date {
+  return new Date(date.getTime() + minutes * 60_000);
 }
 
 function activeActorMembershipId(actor: MembershipAuthContext, organizationId: string): string | null {

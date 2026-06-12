@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { createPrismaNotificationRepository } from "./prisma-repository";
@@ -5,6 +7,7 @@ import type { NotificationJobUpsert } from "./notification-jobs";
 
 const scheduledForDate = new Date("2026-06-12T00:00:00.000Z");
 const nextRunAt = new Date("2026-06-12T10:00:00.000Z");
+const notificationJobsMigrationPath = "prisma/migrations/20260613040000_notification_jobs/migration.sql";
 
 function notificationJob(): NotificationJobUpsert {
   return {
@@ -23,12 +26,23 @@ function notificationJob(): NotificationJobUpsert {
 }
 
 function createClient() {
+  const queryRaw = vi.fn(async (...args: unknown[]): Promise<Array<Record<string, unknown>>> => {
+    void args;
+
+    return [];
+  });
+
   return {
+    $queryRaw: queryRaw,
+    $transaction: vi.fn(async (operation) => operation({ $queryRaw: queryRaw })),
     notificationJob: {
       upsert: vi.fn(),
       findMany: vi.fn(async (): Promise<Array<Record<string, unknown>>> => []),
       updateMany: vi.fn(),
       update: vi.fn(),
+    },
+    notificationEnqueueFailure: {
+      findMany: vi.fn(async (): Promise<Array<Record<string, unknown>>> => []),
     },
   };
 }
@@ -83,6 +97,15 @@ describe("Prisma notification repository", () => {
       take: 100,
       select: expect.any(Object),
     });
+    expect(client.notificationEnqueueFailure.findMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org_1",
+        status: "PENDING",
+      },
+      orderBy: [{ retryAt: "asc" }, { createdAt: "asc" }],
+      take: 100,
+      select: expect.any(Object),
+    });
   });
 
   it("lists failed notification jobs across tenants for platform owners", async () => {
@@ -99,11 +122,67 @@ describe("Prisma notification repository", () => {
       take: 100,
       select: expect.any(Object),
     });
+    expect(client.notificationEnqueueFailure.findMany).toHaveBeenCalledWith({
+      where: { status: "PENDING" },
+      orderBy: [{ retryAt: "asc" }, { createdAt: "asc" }],
+      take: 100,
+      select: expect.any(Object),
+    });
   });
 
-  it("claims due jobs with status, time, attempts, ordering, and batch bounds", async () => {
+  it("surfaces durable enqueue failures through tenant notification inspection", async () => {
     const client = createClient();
-    client.notificationJob.findMany.mockResolvedValueOnce([
+    client.notificationEnqueueFailure.findMany.mockResolvedValueOnce([
+      {
+        id: "enqueue_failure_1",
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        certificateId: null,
+        operation: "ASSIGNMENT_NOTIFICATIONS",
+        status: "PENDING",
+        attempts: 0,
+        retryAt: new Date("2026-06-12T13:05:00.000Z"),
+        failedAt: new Date("2026-06-12T13:00:00.000Z"),
+        lastError: "Notification database unavailable",
+        organization: {
+          name: "Acme",
+          slug: "acme",
+        },
+        assignment: {
+          course: {
+            title: "Safety Basics",
+          },
+        },
+      },
+    ]);
+    const repository = createPrismaNotificationRepository(
+      client as unknown as Parameters<typeof createPrismaNotificationRepository>[0],
+    );
+
+    const jobs = await repository.listTenantNotificationJobs({ organizationId: "org_1" });
+
+    expect(jobs).toEqual([
+      expect.objectContaining({
+        id: "enqueue_failure_1",
+        organizationId: "org_1",
+        organizationName: "Acme",
+        organizationSlug: "acme",
+        assignmentId: "assignment_1",
+        type: "ASSIGNMENT_NOTIFICATIONS",
+        status: "ENQUEUE_FAILED",
+        subject: "Notification enqueue failed",
+        attempts: 0,
+        nextRunAt: new Date("2026-06-12T13:05:00.000Z"),
+        sentAt: null,
+        lastError: "Notification database unavailable",
+        courseTitle: "Safety Basics",
+      }),
+    ]);
+  });
+
+  it("claims due jobs atomically with row locks and returns only rows updated by the claim", async () => {
+    const client = createClient();
+    client.$queryRaw.mockResolvedValueOnce([
       {
         id: "job_1",
         type: "ASSIGNMENT_DUE_SOON",
@@ -112,9 +191,7 @@ describe("Prisma notification repository", () => {
         html: "<p>Hello</p>",
         text: "Hello",
         attempts: 1,
-        assignment: {
-          status: "COMPLETED",
-        },
+        assignmentStatus: "COMPLETED",
       },
     ]);
     const repository = createPrismaNotificationRepository(
@@ -125,35 +202,20 @@ describe("Prisma notification repository", () => {
       now: nextRunAt,
       batchSize: 10,
       maxAttempts: 3,
+      processingTimeoutMs: 15 * 60 * 1000,
     });
 
-    expect(client.notificationJob.findMany).toHaveBeenCalledWith({
-      where: {
-        status: { in: ["PENDING", "FAILED"] },
-        nextRunAt: { lte: nextRunAt },
-        attempts: { lt: 3 },
-      },
-      orderBy: [{ nextRunAt: "asc" }, { createdAt: "asc" }],
-      take: 10,
-      select: {
-        id: true,
-        type: true,
-        recipientEmail: true,
-        subject: true,
-        html: true,
-        text: true,
-        attempts: true,
-        assignment: {
-          select: {
-            status: true,
-          },
-        },
-      },
-    });
-    expect(client.notificationJob.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["job_1"] } },
-      data: { status: "PROCESSING" },
-    });
+    expect(client.$transaction).toHaveBeenCalledTimes(1);
+    expect(client.notificationJob.findMany).not.toHaveBeenCalled();
+    expect(client.notificationJob.updateMany).not.toHaveBeenCalled();
+    const [sqlParts, ...values] = client.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = Array.from(sqlParts as TemplateStringsArray).join("?");
+    expect(sql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(sql).toContain('UPDATE "NotificationJob"');
+    expect(sql).toContain('"status" = \'PROCESSING\'');
+    expect(sql).toContain('"claimedAt"');
+    expect(sql).toContain("RETURNING");
+    expect(values).toContainEqual(new Date("2026-06-12T09:45:00.000Z"));
     expect(jobs).toEqual([
       {
         id: "job_1",
@@ -166,6 +228,26 @@ describe("Prisma notification repository", () => {
         assignmentStatus: "COMPLETED",
       },
     ]);
+  });
+
+  it("makes stale processing jobs eligible for a new atomic claim after the lease timeout", async () => {
+    const client = createClient();
+    const repository = createPrismaNotificationRepository(
+      client as unknown as Parameters<typeof createPrismaNotificationRepository>[0],
+    );
+
+    await repository.claimDueNotificationJobs({
+      now: nextRunAt,
+      batchSize: 5,
+      maxAttempts: 3,
+      processingTimeoutMs: 30 * 60 * 1000,
+    });
+
+    const [sqlParts, ...values] = client.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = Array.from(sqlParts as TemplateStringsArray).join("?");
+    expect(sql).toContain("\"status\" = 'PROCESSING'");
+    expect(sql).toContain('"claimedAt" <=');
+    expect(values).toContainEqual(new Date("2026-06-12T09:30:00.000Z"));
   });
 
   it("marks sent, failed, and skipped jobs", async () => {
@@ -217,5 +299,18 @@ describe("Prisma notification repository", () => {
         lastError: "Assignment completed before delayed notification delivery",
       },
     });
+  });
+
+  it("enforces certificate notification linkage within the same tenant", () => {
+    const schema = readFileSync("prisma/schema.prisma", "utf8");
+    const migration = readFileSync(notificationJobsMigrationPath, "utf8");
+
+    expect(schema).toContain(
+      "certificate       Certificate?          @relation(fields: [organizationId, certificateId], references: [organizationId, id]",
+    );
+    expect(schema).toContain("@@unique([organizationId, id])");
+    expect(migration).toContain(
+      'FOREIGN KEY ("organizationId", "certificateId") REFERENCES "Certificate"("organizationId", "id")',
+    );
   });
 });

@@ -7,7 +7,12 @@ import { processNotificationJobs } from "@/modules/notifications/scheduler";
 import { POST } from "./route";
 
 const mocks = vi.hoisted(() => ({
-  repository: { claimDueNotificationJobs: vi.fn(), markNotificationJobSent: vi.fn(), markNotificationJobFailed: vi.fn() },
+  repository: {
+    claimDueNotificationJobs: vi.fn(),
+    markNotificationJobSent: vi.fn(),
+    markNotificationJobFailed: vi.fn(),
+    markNotificationJobSkipped: vi.fn(),
+  },
   provider: { send: vi.fn() },
   processNotificationJobs: vi.fn(),
 }));
@@ -68,6 +73,7 @@ describe("notification jobs cron route", () => {
         now: expect.any(Date),
         batchSize: 10,
         maxAttempts: 3,
+        processingTimeoutMs: 15 * 60 * 1000,
       },
       mocks.repository,
       mocks.provider,

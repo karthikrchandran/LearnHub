@@ -15,6 +15,19 @@ export type NotificationJobType =
 
 export type NotificationJobStatus = "PENDING" | "PROCESSING" | "SENT" | "FAILED" | "SKIPPED";
 
+export type NotificationEnqueueOperation = "ASSIGNMENT_NOTIFICATIONS" | "CERTIFICATE_NOTIFICATION";
+
+export type NotificationEnqueueFailureInput = {
+  organizationId: string;
+  assignmentId: string;
+  certificateId?: string | null;
+  operation: NotificationEnqueueOperation;
+  payload: unknown;
+  lastError: string;
+  failedAt: Date;
+  retryAt: Date;
+};
+
 export type NotificationJobUpsert = {
   organizationId: string;
   assignmentId: string;

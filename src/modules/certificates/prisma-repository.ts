@@ -1,8 +1,11 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 import type { CertificateRepository } from "./certificates";
 
-type PrismaCertificateClient = Pick<PrismaClient, "courseAssignment" | "certificate" | "credentialIssuance">;
+type PrismaCertificateClient = Pick<
+  PrismaClient,
+  "courseAssignment" | "certificate" | "credentialIssuance" | "notificationEnqueueFailure"
+>;
 
 export function createPrismaCertificateRepository(client: PrismaCertificateClient): CertificateRepository {
   return {
@@ -84,6 +87,14 @@ export function createPrismaCertificateRepository(client: PrismaCertificateClien
     async recordCredentialIssuance(input) {
       await client.credentialIssuance.create({
         data: input,
+      });
+    },
+    async recordNotificationEnqueueFailure(input) {
+      await client.notificationEnqueueFailure.create({
+        data: {
+          ...input,
+          payload: input.payload as Prisma.InputJsonValue,
+        },
       });
     },
   };
