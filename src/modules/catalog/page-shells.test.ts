@@ -9,17 +9,28 @@ async function readPage(relativePath: string): Promise<string> {
 }
 
 describe("course catalog and assignment page shells", () => {
-  it("adds a non-destructive admin catalog shell", async () => {
+  it("wires a live admin catalog page shell", async () => {
     const page = await readPage(path.join("admin", "catalog"));
 
     expect(page).toContain("Categories");
     expect(page).toContain("Tags");
     expect(page).toContain("Courses");
+    expect(page).toContain("createCategoryAction");
+    expect(page).toContain("createTagAction");
+    expect(page).toContain("createCourseAction");
+    expect(page).toContain('name="name"');
+    expect(page).toContain('name="slug"');
+    expect(page).toContain('name="title"');
+    expect(page).toContain('name="type"');
+    expect(page).toContain('name="categoryId"');
+    expect(page).toContain('name="tagIds"');
+    expect(page).toContain('name="expectedDurationMinutes"');
+    expect(page).toContain('name="estimatedCompletionBusinessDays"');
+    expect(page).toContain("updateLifecycleAction");
     expect(page).toContain("Draft");
     expect(page).toContain("Published");
     expect(page).toContain("Deprecated");
     expect(page).toContain("Retired");
-    expect(page).toContain("disabled");
   });
 
   it("adds a non-destructive admin course detail shell", async () => {
