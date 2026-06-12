@@ -1,4 +1,5 @@
 import { requirePlatformOwner } from "@/lib/auth/guards";
+import { ensureGlobalLibraryOrganization } from "@/modules/library/prisma-repository";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -18,9 +19,11 @@ export default async function PlatformLibraryCoursePage({ params }: PlatformLibr
   const { courseSlug } = await params;
   await requirePlatformOwner();
   const { prisma } = await import("@/lib/prisma");
+  const globalLibraryOrganization = await ensureGlobalLibraryOrganization(prisma);
   const course = await prisma.course.findFirst({
     where: {
       slug: courseSlug,
+      organizationId: globalLibraryOrganization.id,
       isGlobalLibraryCourse: true,
     },
     select: {

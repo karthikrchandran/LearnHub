@@ -124,6 +124,8 @@ function createRepository(): TestRepository {
     }),
     updateGlobalLibraryCourseLifecycle: vi.fn(async ({ courseId, status }) => {
       calls.push(`global-lifecycle:${courseId}:${status}`);
+
+      return { changed: true };
     }),
     findGlobalLibraryCourseById: vi.fn(async () => publishedGlobalCourse),
     findGlobalLibraryCourseBySlug: vi.fn(async () => publishedGlobalCourse),
@@ -257,6 +259,29 @@ describe("global library course lifecycle", () => {
       },
     });
   });
+
+  it("throws without audit when lifecycle update does not match exactly one global course", async () => {
+    const repository = createRepository();
+    vi.mocked(repository.updateGlobalLibraryCourseLifecycle).mockImplementationOnce(async ({ courseId, status }) => {
+      repository.calls.push(`global-lifecycle:${courseId}:${status}`);
+
+      return { changed: false };
+    });
+
+    await expect(
+      updateGlobalLibraryCourseLifecycle(
+        {
+          actorId: "owner_1",
+          courseId: "missing_global_course",
+          status: "PUBLISHED",
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Global library course was not found");
+
+    expect(repository.recordAuditLog).not.toHaveBeenCalled();
+    expect(repository.calls).toEqual(["transaction:start", "global-lifecycle:missing_global_course:PUBLISHED"]);
+  });
 });
 
 describe("copyGlobalCourseToTenant", () => {
@@ -305,6 +330,37 @@ describe("copyGlobalCourseToTenant", () => {
     );
 
     expect(repository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rechecks duplicate copies inside the transaction for default BLOCK requests before course creation", async () => {
+    const repository = createRepository();
+    let copyLookupCount = 0;
+    vi.mocked(repository.findTenantCopyForGlobalCourse).mockImplementation(async () => {
+      copyLookupCount += 1;
+      repository.calls.push(copyLookupCount === 1 ? "copy-check:pre" : "copy-check:transaction");
+
+      return copyLookupCount === 1
+        ? null
+        : {
+            id: "tenant_course_existing",
+            slug: "workplace-safety-essentials",
+          };
+    });
+
+    await expect(copyGlobalCourseToTenant(createCopyInput(), repository)).rejects.toThrow(
+      "Global library course is already copied into this organization",
+    );
+
+    expect(repository.createTenantCourse).not.toHaveBeenCalled();
+    expect(repository.recordAuditLog).not.toHaveBeenCalled();
+    expect(repository.calls).toEqual([
+      "copy-check:pre",
+      "transaction:start",
+      "category:compliance",
+      "tag:safety",
+      "tag:onboarding",
+      "copy-check:transaction",
+    ]);
   });
 
   it("allows an explicit duplicate copy when the admin supplies a distinct slug", async () => {

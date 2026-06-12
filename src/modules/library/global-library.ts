@@ -170,7 +170,7 @@ export type TenantScormPackageCopyData = Omit<GlobalLibraryScormPackageSnapshot,
 export type GlobalLibraryRepository = {
   runInTransaction<T>(operation: () => Promise<T>): Promise<T>;
   createGlobalLibraryCourse(data: GlobalLibraryCourseData): Promise<{ id: string; slug: string }>;
-  updateGlobalLibraryCourseLifecycle(input: { courseId: string; status: CourseStatus }): Promise<void>;
+  updateGlobalLibraryCourseLifecycle(input: { courseId: string; status: CourseStatus }): Promise<{ changed: boolean }>;
   findGlobalLibraryCourseById(input: { courseId: string }): Promise<GlobalLibraryCourseSnapshot | null>;
   findGlobalLibraryCourseBySlug(input: { slug: string }): Promise<GlobalLibraryCourseSnapshot | null>;
   findOrganizationLibraryAccess(input: {
@@ -249,10 +249,15 @@ export async function updateGlobalLibraryCourseLifecycle(
   const courseId = requireNonEmptyValue(input.courseId, "Course id is required");
 
   await repository.runInTransaction(async () => {
-    await repository.updateGlobalLibraryCourseLifecycle({
+    const result = await repository.updateGlobalLibraryCourseLifecycle({
       courseId,
       status: input.status,
     });
+
+    if (!result.changed) {
+      throw new Error("Global library course was not found");
+    }
+
     await repository.recordAuditLog({
       actorId,
       action: "global_library.course_lifecycle_updated",
@@ -326,6 +331,14 @@ export async function copyGlobalCourseToTenant(
       });
 
       tagIds.push(tenantTag.id);
+    }
+
+    if (duplicateAction === "BLOCK") {
+      const transactionCopy = await repository.findTenantCopyForGlobalCourse({ organizationId, globalCourseId });
+
+      if (transactionCopy) {
+        throw new Error("Global library course is already copied into this organization");
+      }
     }
 
     const tenantCourse = await repository.createTenantCourse({

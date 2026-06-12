@@ -14,6 +14,12 @@
 
 This plan implements Task 2 only. It does not add the Task 3 knowledge-check schema, scoring, feedback, media storage operations, notification delivery, or SCORM file-copy jobs. The copy payload type intentionally contains an optional `knowledgeChecks` collection and the service treats missing data as an empty collection so Task 3 can extend the payload without changing the copy API.
 
+## Review Hardening Notes
+
+- Lifecycle updates must report whether exactly one hidden global-library course row changed. The service throws `Global library course was not found` and skips audit logging when the repository reports no exact match.
+- Default duplicate blocking uses two checks: a pre-transaction check for fast feedback, then a transaction-time recheck immediately before tenant course creation. The Prisma repository runs copy transactions with `Serializable` isolation so concurrent `BLOCK` copy attempts detect the predicate conflict. There is no unique database constraint on `(organizationId, globalLibrarySourceCourseId)` because explicit duplicate copies are a supported admin action.
+- Hidden global library visibility is scoped through the repository's centralized `learnhub-global-library` organization lookup. Repository reads and App Router listing/detail queries include both `organizationId` and `isGlobalLibraryCourse`.
+
 ## File Structure
 
 - Create `docs/superpowers/plans/2026-06-13-global-library-copy-workflow-implementation.md`: this implementation plan.

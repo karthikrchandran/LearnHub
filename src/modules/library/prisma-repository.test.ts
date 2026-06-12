@@ -116,15 +116,45 @@ describe("createPrismaGlobalLibraryRepository", () => {
     expect(root.course.findFirst).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        where: { id: "global_course_1", isGlobalLibraryCourse: true },
+        where: { id: "global_course_1", organizationId: "global_org", isGlobalLibraryCourse: true },
       }),
     );
     expect(root.course.findFirst).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        where: { slug: "workplace-safety", isGlobalLibraryCourse: true },
+        where: { slug: "workplace-safety", organizationId: "global_org", isGlobalLibraryCourse: true },
       }),
     );
+  });
+
+  it("reports whether exactly one hidden global-library course lifecycle row changed", async () => {
+    const { root } = createClient();
+    const repository = createPrismaGlobalLibraryRepository(
+      root as unknown as Parameters<typeof createPrismaGlobalLibraryRepository>[0],
+    );
+
+    await expect(
+      repository.updateGlobalLibraryCourseLifecycle({
+        courseId: "global_course_1",
+        status: "RETIRED",
+      }),
+    ).resolves.toEqual({ changed: true });
+    expect(root.course.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "global_course_1",
+        organizationId: "global_org",
+        isGlobalLibraryCourse: true,
+      },
+      data: { status: "RETIRED" },
+    });
+
+    root.course.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(
+      repository.updateGlobalLibraryCourseLifecycle({
+        courseId: "missing",
+        status: "RETIRED",
+      }),
+    ).resolves.toEqual({ changed: false });
   });
 
   it("looks up existing tenant copies by target organization and global source", async () => {
@@ -238,6 +268,7 @@ describe("createPrismaGlobalLibraryRepository", () => {
       });
     });
 
+    expect(root.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
     expect(root.courseCategory.upsert).not.toHaveBeenCalled();
     expect(root.course.create).not.toHaveBeenCalled();
     expect(root.auditLog.create).not.toHaveBeenCalled();

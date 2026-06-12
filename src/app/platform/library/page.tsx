@@ -1,4 +1,5 @@
 import { requirePlatformOwner } from "@/lib/auth/guards";
+import { ensureGlobalLibraryOrganization } from "@/modules/library/prisma-repository";
 import Link from "next/link";
 
 import { createGlobalLibraryCourseFormAction } from "./actions";
@@ -8,8 +9,12 @@ export const dynamic = "force-dynamic";
 export default async function PlatformLibraryPage() {
   await requirePlatformOwner();
   const { prisma } = await import("@/lib/prisma");
+  const globalLibraryOrganization = await ensureGlobalLibraryOrganization(prisma);
   const courses = await prisma.course.findMany({
-    where: { isGlobalLibraryCourse: true },
+    where: {
+      organizationId: globalLibraryOrganization.id,
+      isGlobalLibraryCourse: true,
+    },
     orderBy: { title: "asc" },
     select: {
       id: true,

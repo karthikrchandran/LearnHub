@@ -34,7 +34,7 @@ function createRepository(): GlobalLibraryRepository {
   return {
     runInTransaction: vi.fn(async (operation) => operation()),
     createGlobalLibraryCourse: vi.fn(async ({ slug }) => ({ id: "global_course_created", slug })),
-    updateGlobalLibraryCourseLifecycle: vi.fn(async () => {}),
+    updateGlobalLibraryCourseLifecycle: vi.fn(async () => ({ changed: true })),
     findGlobalLibraryCourseById: vi.fn(async () => globalCourse),
     findGlobalLibraryCourseBySlug: vi.fn(async () => globalCourse),
     findOrganizationLibraryAccess: vi.fn(async () => ({ id: "tenant_org_1", globalLibraryEnabled: true })),

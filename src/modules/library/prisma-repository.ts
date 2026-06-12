@@ -121,29 +121,40 @@ const globalCourseSelect = {
 
 type GlobalCourseRecord = Prisma.CourseGetPayload<{ select: typeof globalCourseSelect }>;
 
+type GlobalLibraryOrganizationClient = Pick<PrismaGlobalLibraryClient, "organization">;
+
+export async function ensureGlobalLibraryOrganization(
+  client: GlobalLibraryOrganizationClient,
+): Promise<{ id: string }> {
+  return client.organization.upsert({
+    where: { slug: globalLibraryOrganization.slug },
+    update: {},
+    create: globalLibraryOrganization,
+    select: { id: true },
+  });
+}
+
 export function createPrismaGlobalLibraryRepository(client: PrismaGlobalLibraryClient): GlobalLibraryRepository {
   let transactionClient: PrismaGlobalLibraryClient | null = null;
   const activeClient = () => transactionClient ?? client;
 
   return {
     async runInTransaction(operation) {
-      return client.$transaction(async (transaction) => {
-        transactionClient = transaction as PrismaGlobalLibraryClient;
+      return client.$transaction(
+        async (transaction) => {
+          transactionClient = transaction as PrismaGlobalLibraryClient;
 
-        try {
-          return await operation();
-        } finally {
-          transactionClient = null;
-        }
-      });
+          try {
+            return await operation();
+          } finally {
+            transactionClient = null;
+          }
+        },
+        { isolationLevel: "Serializable" },
+      );
     },
     async createGlobalLibraryCourse(data) {
-      const organization = await activeClient().organization.upsert({
-        where: { slug: globalLibraryOrganization.slug },
-        update: {},
-        create: globalLibraryOrganization,
-        select: { id: true },
-      });
+      const organization = await ensureGlobalLibraryOrganization(activeClient());
 
       return activeClient().course.create({
         data: {
@@ -162,25 +173,31 @@ export function createPrismaGlobalLibraryRepository(client: PrismaGlobalLibraryC
       });
     },
     async updateGlobalLibraryCourseLifecycle(input) {
-      await activeClient().course.updateMany({
+      const organization = await ensureGlobalLibraryOrganization(activeClient());
+      const result = await activeClient().course.updateMany({
         where: {
           id: input.courseId,
+          organizationId: organization.id,
           isGlobalLibraryCourse: true,
         },
         data: { status: input.status },
       });
+
+      return { changed: result.count === 1 };
     },
     async findGlobalLibraryCourseById(input) {
+      const organization = await ensureGlobalLibraryOrganization(activeClient());
       const course = await activeClient().course.findFirst({
-        where: { id: input.courseId, isGlobalLibraryCourse: true },
+        where: { id: input.courseId, organizationId: organization.id, isGlobalLibraryCourse: true },
         select: globalCourseSelect,
       });
 
       return course ? mapGlobalCourse(course) : null;
     },
     async findGlobalLibraryCourseBySlug(input) {
+      const organization = await ensureGlobalLibraryOrganization(activeClient());
       const course = await activeClient().course.findFirst({
-        where: { slug: input.slug, isGlobalLibraryCourse: true },
+        where: { slug: input.slug, organizationId: organization.id, isGlobalLibraryCourse: true },
         select: globalCourseSelect,
       });
 

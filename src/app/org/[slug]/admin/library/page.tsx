@@ -1,4 +1,5 @@
 import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import { ensureGlobalLibraryOrganization } from "@/modules/library/prisma-repository";
 
 import { copyGlobalLibraryCourseFormAction } from "./actions";
 
@@ -21,9 +22,13 @@ export default async function TenantLibraryPage({ params }: TenantLibraryPagePro
       globalLibraryEnabled: true,
     },
   });
+  const globalLibraryOrganization = organization?.globalLibraryEnabled
+    ? await ensureGlobalLibraryOrganization(prisma)
+    : null;
   const globalCourses = organization?.globalLibraryEnabled
     ? await prisma.course.findMany({
         where: {
+          organizationId: globalLibraryOrganization!.id,
           isGlobalLibraryCourse: true,
           status: "PUBLISHED",
         },
