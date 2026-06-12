@@ -54,14 +54,24 @@ describe("auth guards", () => {
       allowed: false,
       redirectTo: "/platform",
     });
+    expect(resolveOrganizationUsersAdminGuard(orgAdmin, "org_1", "INACTIVE")).toEqual({
+      allowed: false,
+      redirectTo: "/platform",
+    });
     expect(resolveOrganizationUsersAdminGuard(orgAdmin, "org_1")).toEqual({ allowed: true });
     expect(resolveOrganizationUsersAdminGuard(platformOwner, "org_1")).toEqual({ allowed: true });
+    expect(resolveOrganizationUsersAdminGuard(platformOwner, "org_1", "INACTIVE")).toEqual({ allowed: true });
   });
 
   it("allows only platform owners or active organization members into organization workspaces", () => {
     expect(resolveOrganizationMemberGuard(null, "org_1")).toEqual({ allowed: false, redirectTo: "/login" });
     expect(resolveOrganizationMemberGuard(inactiveAdmin, "org_1")).toEqual({ allowed: false, redirectTo: "/platform" });
+    expect(resolveOrganizationMemberGuard(orgAdmin, "org_1", "INACTIVE")).toEqual({
+      allowed: false,
+      redirectTo: "/platform",
+    });
     expect(resolveOrganizationMemberGuard(orgAdmin, "org_1")).toEqual({ allowed: true });
     expect(resolveOrganizationMemberGuard(platformOwner, "org_1")).toEqual({ allowed: true });
+    expect(resolveOrganizationMemberGuard(platformOwner, "org_1", "INACTIVE")).toEqual({ allowed: true });
   });
 });
