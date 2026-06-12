@@ -57,7 +57,7 @@ export function resolveOrganizationMemberGuard(context: GuardAuthContext | null,
 
 async function getCurrentAuthContext(): Promise<GuardAuthContext | null> {
   const [{ getServerSession }, { prisma }, { authOptions }] = await Promise.all([
-    import("next-auth"),
+    import("next-auth/next"),
     import("../prisma"),
     import("./next-auth"),
   ]);

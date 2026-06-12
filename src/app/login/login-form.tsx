@@ -18,7 +18,7 @@ export function LoginForm() {
     const result = await signIn("credentials", {
       email,
       password,
-      callbackUrl: "/platform",
+      callbackUrl: "/org",
       redirect: false,
     });
 
@@ -29,7 +29,7 @@ export function LoginForm() {
       return;
     }
 
-    window.location.assign(result?.url ?? "/platform");
+    window.location.assign(result?.url ?? "/org");
   }
 
   return (

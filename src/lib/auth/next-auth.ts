@@ -3,7 +3,15 @@ import CredentialsProvider from "next-auth/providers/credentials";
 
 import { authenticateWithPassword } from "@/modules/auth/credentials";
 
+const localNextAuthSecret = "learnhub-local-secret";
+const nextAuthSecret =
+  process.env.NEXTAUTH_SECRET?.trim() ||
+  (process.env.NODE_ENV !== "production" || process.env.NEXT_PHASE === "phase-production-build"
+    ? localNextAuthSecret
+    : undefined);
+
 export const authOptions: NextAuthOptions = {
+  secret: nextAuthSecret,
   providers: [
     CredentialsProvider({
       name: "Email and password",

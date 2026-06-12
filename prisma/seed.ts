@@ -3,6 +3,8 @@ import { hashPassword } from "../src/lib/auth/password";
 import { createPrismaClient } from "../src/lib/prisma";
 
 const prisma = createPrismaClient();
+const demoAdminEmail = "admin@example.com";
+const legacyDemoAdminEmail = "admin@acme.test";
 
 async function main() {
   const passwordHash = await hashPassword("LearnHubDemo123!");
@@ -32,7 +34,7 @@ async function main() {
       name: "Acme Learning",
       primaryColor: "#2563eb",
       accentColor: "#14b8a6",
-      allowedEmailDomains: ["acme.test"],
+      allowedEmailDomains: ["example.com", "acme.test"],
       enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
       globalLibraryEnabled: true,
     },
@@ -41,14 +43,14 @@ async function main() {
       slug: "acme",
       primaryColor: "#2563eb",
       accentColor: "#14b8a6",
-      allowedEmailDomains: ["acme.test"],
+      allowedEmailDomains: ["example.com", "acme.test"],
       enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
       globalLibraryEnabled: true,
     },
   });
 
   const admin = await prisma.user.upsert({
-    where: { email: "admin@acme.test" },
+    where: { email: demoAdminEmail },
     update: {
       firstName: "Asha",
       lastName: "Admin",
@@ -56,7 +58,7 @@ async function main() {
       status: "ACTIVE",
     },
     create: {
-      email: "admin@acme.test",
+      email: demoAdminEmail,
       firstName: "Asha",
       lastName: "Admin",
       passwordHash,
@@ -531,6 +533,44 @@ async function main() {
       status: "ASSIGNED",
     },
   });
+
+  const legacyAdmin = await prisma.user.findUnique({
+    where: { email: legacyDemoAdminEmail },
+    select: {
+      id: true,
+      memberships: {
+        where: { organizationId: organization.id },
+        select: { id: true },
+      },
+    },
+  });
+
+  if (legacyAdmin) {
+    const legacyMembershipIds = legacyAdmin.memberships.map((membership) => membership.id);
+
+    if (legacyMembershipIds.length > 0) {
+      await prisma.courseAssignment.updateMany({
+        where: {
+          organizationId: organization.id,
+          assignedByMembershipId: { in: legacyMembershipIds },
+        },
+        data: {
+          assignedByMembershipId: adminMembership.id,
+        },
+      });
+
+      await prisma.organizationMembership.deleteMany({
+        where: {
+          organizationId: organization.id,
+          userId: legacyAdmin.id,
+        },
+      });
+    }
+
+    await prisma.user.delete({
+      where: { id: legacyAdmin.id },
+    });
+  }
 
   await prisma.auditLog.upsert({
     where: {
