@@ -56,6 +56,12 @@ const completedAssignment = {
   learnerName: "Asha Rao",
   learnerEmail: "asha@example.com",
   courseTitle: "Safety Basics",
+  issuerName: "Acme Learning",
+  issuerLogoUrl: "https://cdn.example/logo.png",
+  issuerPrimaryColor: "#0f766e",
+  issuerAccentColor: "#f59e0b",
+  credentialProvider: "CREDLY" as const,
+  credentialTemplateId: "template_1",
   status: "COMPLETED" as const,
 };
 
@@ -87,6 +93,10 @@ describe("issueCertificateForCompletedAssignment", () => {
       learnerName: "Asha Rao",
       learnerEmail: "asha@example.com",
       courseTitle: "Safety Basics",
+      issuerName: "Acme Learning",
+      issuerLogoUrl: "https://cdn.example/logo.png",
+      issuerPrimaryColor: "#0f766e",
+      issuerAccentColor: "#f59e0b",
       issuedAt: new Date("2026-06-09T12:00:00.000Z"),
     });
     expect(notifications.scheduleCertificateNotification).toHaveBeenCalledWith({
@@ -203,5 +213,49 @@ describe("issueCertificateForCompletedAssignment", () => {
     });
 
     expect(repository.createdCertificates).toHaveLength(1);
+  });
+
+  it("uses the course credential template mapping when issuing Credly credentials", async () => {
+    const repository = createRepository(completedAssignment);
+    const credentialProvider = {
+      issueCredential: vi.fn(async () => ({
+        providerCredentialId: "credly_1",
+        providerUrl: "https://credly.test/badges/credly_1",
+      })),
+    };
+    const credentialIssuances: unknown[] = [];
+    repository.recordCredentialIssuance = async (input) => {
+      credentialIssuances.push(input);
+    };
+
+    await issueCertificateForCompletedAssignment(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        appBaseUrl: "https://learnhub.example",
+        now: new Date("2026-06-09T12:00:00.000Z"),
+        credentialProvider,
+      },
+      repository,
+    );
+
+    expect(credentialProvider.issueCredential).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      courseId: "course_1",
+      learnerEmail: "asha@example.com",
+      learnerName: "Asha Rao",
+      issuedAt: new Date("2026-06-09T12:00:00.000Z"),
+      providerTemplateId: "template_1",
+    });
+    expect(credentialIssuances).toEqual([
+      expect.objectContaining({
+        organizationId: "org_1",
+        certificateId: "certificate_1",
+        provider: "CREDLY",
+        status: "SUCCEEDED",
+        providerCredentialId: "credly_1",
+        providerUrl: "https://credly.test/badges/credly_1",
+      }),
+    ]);
   });
 });

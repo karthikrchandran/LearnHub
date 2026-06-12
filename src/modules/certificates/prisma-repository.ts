@@ -24,6 +24,16 @@ export function createPrismaCertificateRepository(client: PrismaCertificateClien
           course: {
             select: {
               title: true,
+              credentialProvider: true,
+              credentialTemplateId: true,
+              organization: {
+                select: {
+                  name: true,
+                  logoUrl: true,
+                  primaryColor: true,
+                  accentColor: true,
+                },
+              },
             },
           },
           membership: {
@@ -54,6 +64,12 @@ export function createPrismaCertificateRepository(client: PrismaCertificateClien
         learnerName: `${assignment.membership.user.firstName} ${assignment.membership.user.lastName}`.trim(),
         learnerEmail: assignment.membership.user.email,
         courseTitle: assignment.course.title,
+        issuerName: assignment.course.organization.name,
+        issuerLogoUrl: assignment.course.organization.logoUrl,
+        issuerPrimaryColor: assignment.course.organization.primaryColor,
+        issuerAccentColor: assignment.course.organization.accentColor,
+        credentialProvider: assignment.course.credentialProvider,
+        credentialTemplateId: assignment.course.credentialTemplateId,
         status: assignment.status,
       };
     },
@@ -85,8 +101,27 @@ export function createPrismaCertificateRepository(client: PrismaCertificateClien
       });
     },
     async recordCredentialIssuance(input) {
-      await client.credentialIssuance.create({
-        data: input,
+      const attemptedAt = input.attemptedAt ?? new Date();
+
+      await client.credentialIssuance.upsert({
+        where: {
+          organizationId_certificateId_provider: {
+            organizationId: input.organizationId,
+            certificateId: input.certificateId,
+            provider: input.provider,
+          },
+        },
+        create: {
+          ...input,
+          attemptedAt,
+        },
+        update: {
+          status: input.status,
+          providerCredentialId: input.providerCredentialId ?? null,
+          providerUrl: input.providerUrl ?? null,
+          errorMessage: input.errorMessage ?? null,
+          attemptedAt,
+        },
       });
     },
     async recordNotificationEnqueueFailure(input) {

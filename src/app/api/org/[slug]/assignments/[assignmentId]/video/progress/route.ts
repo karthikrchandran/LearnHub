@@ -4,6 +4,7 @@ import { issueCertificateForCompletedAssignment } from "@/modules/certificates/c
 import { createPrismaCertificateRepository } from "@/modules/certificates/prisma-repository";
 import { scheduleCertificateNotification } from "@/modules/notifications/notification-jobs";
 import { createPrismaNotificationRepository } from "@/modules/notifications/prisma-repository";
+import { createConfiguredCredlyCredentialProvider } from "@/modules/providers/credentials/credly-provider";
 import { createPrismaRuntimeRouteRepository } from "@/modules/runtime/prisma-repository";
 import {
   RuntimeRouteError,
@@ -57,6 +58,11 @@ export async function POST(request: Request, { params }: VideoProgressRouteConte
 
     if (result.completed) {
       const notificationRepository = createPrismaNotificationRepository(prisma);
+      const credentialProvider = createConfiguredCredlyCredentialProvider({
+        baseUrl: env.CREDLY_BASE_URL,
+        apiToken: env.CREDLY_API_TOKEN,
+        organizationId: env.CREDLY_ORGANIZATION_ID,
+      });
 
       await issueCertificateForCompletedAssignment(
         {
@@ -64,6 +70,7 @@ export async function POST(request: Request, { params }: VideoProgressRouteConte
           assignmentId,
           appBaseUrl: env.APP_BASE_URL,
           now: occurredAt,
+          ...(credentialProvider ? { credentialProvider } : {}),
         },
         createPrismaCertificateRepository(prisma),
         {
