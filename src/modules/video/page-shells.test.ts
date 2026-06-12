@@ -27,7 +27,31 @@ describe("native video page shells", () => {
     expect(page).toContain("/mux-upload");
     expect(page).toContain("Chapters");
     expect(page).toContain("Transcript");
+    expect(page).toContain("/admin/courses/${encodeURIComponent(courseSlug)}/checks");
+    expect(page).toContain("Manage knowledge checks");
     expect(page).not.toContain("disabled");
+  });
+
+  it("includes live admin knowledge check forms and server action wiring", () => {
+    const page = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/checks/page.tsx");
+    const actions = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/checks/actions.ts");
+
+    expect(page).toContain("requireOrganizationUsersAdminBySlug");
+    expect(page).toContain("createPrismaKnowledgeCheckRepository");
+    expect(page).toContain("Knowledge checks");
+    expect(page).toContain("Single answer");
+    expect(page).toContain("Multiple answer");
+    expect(page).toContain("True/false");
+    expect(page).toContain("Explanation");
+    expect(page).toContain("Answer feedback");
+    expect(page).toContain("Activate");
+    expect(page).toContain("Deactivate");
+    expect(page).toContain("Reorder");
+    expect(page).toContain("createCheckFormAction");
+    expect(page).toContain("updateCheckFormAction");
+    expect(actions).toContain("requireOrganizationUsersAdminBySlug");
+    expect(actions).toContain("createKnowledgeCheckAdminActions");
+    expect(actions).toContain("createPrismaKnowledgeCheckRepository");
   });
 
   it("includes live learner video player wiring", () => {
