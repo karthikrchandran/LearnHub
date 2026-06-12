@@ -3,6 +3,11 @@ import {
   recordLearningEvent,
 } from "../progress/progress";
 import {
+  buildLearnerKnowledgeCheckView,
+  calculateNativeCompletionWithChecks,
+} from "../assessments/knowledge-checks";
+import type { KnowledgeCheckQuestionType } from "../assessments/scoring";
+import {
   clampVideoSecond,
   requireNonNegativeSecond,
 } from "./video-validation";
@@ -57,6 +62,30 @@ export type VideoRuntimeLessonProgress = {
   lastWatchedAt: Date | null;
 };
 
+export type VideoRuntimeKnowledgeCheck = {
+  id: string;
+  lessonId: string | null;
+  prompt: string;
+  questionType: KnowledgeCheckQuestionType;
+  required: boolean;
+  active: boolean;
+  explanation: string | null;
+  answers: Array<{
+    id: string;
+    text: string;
+    correct: boolean;
+  }>;
+};
+
+export type VideoRuntimeKnowledgeCheckAttempt = {
+  questionId: string;
+  selectedAnswerIds: string[];
+  correct: boolean;
+  scorePercent: number;
+};
+
+export type VideoRuntimeKnowledgeCheckView = ReturnType<typeof buildLearnerKnowledgeCheckView>;
+
 export type VideoRuntimeAssignment = {
   id: string;
   organizationId: string;
@@ -67,8 +96,10 @@ export type VideoRuntimeAssignment = {
     type: VideoRuntimeCourseType;
     modules: VideoRuntimeModule[];
     lessons: VideoRuntimeLesson[];
+    knowledgeChecks: VideoRuntimeKnowledgeCheck[];
   };
   videoProgress: VideoRuntimeLessonProgress[];
+  knowledgeCheckAttempts: VideoRuntimeKnowledgeCheckAttempt[];
 };
 
 export type LaunchVideoRuntimeInput = {
@@ -106,6 +137,7 @@ export type VideoRuntimeRepository = ProgressRepository & {
 
 export type VideoRuntimeLessonView = VideoRuntimeLesson & {
   progress: VideoRuntimeLessonProgress;
+  knowledgeChecks: VideoRuntimeKnowledgeCheckView[];
 };
 
 export type VideoRuntimeLaunch = {
@@ -140,7 +172,7 @@ export async function launchVideoRuntime(
     modules: sortModules(assignment.course.modules),
     lessons,
     currentLesson,
-    courseProgressPercent: calculateCourseProgressPercent(assignment.course.lessons, assignment.videoProgress),
+    courseProgressPercent: calculateCourseProgressPercent(assignment, assignment.videoProgress),
   };
 }
 
@@ -176,8 +208,8 @@ export async function recordVideoProgress(
       lastWatchedAt: input.occurredAt,
     });
     const nextProgress = replaceLessonProgress(assignment.videoProgress, lessonProgress);
-    const progressSummary = summarizeRequiredLessonProgress(assignment.course.lessons, nextProgress);
-    const eventType = progressSummary.percent >= 100 ? "COMPLETED" : "PROGRESS";
+    const progressSummary = summarizeNativeProgress(assignment, nextProgress);
+    const eventType = progressSummary.completed ? "COMPLETED" : "PROGRESS";
 
     const eventResult = await recordLearningEvent(
       {
@@ -185,14 +217,16 @@ export async function recordVideoProgress(
         assignmentId: assignment.id,
         source: "NATIVE",
         type: eventType,
-        progressPercent: progressSummary.percent,
+        progressPercent: progressSummary.progressPercent,
         occurredAt: input.occurredAt,
         rawPayload: {
           lessonId: lesson.id,
           positionSecond,
           watchedSecond,
-          requiredLessonsCompleted: progressSummary.completedRequiredCount,
+          requiredLessonsCompleted: progressSummary.completedRequiredLessonCount,
           requiredLessonsTotal: progressSummary.requiredLessonCount,
+          requiredChecksCompleted: progressSummary.completedRequiredCheckCount,
+          requiredChecksTotal: progressSummary.requiredCheckCount,
         },
       },
       repository,
@@ -200,7 +234,7 @@ export async function recordVideoProgress(
 
     return {
       lessonProgress,
-      courseProgressPercent: progressSummary.percent,
+      courseProgressPercent: progressSummary.progressPercent,
       completed: eventResult.completed,
     };
   });
@@ -232,6 +266,12 @@ function buildLessonViews(assignment: VideoRuntimeAssignment): VideoRuntimeLesso
     chapters: [...lesson.chapters].sort((left, right) => left.sortOrder - right.sortOrder),
     transcriptCues: [...lesson.transcriptCues].sort((left, right) => left.startSecond - right.startSecond),
     progress: existingProgressForLesson(assignment.videoProgress, lesson.id),
+    knowledgeChecks: activeKnowledgeChecksForLesson(assignment, lesson.id).map((check) =>
+      buildLearnerKnowledgeCheckView({
+        ...check,
+        latestAttempt: latestAttemptForCheck(assignment.knowledgeCheckAttempts, check.id),
+      }),
+    ),
   }));
 }
 
@@ -294,33 +334,67 @@ function replaceLessonProgress(
 }
 
 function calculateCourseProgressPercent(
-  lessons: VideoRuntimeLesson[],
+  assignment: VideoRuntimeAssignment,
   progress: VideoRuntimeLessonProgress[],
 ): number {
-  return summarizeRequiredLessonProgress(lessons, progress).percent;
+  return summarizeNativeProgress(assignment, progress).progressPercent;
 }
 
-function summarizeRequiredLessonProgress(
-  lessons: VideoRuntimeLesson[],
+function summarizeNativeProgress(
+  assignment: VideoRuntimeAssignment,
   progress: VideoRuntimeLessonProgress[],
 ): {
   requiredLessonCount: number;
-  completedRequiredCount: number;
-  percent: number;
+  completedRequiredLessonCount: number;
+  requiredCheckCount: number;
+  completedRequiredCheckCount: number;
+  completed: boolean;
+  progressPercent: number;
 } {
-  const requiredLessons = lessons.filter((lesson) => lesson.required);
-
-  if (requiredLessons.length === 0) {
-    return { requiredLessonCount: 0, completedRequiredCount: 0, percent: 100 };
-  }
-
-  const completedRequiredCount = requiredLessons.filter(
+  const requiredLessons = assignment.course.lessons.filter((lesson) => lesson.required);
+  const requiredChecks = assignment.course.knowledgeChecks.filter((check) => check.active && check.required);
+  const completedRequiredLessonCount = requiredLessons.filter(
     (lesson) => existingProgressForLesson(progress, lesson.id).completed,
   ).length;
+  const completedRequiredCheckCount = requiredChecks.filter((check) =>
+    assignment.knowledgeCheckAttempts.some((attempt) => attempt.questionId === check.id && attempt.correct),
+  ).length;
+  const completion = calculateNativeCompletionWithChecks({
+    requiredLessonCount: requiredLessons.length,
+    completedRequiredLessonCount,
+    requiredCheckCount: requiredChecks.length,
+    completedRequiredCheckCount,
+  });
+
 
   return {
     requiredLessonCount: requiredLessons.length,
-    completedRequiredCount,
-    percent: Math.round((completedRequiredCount / requiredLessons.length) * 100),
+    completedRequiredLessonCount,
+    requiredCheckCount: requiredChecks.length,
+    completedRequiredCheckCount,
+    completed: completion.completed,
+    progressPercent: completion.progressPercent,
   };
+}
+
+function activeKnowledgeChecksForLesson(
+  assignment: VideoRuntimeAssignment,
+  lessonId: string,
+): VideoRuntimeKnowledgeCheck[] {
+  return assignment.course.knowledgeChecks.filter((check) => check.active && check.lessonId === lessonId);
+}
+
+function latestAttemptForCheck(
+  attempts: VideoRuntimeKnowledgeCheckAttempt[],
+  questionId: string,
+): VideoRuntimeKnowledgeCheckView["latestAttempt"] {
+  const attempt = [...attempts].reverse().find((candidate) => candidate.questionId === questionId);
+
+  return attempt
+    ? {
+        correct: attempt.correct,
+        scorePercent: attempt.scorePercent,
+        selectedAnswerIds: attempt.selectedAnswerIds,
+      }
+    : null;
 }

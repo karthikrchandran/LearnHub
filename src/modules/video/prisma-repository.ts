@@ -41,8 +41,10 @@ type RuntimeAssignmentRecord = {
     status: unknown;
     modules: VideoRuntimeAssignment["course"]["modules"];
     videoLessons: VideoRuntimeAssignment["course"]["lessons"];
+    knowledgeCheckQuestions: VideoRuntimeAssignment["course"]["knowledgeChecks"];
   };
   videoProgress: VideoRuntimeAssignment["videoProgress"];
+  knowledgeCheckAttempts: VideoRuntimeAssignment["knowledgeCheckAttempts"];
 };
 
 function rawPayloadToJson(rawPayload: unknown): Prisma.InputJsonValue {
@@ -235,6 +237,28 @@ export function createPrismaVideoRepository(client: PrismaVideoClient): PrismaVi
                   },
                 },
               },
+              knowledgeCheckQuestions: {
+                where: { active: true },
+                orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
+                select: {
+                  id: true,
+                  lessonId: true,
+                  prompt: true,
+                  questionType: true,
+                  required: true,
+                  active: true,
+                  explanation: true,
+                  answers: {
+                    where: { organizationId: input.organizationId },
+                    orderBy: { sortOrder: "asc" },
+                    select: {
+                      id: true,
+                      text: true,
+                      correct: true,
+                    },
+                  },
+                },
+              },
             },
           },
           videoProgress: {
@@ -244,6 +268,15 @@ export function createPrismaVideoRepository(client: PrismaVideoClient): PrismaVi
               maxWatchedSecond: true,
               completed: true,
               lastWatchedAt: true,
+            },
+          },
+          knowledgeCheckAttempts: {
+            orderBy: [{ questionId: "asc" }, { submittedAt: "asc" }],
+            select: {
+              questionId: true,
+              selectedAnswerIds: true,
+              correct: true,
+              scorePercent: true,
             },
           },
         },
@@ -415,7 +448,9 @@ function mapRuntimeAssignment(assignment: RuntimeAssignmentRecord): VideoRuntime
       type: assignment.course.type,
       modules: assignment.course.modules,
       lessons: assignment.course.videoLessons,
+      knowledgeChecks: assignment.course.knowledgeCheckQuestions,
     },
     videoProgress: assignment.videoProgress,
+    knowledgeCheckAttempts: assignment.knowledgeCheckAttempts,
   };
 }

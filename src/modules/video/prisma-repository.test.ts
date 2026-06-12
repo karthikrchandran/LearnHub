@@ -86,6 +86,28 @@ describe("createPrismaVideoRepository", () => {
                 },
               },
             },
+            knowledgeCheckQuestions: {
+              where: { active: true },
+              orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
+              select: {
+                id: true,
+                lessonId: true,
+                prompt: true,
+                questionType: true,
+                required: true,
+                active: true,
+                explanation: true,
+                answers: {
+                  where: { organizationId: "org_1" },
+                  orderBy: { sortOrder: "asc" },
+                  select: {
+                    id: true,
+                    text: true,
+                    correct: true,
+                  },
+                },
+              },
+            },
           },
         },
         videoProgress: {
@@ -95,6 +117,15 @@ describe("createPrismaVideoRepository", () => {
             maxWatchedSecond: true,
             completed: true,
             lastWatchedAt: true,
+          },
+        },
+        knowledgeCheckAttempts: {
+          orderBy: [{ questionId: "asc" }, { submittedAt: "asc" }],
+          select: {
+            questionId: true,
+            selectedAnswerIds: true,
+            correct: true,
+            scorePercent: true,
           },
         },
       },

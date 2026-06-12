@@ -168,6 +168,7 @@ describe("native video runtime route handlers", () => {
             completed: false,
             lastWatchedAt: null,
           },
+          knowledgeChecks: [],
         },
       ],
       currentLesson: {
@@ -193,6 +194,7 @@ describe("native video runtime route handlers", () => {
           completed: false,
           lastWatchedAt: null,
         },
+        knowledgeChecks: [],
       },
       courseProgressPercent: 25,
     });
