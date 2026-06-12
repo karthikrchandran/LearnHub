@@ -69,6 +69,21 @@ enum CredentialIssuanceStatus {
   FAILED
 }
 
+enum NotificationJobType {
+  ASSIGNMENT_ASSIGNED
+  ASSIGNMENT_DUE_SOON
+  ASSIGNMENT_OVERDUE
+  MANAGER_ESCALATION
+  CERTIFICATE_ISSUED
+}
+
+enum NotificationJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 model User {
   id              String                   @id @default(cuid())
   email           String                   @unique
@@ -114,6 +129,7 @@ model Organization {
   learningEvents       LearningProgressEvent[]
   certificates         Certificate[]
   credentialIssuances  CredentialIssuance[]
+  notificationJobs     NotificationJob[]
   auditLogs            AuditLog[]
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
@@ -264,6 +280,7 @@ model CourseAssignment {
   videoProgress          VideoLessonProgress[]
   scormRegistration      ScormRegistration?
   certificate            Certificate?
+  notificationJobs       NotificationJob[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -473,6 +490,7 @@ model Certificate {
   course              Course                 @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
   membership          OrganizationMembership @relation("MembershipCertificates", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
   credentialIssuances CredentialIssuance[]
+  notificationJobs    NotificationJob[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
@@ -499,6 +517,37 @@ model CredentialIssuance {
   @@index([organizationId])
   @@index([certificateId])
   @@index([organizationId, provider, status])
+}
+
+model NotificationJob {
+  id                String                @id @default(cuid())
+  organizationId    String
+  assignmentId      String
+  certificateId     String?
+  type              NotificationJobType
+  status            NotificationJobStatus @default(PENDING)
+  recipientEmail    String
+  recipientName     String?
+  subject           String
+  html              String
+  text              String
+  scheduledForDate  DateTime
+  nextRunAt         DateTime
+  attempts          Int                   @default(0)
+  providerMessageId String?
+  lastError         String?
+  sentAt            DateTime?
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment        CourseAssignment      @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  certificate       Certificate?          @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([organizationId, assignmentId, type, scheduledForDate])
+  @@index([status, nextRunAt])
+  @@index([organizationId, status, nextRunAt])
+  @@index([organizationId, type])
+  @@index([certificateId])
 }
 
 model AuditLog {

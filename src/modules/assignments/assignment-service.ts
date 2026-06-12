@@ -9,15 +9,21 @@ import type {
 import { addBusinessDays } from "../../lib/dates/business-days";
 import { canAssignDirectReport, type MembershipAuthContext, type TargetMembership } from "../auth/permissions";
 import { assertCourseAssignable, assertCourseSelfEnrollable } from "../catalog/course-lifecycle";
+import type { AssignmentNotificationScheduleInput } from "../notifications/notification-jobs";
 
 export type AssignmentCourse = {
   id: string;
   organizationId: string;
+  title: string;
   status: CourseStatus;
   estimatedCompletionBusinessDays: number;
 };
 
 export type AssignmentMembership = TargetMembership & {
+  learnerEmail: string;
+  learnerName: string;
+  managerEmail: string | null;
+  managerName: string | null;
   status: UserStatus;
   roles: OrganizationRole[];
 };
@@ -28,6 +34,8 @@ export type AssignCourseInput = {
   learnerMembershipId: string;
   actor: MembershipAuthContext;
   startDate: Date;
+  now?: Date;
+  assignmentUrl?: string;
 };
 
 export type SelfEnrollInput = {
@@ -36,6 +44,8 @@ export type SelfEnrollInput = {
   learnerMembershipId: string;
   actor: MembershipAuthContext;
   startDate: Date;
+  now?: Date;
+  assignmentUrl?: string;
 };
 
 export type AssignmentRepository = {
@@ -64,9 +74,14 @@ export type AssignmentRepository = {
   }): Promise<void>;
 };
 
+export type AssignmentNotificationScheduler = {
+  scheduleAssignmentNotifications(input: AssignmentNotificationScheduleInput): Promise<void> | void;
+};
+
 export async function assignCourse(
   input: AssignCourseInput,
   repository: AssignmentRepository,
+  notifications?: AssignmentNotificationScheduler,
 ): Promise<{ id: string }> {
   const course = await requireCourse(input, repository);
   const learner = await requireLearner(input, repository);
@@ -80,6 +95,8 @@ export async function assignCourse(
   return createAssignmentWithAudit({
     input,
     repository,
+    learner,
+    notifications,
     assignedByMembershipId: activeActorMembershipId(input.actor, input.organizationId),
     auditAction: "assignment.created",
   });
@@ -88,6 +105,7 @@ export async function assignCourse(
 export async function selfEnrollInCourse(
   input: SelfEnrollInput,
   repository: AssignmentRepository,
+  notifications?: AssignmentNotificationScheduler,
 ): Promise<{ id: string }> {
   const organization = await repository.findOrganization({ organizationId: input.organizationId });
 
@@ -111,6 +129,8 @@ export async function selfEnrollInCourse(
   return createAssignmentWithAudit({
     input,
     repository,
+    learner,
+    notifications,
     assignedByMembershipId: null,
     auditAction: "assignment.self_enrolled",
   });
@@ -159,12 +179,14 @@ async function requireLearner(
 async function createAssignmentWithAudit(input: {
   input: AssignCourseInput | SelfEnrollInput;
   repository: AssignmentRepository;
+  learner: AssignmentMembership;
+  notifications?: AssignmentNotificationScheduler;
   assignedByMembershipId: string | null;
   auditAction: string;
 }): Promise<{ id: string }> {
   const { repository } = input;
 
-  return repository.runInTransaction(async () => {
+  const created = await repository.runInTransaction(async () => {
     const existingAssignment = await repository.assignmentExists({
       organizationId: input.input.organizationId,
       courseId: input.input.courseId,
@@ -184,13 +206,14 @@ async function createAssignmentWithAudit(input: {
       throw new Error("Course not found");
     }
 
+    const dueDate = addBusinessDays(input.input.startDate, course.estimatedCompletionBusinessDays);
     const assignment = await repository.createAssignment({
       organizationId: input.input.organizationId,
       courseId: input.input.courseId,
       membershipId: input.input.learnerMembershipId,
       assignedByMembershipId: input.assignedByMembershipId,
       startDate: input.input.startDate,
-      dueDate: addBusinessDays(input.input.startDate, course.estimatedCompletionBusinessDays),
+      dueDate,
       status: "ASSIGNED",
     });
 
@@ -202,8 +225,25 @@ async function createAssignmentWithAudit(input: {
       targetId: assignment.id,
     });
 
-    return assignment;
+    return { assignment, course, dueDate };
   });
+
+  if (input.notifications) {
+    await input.notifications.scheduleAssignmentNotifications({
+      organizationId: input.input.organizationId,
+      assignmentId: created.assignment.id,
+      learnerEmail: input.learner.learnerEmail,
+      learnerName: input.learner.learnerName,
+      courseTitle: created.course.title,
+      dueDate: created.dueDate,
+      assignmentUrl: input.input.assignmentUrl ?? "",
+      managerEmail: input.learner.managerEmail,
+      managerName: input.learner.managerName,
+      now: input.input.now ?? new Date(),
+    });
+  }
+
+  return created.assignment;
 }
 
 function activeActorMembershipId(actor: MembershipAuthContext, organizationId: string): string | null {

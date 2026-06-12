@@ -58,6 +58,74 @@ describe("environment contract", () => {
     expect(() => getEnv({ NODE_ENV: "test", EMAIL_PROVIDER: "smtp" })).toThrow(/SMTP_HOST/);
   });
 
+  it("requires SMTP production settings when the email provider is smtp", () => {
+    const productionBase = {
+      NODE_ENV: "production" as const,
+      DATABASE_URL: localDatabaseUrl,
+      NEXTAUTH_SECRET: "production-secret",
+      NEXTAUTH_URL: "https://learnhub.example.com",
+      APP_BASE_URL: "https://learnhub.example.com",
+      NOTIFICATION_JOBS_SECRET: "jobs-secret",
+    };
+
+    expect(() =>
+      getEnv({
+        ...productionBase,
+        EMAIL_PROVIDER: "smtp",
+        SMTP_HOST: "smtp.learnhub.test",
+      }),
+    ).toThrow(/EMAIL_FROM/);
+    expect(
+      getEnv({
+        ...productionBase,
+        EMAIL_PROVIDER: "smtp",
+        SMTP_HOST: "smtp.learnhub.test",
+        EMAIL_FROM: "no-reply@learnhub.test",
+      }).EMAIL_FROM,
+    ).toBe("no-reply@learnhub.test");
+  });
+
+  it("requires API production settings when the email provider is api-provider", () => {
+    const productionBase = {
+      NODE_ENV: "production" as const,
+      DATABASE_URL: localDatabaseUrl,
+      NEXTAUTH_SECRET: "production-secret",
+      NEXTAUTH_URL: "https://learnhub.example.com",
+      APP_BASE_URL: "https://learnhub.example.com",
+      EMAIL_PROVIDER: "api-provider" as const,
+      NOTIFICATION_JOBS_SECRET: "jobs-secret",
+    };
+
+    expect(() =>
+      getEnv({
+        ...productionBase,
+        EMAIL_API_ENDPOINT: "https://email-api.learnhub.test/send",
+        EMAIL_FROM: "no-reply@learnhub.test",
+      }),
+    ).toThrow(/EMAIL_API_TOKEN/);
+    expect(
+      getEnv({
+        ...productionBase,
+        EMAIL_API_ENDPOINT: "https://email-api.learnhub.test/send",
+        EMAIL_API_TOKEN: "api-token",
+        EMAIL_FROM: "no-reply@learnhub.test",
+      }).EMAIL_API_ENDPOINT,
+    ).toBe("https://email-api.learnhub.test/send");
+  });
+
+  it("requires the notification jobs shared secret in production", () => {
+    expect(() =>
+      getEnv({
+        NODE_ENV: "production",
+        DATABASE_URL: localDatabaseUrl,
+        NEXTAUTH_SECRET: "production-secret",
+        NEXTAUTH_URL: "https://learnhub.example.com",
+        APP_BASE_URL: "https://learnhub.example.com",
+        EMAIL_PROVIDER: "console",
+      }),
+    ).toThrow(/NOTIFICATION_JOBS_SECRET/);
+  });
+
   it("does not parse process.env until the lazy env object is read", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("DATABASE_URL", "");

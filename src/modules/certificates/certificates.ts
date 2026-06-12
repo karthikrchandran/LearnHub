@@ -1,4 +1,5 @@
 import type { CredentialProvider } from "../providers/credentials/credential-provider";
+import type { CertificateNotificationScheduleInput } from "../notifications/notification-jobs";
 
 export type CertificateAssignment = {
   id: string;
@@ -63,6 +64,10 @@ export type IssueCertificateInput = {
   credentialProviderTemplateId?: string;
 };
 
+export type CertificateNotificationScheduler = {
+  scheduleCertificateNotification(input: CertificateNotificationScheduleInput): Promise<void> | void;
+};
+
 const VERIFICATION_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function createVerificationCode(): string {
@@ -79,6 +84,7 @@ function buildVerificationUrl(appBaseUrl: string, verificationCode: string): str
 export async function issueCertificateForCompletedAssignment(
   input: IssueCertificateInput,
   repository: CertificateRepository,
+  notifications?: CertificateNotificationScheduler,
 ): Promise<CertificateRecord> {
   const assignment = await repository.findAssignmentForCertificate({
     organizationId: input.organizationId,
@@ -116,6 +122,19 @@ export async function issueCertificateForCompletedAssignment(
     verificationUrl: buildVerificationUrl(input.appBaseUrl, verificationCode),
     issuedAt: input.now,
   });
+
+  if (notifications) {
+    await notifications.scheduleCertificateNotification({
+      organizationId: assignment.organizationId,
+      assignmentId: assignment.id,
+      certificateId: certificate.id,
+      learnerEmail: assignment.learnerEmail,
+      learnerName: assignment.learnerName,
+      courseTitle: assignment.courseTitle,
+      certificateUrl: certificate.verificationUrl,
+      now: input.now,
+    });
+  }
 
   if (input.credentialProvider && input.credentialProviderTemplateId && repository.recordCredentialIssuance) {
     try {

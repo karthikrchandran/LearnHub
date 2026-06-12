@@ -29,13 +29,14 @@ export function createPrismaAssignmentRepository(client: PrismaAssignmentClient)
         select: {
           id: true,
           organizationId: true,
+          title: true,
           status: true,
           estimatedCompletionBusinessDays: true,
         },
       });
     },
-    findMembership(input) {
-      return activeClient().organizationMembership.findFirst({
+    async findMembership(input) {
+      const membership = await activeClient().organizationMembership.findFirst({
         where: { id: input.membershipId, organizationId: input.organizationId },
         select: {
           id: true,
@@ -44,8 +45,49 @@ export function createPrismaAssignmentRepository(client: PrismaAssignmentClient)
           managerMembershipId: true,
           status: true,
           roles: true,
+          user: {
+            select: {
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          managerMembership: {
+            select: {
+              user: {
+                select: {
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
       });
+
+      if (!membership) {
+        return null;
+      }
+
+      return {
+        id: membership.id,
+        userId: membership.userId,
+        organizationId: membership.organizationId,
+        managerMembershipId: membership.managerMembershipId,
+        learnerEmail: membership.user.email,
+        learnerName: formatName(membership.user.firstName, membership.user.lastName, membership.user.email),
+        managerEmail: membership.managerMembership?.user.email ?? null,
+        managerName: membership.managerMembership
+          ? formatName(
+              membership.managerMembership.user.firstName,
+              membership.managerMembership.user.lastName,
+              membership.managerMembership.user.email,
+            )
+          : null,
+        status: membership.status,
+        roles: membership.roles,
+      };
     },
     findOrganization(input) {
       return activeClient().organization.findUnique({
@@ -83,4 +125,8 @@ export function createPrismaAssignmentRepository(client: PrismaAssignmentClient)
       });
     },
   };
+}
+
+function formatName(firstName: string, lastName: string, fallback: string): string {
+  return `${firstName} ${lastName}`.trim() || fallback;
 }

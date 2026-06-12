@@ -39,6 +39,7 @@ function createRepository(): AssignmentRepository {
     findCourse: vi.fn(async () => ({
       id: "course_1",
       organizationId: "org_1",
+      title: "Safety Basics",
       status: "PUBLISHED" as const,
       estimatedCompletionBusinessDays: 3,
     })),
@@ -47,6 +48,10 @@ function createRepository(): AssignmentRepository {
       userId: "learner-user",
       organizationId: "org_1",
       managerMembershipId: null,
+      learnerEmail: "learner@example.com",
+      learnerName: "Ada Lovelace",
+      managerEmail: null,
+      managerName: null,
       status: "ACTIVE" as const,
       roles: ["LEARNER" as const],
     })),
@@ -63,6 +68,11 @@ function createRepository(): AssignmentRepository {
 function createAssignDependencies(): AssignCourseActionDependencies & { repository: AssignmentRepository } {
   return {
     repository: createRepository(),
+    notificationScheduler: {
+      scheduleAssignmentNotifications: vi.fn(),
+    },
+    buildAssignmentUrl: vi.fn((slug) => `https://learnhub.test/org/${slug}/learn`),
+    now: vi.fn(() => new Date("2026-06-12T13:00:00.000Z")),
     getActorAndOrganization: vi.fn(async (slug) => ({
       actor,
       organizationId: slug === "acme" ? "org_1" : "org_other",
@@ -73,6 +83,11 @@ function createAssignDependencies(): AssignCourseActionDependencies & { reposito
 function createSelfEnrollDependencies(): SelfEnrollActionDependencies & { repository: AssignmentRepository } {
   return {
     repository: createRepository(),
+    notificationScheduler: {
+      scheduleAssignmentNotifications: vi.fn(),
+    },
+    buildAssignmentUrl: vi.fn((slug) => `https://learnhub.test/org/${slug}/learn`),
+    now: vi.fn(() => new Date("2026-06-12T13:00:00.000Z")),
     getActorAndOrganization: vi.fn(async () => ({
       actor: {
         ...actor,
@@ -115,6 +130,14 @@ describe("assignment server actions", () => {
         courseId: "course_1",
         membershipId: "learner-membership",
         status: "ASSIGNED",
+      }),
+    );
+    expect(dependencies.notificationScheduler!.scheduleAssignmentNotifications).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        assignmentUrl: "https://learnhub.test/org/acme/learn",
+        now: new Date("2026-06-12T13:00:00.000Z"),
       }),
     );
   });

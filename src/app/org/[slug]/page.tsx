@@ -76,6 +76,12 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           Branding
         </Link>
         <Link
+          href={`/org/${slug}/admin/notifications`}
+          className="rounded-md border border-slate-300 px-3 py-2 text-slate-800"
+        >
+          Notifications
+        </Link>
+        <Link
           href={`/org/${slug}/reports`}
           className="rounded-md bg-[var(--organization-accent)] px-3 py-2 text-slate-950"
         >

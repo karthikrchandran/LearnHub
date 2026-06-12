@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { issueCertificateForCompletedAssignment, type CertificateRepository } from "./certificates";
 
@@ -45,6 +45,9 @@ const completedAssignment = {
 describe("issueCertificateForCompletedAssignment", () => {
   it("creates a public verification certificate for completed assignments", async () => {
     const repository = createRepository(completedAssignment);
+    const notifications = {
+      scheduleCertificateNotification: vi.fn(),
+    };
 
     const certificate = await issueCertificateForCompletedAssignment(
       {
@@ -54,6 +57,7 @@ describe("issueCertificateForCompletedAssignment", () => {
         now: new Date("2026-06-09T12:00:00.000Z"),
       },
       repository,
+      notifications,
     );
 
     expect(certificate.verificationUrl).toMatch(/^https:\/\/learnhub\.example\/certificates\/[A-Z0-9]{16}$/);
@@ -68,6 +72,16 @@ describe("issueCertificateForCompletedAssignment", () => {
       courseTitle: "Safety Basics",
       issuedAt: new Date("2026-06-09T12:00:00.000Z"),
     });
+    expect(notifications.scheduleCertificateNotification).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      assignmentId: "assignment_1",
+      certificateId: "certificate_1",
+      learnerEmail: "asha@example.com",
+      learnerName: "Asha Rao",
+      courseTitle: "Safety Basics",
+      certificateUrl: certificate.verificationUrl,
+      now: new Date("2026-06-09T12:00:00.000Z"),
+    });
   });
 
   it("returns the existing certificate without creating another record", async () => {
@@ -78,6 +92,9 @@ describe("issueCertificateForCompletedAssignment", () => {
       issuedAt: new Date("2026-06-09T12:00:00.000Z"),
     };
     const repository = createRepository(completedAssignment, existing);
+    const notifications = {
+      scheduleCertificateNotification: vi.fn(),
+    };
 
     const certificate = await issueCertificateForCompletedAssignment(
       {
@@ -87,10 +104,12 @@ describe("issueCertificateForCompletedAssignment", () => {
         now: new Date("2026-06-09T12:30:00.000Z"),
       },
       repository,
+      notifications,
     );
 
     expect(certificate).toBe(existing);
     expect(repository.createdCertificates).toEqual([]);
+    expect(notifications.scheduleCertificateNotification).not.toHaveBeenCalled();
   });
 
   it("does not require provider credential success to issue the certificate", async () => {

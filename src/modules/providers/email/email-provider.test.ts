@@ -32,8 +32,20 @@ describe("email providers", () => {
     );
   });
 
-  it("fails explicitly for configured providers that are not wired yet", async () => {
-    const provider = createEmailProvider({ emailProvider: "smtp", nodeEnv: "production" });
+  it("allows SMTP email in production when configured", async () => {
+    const client = {
+      send: vi.fn(async () => ({ providerMessageId: "smtp-123" })),
+    };
+    const provider = createEmailProvider({
+      emailProvider: "smtp",
+      nodeEnv: "production",
+      smtp: {
+        host: "smtp.learnhub.test",
+        port: 587,
+        from: "no-reply@learnhub.test",
+        client,
+      },
+    });
 
     await expect(
       provider.send({
@@ -42,6 +54,38 @@ describe("email providers", () => {
         html: "html",
         text: "text",
       }),
-    ).rejects.toThrow("SMTP email provider is not configured yet");
+    ).resolves.toEqual({ providerMessageId: "smtp-123" });
+  });
+
+  it("allows API email in production when configured", async () => {
+    const fetch = vi.fn(async () => Response.json({ providerMessageId: "api-123" }));
+    const provider = createEmailProvider({
+      emailProvider: "api-provider",
+      nodeEnv: "production",
+      api: {
+        endpoint: "https://email-api.learnhub.test/send",
+        token: "api-token",
+        from: "no-reply@learnhub.test",
+        fetch,
+      },
+    });
+
+    await expect(
+      provider.send({
+        to: "learner@acme.test",
+        subject: "Reset",
+        html: "html",
+        text: "text",
+      }),
+    ).resolves.toEqual({ providerMessageId: "api-123" });
+  });
+
+  it("fails clearly when configured providers are missing settings", () => {
+    expect(() => createEmailProvider({ emailProvider: "smtp", nodeEnv: "production" })).toThrow(
+      "SMTP email provider requires SMTP host and from address",
+    );
+    expect(() => createEmailProvider({ emailProvider: "api-provider", nodeEnv: "production" })).toThrow(
+      "API email provider requires endpoint, token, and from address",
+    );
   });
 });

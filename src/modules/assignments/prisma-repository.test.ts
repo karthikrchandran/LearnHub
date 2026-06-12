@@ -9,6 +9,7 @@ function createAssignmentClient() {
       findFirst: vi.fn(async () => ({
         id: "course_1",
         organizationId: "org_1",
+        title: "Safety Basics",
         status: "PUBLISHED",
         estimatedCompletionBusinessDays: 3,
       })),
@@ -21,6 +22,18 @@ function createAssignmentClient() {
         managerMembershipId: "manager-membership",
         status: "ACTIVE",
         roles: ["LEARNER"],
+        user: {
+          email: "learner@example.com",
+          firstName: "Ada",
+          lastName: "Lovelace",
+        },
+        managerMembership: {
+          user: {
+            email: "manager@example.com",
+            firstName: "Grace",
+            lastName: "Hopper",
+          },
+        },
       })),
     },
     organization: {
@@ -60,6 +73,7 @@ describe("createPrismaAssignmentRepository", () => {
       select: {
         id: true,
         organizationId: true,
+        title: true,
         status: true,
         estimatedCompletionBusinessDays: true,
       },
@@ -73,6 +87,24 @@ describe("createPrismaAssignmentRepository", () => {
         managerMembershipId: true,
         status: true,
         roles: true,
+        user: {
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        managerMembership: {
+          select: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
       },
     });
     expect(client.organization.findUnique).toHaveBeenCalledWith({

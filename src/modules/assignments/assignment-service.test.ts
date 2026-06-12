@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   assignCourse,
@@ -16,6 +16,7 @@ const startDate = new Date("2026-06-12T12:00:00.000Z");
 const publishedCourse: AssignmentCourse = {
   id: "course_1",
   organizationId: "org_1",
+  title: "Safety Basics",
   status: "PUBLISHED",
   estimatedCompletionBusinessDays: 3,
 };
@@ -25,6 +26,10 @@ const activeLearner: AssignmentMembership = {
   userId: "learner-user",
   organizationId: "org_1",
   managerMembershipId: "manager-membership",
+  learnerEmail: "learner@example.com",
+  learnerName: "Ada Lovelace",
+  managerEmail: "manager@example.com",
+  managerName: "Grace Hopper",
   status: "ACTIVE",
   roles: ["LEARNER"],
 };
@@ -139,6 +144,9 @@ class FakeAssignmentRepository implements AssignmentRepository {
 describe("assignment service", () => {
   it("lets an admin assign a published course to an active learner in the organization", async () => {
     const repository = createRepository();
+    const notifications = {
+      scheduleAssignmentNotifications: vi.fn(),
+    };
 
     const assignment = await assignCourse(
       {
@@ -147,8 +155,11 @@ describe("assignment service", () => {
         learnerMembershipId: "learner-membership",
         actor: adminActor,
         startDate,
+        now: new Date("2026-06-12T13:00:00.000Z"),
+        assignmentUrl: "https://learnhub.test/org/acme/learn",
       },
       repository,
+      notifications,
     );
 
     expect(assignment).toEqual({ id: "assignment_1" });
@@ -164,6 +175,18 @@ describe("assignment service", () => {
       },
     ]);
     expect(repository.auditLogs).toMatchObject([{ action: "assignment.created", targetId: "assignment_1" }]);
+    expect(notifications.scheduleAssignmentNotifications).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      assignmentId: "assignment_1",
+      learnerEmail: "learner@example.com",
+      learnerName: "Ada Lovelace",
+      courseTitle: "Safety Basics",
+      dueDate: new Date("2026-06-17T12:00:00.000Z"),
+      assignmentUrl: "https://learnhub.test/org/acme/learn",
+      managerEmail: "manager@example.com",
+      managerName: "Grace Hopper",
+      now: new Date("2026-06-12T13:00:00.000Z"),
+    });
     expect(repository.transactions).toBe(1);
     expect(repository.calls).toEqual([
       "find-course",
