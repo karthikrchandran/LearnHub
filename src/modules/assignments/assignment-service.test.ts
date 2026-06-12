@@ -200,6 +200,43 @@ describe("assignment service", () => {
     ]);
   });
 
+  it("does not fail the committed assignment when notification enqueue fails", async () => {
+    const repository = createRepository();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await expect(
+        assignCourse(
+          {
+            organizationId: "org_1",
+            courseId: "course_1",
+            learnerMembershipId: "learner-membership",
+            actor: adminActor,
+            startDate,
+            now: new Date("2026-06-12T13:00:00.000Z"),
+            assignmentUrl: "https://learnhub.test/org/acme/learn",
+          },
+          repository,
+          {
+            scheduleAssignmentNotifications: async () => {
+              throw new Error("Notification database unavailable");
+            },
+          },
+        ),
+      ).resolves.toEqual({ id: "assignment_1" });
+
+      expect(repository.createdAssignments).toHaveLength(1);
+      expect(repository.auditLogs).toMatchObject([{ action: "assignment.created", targetId: "assignment_1" }]);
+      expect(error).toHaveBeenCalledWith("Notification enqueue failed after assignment commit", {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        error: "Notification database unavailable",
+      });
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("lets a manager assign a published course only to an active direct report", async () => {
     const repository = createRepository();
 

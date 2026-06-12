@@ -131,6 +131,10 @@ export const getEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
     throw new Error("NOTIFICATION_JOBS_SECRET is required in production.");
   }
 
+  if (source.NODE_ENV === "production" && parsedEnv.EMAIL_PROVIDER === "console") {
+    throw new Error("Console email provider cannot be used in production.");
+  }
+
   return parsedEnv;
 };
 

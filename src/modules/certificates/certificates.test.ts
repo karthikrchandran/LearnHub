@@ -112,6 +112,40 @@ describe("issueCertificateForCompletedAssignment", () => {
     expect(notifications.scheduleCertificateNotification).not.toHaveBeenCalled();
   });
 
+  it("does not fail certificate issuance when notification enqueue fails after certificate creation", async () => {
+    const repository = createRepository(completedAssignment);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await expect(
+        issueCertificateForCompletedAssignment(
+          {
+            organizationId: "org_1",
+            assignmentId: "assignment_1",
+            appBaseUrl: "https://learnhub.example",
+            now: new Date("2026-06-09T12:00:00.000Z"),
+          },
+          repository,
+          {
+            scheduleCertificateNotification: async () => {
+              throw new Error("Notification database unavailable");
+            },
+          },
+        ),
+      ).resolves.toMatchObject({ id: "certificate_1" });
+
+      expect(repository.createdCertificates).toHaveLength(1);
+      expect(error).toHaveBeenCalledWith("Notification enqueue failed after certificate commit", {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        certificateId: "certificate_1",
+        error: "Notification database unavailable",
+      });
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("does not require provider credential success to issue the certificate", async () => {
     const repository = createRepository(completedAssignment);
 

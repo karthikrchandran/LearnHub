@@ -124,16 +124,25 @@ export async function issueCertificateForCompletedAssignment(
   });
 
   if (notifications) {
-    await notifications.scheduleCertificateNotification({
-      organizationId: assignment.organizationId,
-      assignmentId: assignment.id,
-      certificateId: certificate.id,
-      learnerEmail: assignment.learnerEmail,
-      learnerName: assignment.learnerName,
-      courseTitle: assignment.courseTitle,
-      certificateUrl: certificate.verificationUrl,
-      now: input.now,
-    });
+    try {
+      await notifications.scheduleCertificateNotification({
+        organizationId: assignment.organizationId,
+        assignmentId: assignment.id,
+        certificateId: certificate.id,
+        learnerEmail: assignment.learnerEmail,
+        learnerName: assignment.learnerName,
+        courseTitle: assignment.courseTitle,
+        certificateUrl: certificate.verificationUrl,
+        now: input.now,
+      });
+    } catch (error) {
+      console.error("Notification enqueue failed after certificate commit", {
+        organizationId: assignment.organizationId,
+        assignmentId: assignment.id,
+        certificateId: certificate.id,
+        error: error instanceof Error ? error.message : "Notification enqueue failed",
+      });
+    }
   }
 
   if (input.credentialProvider && input.credentialProviderTemplateId && repository.recordCredentialIssuance) {

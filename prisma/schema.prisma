@@ -82,6 +82,7 @@ enum NotificationJobStatus {
   PROCESSING
   SENT
   FAILED
+  SKIPPED
 }
 
 model User {

@@ -1,7 +1,10 @@
 import type { EmailProvider } from "../providers/email/email-provider";
+import type { NotificationJobType } from "./notification-jobs";
 
 export type NotificationDeliveryJob = {
   id: string;
+  type: NotificationJobType;
+  assignmentStatus: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
   recipientEmail: string;
   subject: string;
   html: string;
@@ -13,6 +16,7 @@ export type NotificationProcessResult = {
   processed: number;
   sent: number;
   failed: number;
+  skipped: number;
 };
 
 export interface NotificationSchedulerRepository {
@@ -32,6 +36,11 @@ export interface NotificationSchedulerRepository {
     lastError: string;
     nextRunAt: Date;
   }): Promise<void>;
+  markNotificationJobSkipped(input: {
+    id: string;
+    skippedAt: Date;
+    reason: string;
+  }): Promise<void>;
 }
 
 export async function processNotificationJobs(
@@ -47,8 +56,19 @@ export async function processNotificationJobs(
   });
   let sent = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (const job of jobs) {
+    if (shouldSkipCompletedAssignmentNotification(job)) {
+      await repository.markNotificationJobSkipped({
+        id: job.id,
+        skippedAt: input.now,
+        reason: "Assignment completed before delayed notification delivery",
+      });
+      skipped += 1;
+      continue;
+    }
+
     try {
       const result = await provider.send({
         to: job.recipientEmail,
@@ -79,7 +99,16 @@ export async function processNotificationJobs(
     processed: jobs.length,
     sent,
     failed,
+    skipped,
   };
+}
+
+function shouldSkipCompletedAssignmentNotification(job: NotificationDeliveryJob): boolean {
+  return job.assignmentStatus === "COMPLETED" && isDelayedAssignmentNotification(job.type);
+}
+
+function isDelayedAssignmentNotification(type: NotificationJobType): boolean {
+  return type === "ASSIGNMENT_DUE_SOON" || type === "ASSIGNMENT_OVERDUE" || type === "MANAGER_ESCALATION";
 }
 
 function clampBatchSize(batchSize: number): number {

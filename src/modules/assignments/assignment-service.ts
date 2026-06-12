@@ -229,18 +229,26 @@ async function createAssignmentWithAudit(input: {
   });
 
   if (input.notifications) {
-    await input.notifications.scheduleAssignmentNotifications({
-      organizationId: input.input.organizationId,
-      assignmentId: created.assignment.id,
-      learnerEmail: input.learner.learnerEmail,
-      learnerName: input.learner.learnerName,
-      courseTitle: created.course.title,
-      dueDate: created.dueDate,
-      assignmentUrl: input.input.assignmentUrl ?? "",
-      managerEmail: input.learner.managerEmail,
-      managerName: input.learner.managerName,
-      now: input.input.now ?? new Date(),
-    });
+    try {
+      await input.notifications.scheduleAssignmentNotifications({
+        organizationId: input.input.organizationId,
+        assignmentId: created.assignment.id,
+        learnerEmail: input.learner.learnerEmail,
+        learnerName: input.learner.learnerName,
+        courseTitle: created.course.title,
+        dueDate: created.dueDate,
+        assignmentUrl: input.input.assignmentUrl ?? "",
+        managerEmail: input.learner.managerEmail,
+        managerName: input.learner.managerName,
+        now: input.input.now ?? new Date(),
+      });
+    } catch (error) {
+      console.error("Notification enqueue failed after assignment commit", {
+        organizationId: input.input.organizationId,
+        assignmentId: created.assignment.id,
+        error: error instanceof Error ? error.message : "Notification enqueue failed",
+      });
+    }
   }
 
   return created.assignment;

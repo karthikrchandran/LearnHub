@@ -97,6 +97,12 @@ export function createPrismaNotificationRepository(
         take: input.batchSize,
         select: {
           id: true,
+          type: true,
+          assignment: {
+            select: {
+              status: true,
+            },
+          },
           recipientEmail: true,
           subject: true,
           html: true,
@@ -112,7 +118,16 @@ export function createPrismaNotificationRepository(
         });
       }
 
-      return jobs;
+      return jobs.map((job) => ({
+        id: job.id,
+        type: job.type,
+        assignmentStatus: job.assignment.status,
+        recipientEmail: job.recipientEmail,
+        subject: job.subject,
+        html: job.html,
+        text: job.text,
+        attempts: job.attempts,
+      }));
     },
     async markNotificationJobSent(input) {
       await client.notificationJob.update({
@@ -133,6 +148,16 @@ export function createPrismaNotificationRepository(
           attempts: input.attempts,
           lastError: input.lastError,
           nextRunAt: input.nextRunAt,
+        },
+      });
+    },
+    async markNotificationJobSkipped(input) {
+      await client.notificationJob.update({
+        where: { id: input.id },
+        data: {
+          status: "SKIPPED",
+          sentAt: input.skippedAt,
+          lastError: input.reason,
         },
       });
     },

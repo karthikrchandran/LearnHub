@@ -48,6 +48,20 @@ describe("environment contract", () => {
     ).toThrow(/EMAIL_PROVIDER/);
   });
 
+  it("rejects the console email provider in production", () => {
+    expect(() =>
+      getEnv({
+        NODE_ENV: "production",
+        DATABASE_URL: localDatabaseUrl,
+        NEXTAUTH_SECRET: "production-secret",
+        NEXTAUTH_URL: "https://learnhub.example.com",
+        APP_BASE_URL: "https://learnhub.example.com",
+        EMAIL_PROVIDER: "console",
+        NOTIFICATION_JOBS_SECRET: "jobs-secret",
+      }),
+    ).toThrow(/Console email provider cannot be used in production/);
+  });
+
   it("allows placeholder secrets outside production", () => {
     expect(getEnv({ NODE_ENV: "test", NEXTAUTH_SECRET: "replace-with-a-local-secret" }).NEXTAUTH_SECRET).toBe(
       "replace-with-a-local-secret",

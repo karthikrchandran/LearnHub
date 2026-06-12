@@ -13,7 +13,7 @@ export type NotificationJobType =
   | "MANAGER_ESCALATION"
   | "CERTIFICATE_ISSUED";
 
-export type NotificationJobStatus = "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+export type NotificationJobStatus = "PENDING" | "PROCESSING" | "SENT" | "FAILED" | "SKIPPED";
 
 export type NotificationJobUpsert = {
   organizationId: string;

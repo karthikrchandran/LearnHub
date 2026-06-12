@@ -106,11 +106,15 @@ describe("Prisma notification repository", () => {
     client.notificationJob.findMany.mockResolvedValueOnce([
       {
         id: "job_1",
+        type: "ASSIGNMENT_DUE_SOON",
         recipientEmail: "learner@example.com",
         subject: "Subject",
         html: "<p>Hello</p>",
         text: "Hello",
         attempts: 1,
+        assignment: {
+          status: "COMPLETED",
+        },
       },
     ]);
     const repository = createPrismaNotificationRepository(
@@ -133,11 +137,17 @@ describe("Prisma notification repository", () => {
       take: 10,
       select: {
         id: true,
+        type: true,
         recipientEmail: true,
         subject: true,
         html: true,
         text: true,
         attempts: true,
+        assignment: {
+          select: {
+            status: true,
+          },
+        },
       },
     });
     expect(client.notificationJob.updateMany).toHaveBeenCalledWith({
@@ -147,16 +157,18 @@ describe("Prisma notification repository", () => {
     expect(jobs).toEqual([
       {
         id: "job_1",
+        type: "ASSIGNMENT_DUE_SOON",
         recipientEmail: "learner@example.com",
         subject: "Subject",
         html: "<p>Hello</p>",
         text: "Hello",
         attempts: 1,
+        assignmentStatus: "COMPLETED",
       },
     ]);
   });
 
-  it("marks sent and failed jobs", async () => {
+  it("marks sent, failed, and skipped jobs", async () => {
     const client = createClient();
     const repository = createPrismaNotificationRepository(
       client as unknown as Parameters<typeof createPrismaNotificationRepository>[0],
@@ -172,6 +184,11 @@ describe("Prisma notification repository", () => {
       attempts: 2,
       lastError: "SMTP unavailable",
       nextRunAt,
+    });
+    await repository.markNotificationJobSkipped({
+      id: "job_3",
+      skippedAt: nextRunAt,
+      reason: "Assignment completed before delayed notification delivery",
     });
 
     expect(client.notificationJob.update).toHaveBeenCalledWith({
@@ -190,6 +207,14 @@ describe("Prisma notification repository", () => {
         attempts: 2,
         lastError: "SMTP unavailable",
         nextRunAt,
+      },
+    });
+    expect(client.notificationJob.update).toHaveBeenCalledWith({
+      where: { id: "job_3" },
+      data: {
+        status: "SKIPPED",
+        sentAt: nextRunAt,
+        lastError: "Assignment completed before delayed notification delivery",
       },
     });
   });

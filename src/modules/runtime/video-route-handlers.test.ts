@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
+import { issueCertificateForCompletedAssignment } from "@/modules/certificates/certificates";
+import { createPrismaCertificateRepository } from "@/modules/certificates/prisma-repository";
+import { scheduleCertificateNotification } from "@/modules/notifications/notification-jobs";
+import { createPrismaNotificationRepository } from "@/modules/notifications/prisma-repository";
 import { createPrismaRuntimeRouteRepository } from "@/modules/runtime/prisma-repository";
 import {
   RuntimeRouteError,
@@ -21,6 +25,46 @@ vi.mock("@/lib/auth/guards", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: { courseAssignment: {} },
+}));
+
+vi.mock("@/lib/env", () => ({
+  env: {
+    APP_BASE_URL: "https://learnhub.test",
+  },
+}));
+
+vi.mock("@/modules/certificates/certificates", () => ({
+  issueCertificateForCompletedAssignment: vi.fn(async (_input, _repository, notifications) => {
+    await notifications.scheduleCertificateNotification({
+      organizationId: "org_1",
+      assignmentId: "assignment_1",
+      certificateId: "certificate_1",
+      learnerEmail: "learner@example.com",
+      learnerName: "Learner One",
+      courseTitle: "Course One",
+      certificateUrl: "https://learnhub.test/certificates/ABC123",
+      now: new Date("2026-06-12T12:00:00.000Z"),
+    });
+
+    return {
+      id: "certificate_1",
+      verificationCode: "ABC123",
+      verificationUrl: "https://learnhub.test/certificates/ABC123",
+      issuedAt: new Date("2026-06-12T12:00:00.000Z"),
+    };
+  }),
+}));
+
+vi.mock("@/modules/certificates/prisma-repository", () => ({
+  createPrismaCertificateRepository: vi.fn(() => ({ kind: "certificate-repository" })),
+}));
+
+vi.mock("@/modules/notifications/notification-jobs", () => ({
+  scheduleCertificateNotification: vi.fn(),
+}));
+
+vi.mock("@/modules/notifications/prisma-repository", () => ({
+  createPrismaNotificationRepository: vi.fn(() => ({ kind: "notification-repository" })),
 }));
 
 vi.mock("@/modules/runtime/prisma-repository", () => ({
@@ -213,6 +257,49 @@ describe("native video runtime route handlers", () => {
 
     expect(response.status).toBe(400);
     expect(await json(response)).toEqual({ error: "Position must be non-negative" });
+  });
+
+  it("issues a certificate and enqueues certificate notification when video completion is recorded", async () => {
+    vi.mocked(recordVideoProgress).mockResolvedValueOnce({
+      lessonProgress: {
+        lessonId: "lesson_1",
+        lastPositionSecond: 120,
+        maxWatchedSecond: 120,
+        completed: true,
+        lastWatchedAt: new Date("2026-06-12T12:00:00.000Z"),
+      },
+      courseProgressPercent: 100,
+      completed: true,
+    });
+
+    const response = await commitVideoProgress(
+      new Request("http://learnhub.test", {
+        method: "POST",
+        body: JSON.stringify({ lessonId: "lesson_1", positionSecond: 120, watchedSecond: 120 }),
+      }),
+      routeContext,
+    );
+
+    expect(response.status).toBe(200);
+    expect(issueCertificateForCompletedAssignment).toHaveBeenCalledWith(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        appBaseUrl: "https://learnhub.test",
+        now: expect.any(Date),
+      },
+      { kind: "certificate-repository" },
+      { scheduleCertificateNotification: expect.any(Function) },
+    );
+    expect(createPrismaCertificateRepository).toHaveBeenCalledTimes(1);
+    expect(createPrismaNotificationRepository).toHaveBeenCalledTimes(1);
+    expect(scheduleCertificateNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        certificateId: "certificate_1",
+        assignmentId: "assignment_1",
+      }),
+      { kind: "notification-repository" },
+    );
   });
 
   it("returns forbidden for unauthorized launches", async () => {
