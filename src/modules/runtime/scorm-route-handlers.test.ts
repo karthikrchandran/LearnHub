@@ -31,6 +31,10 @@ vi.mock("@/lib/env", () => ({
   env: {
     APP_BASE_URL: "https://learnhub.test",
   },
+  getEnv: vi.fn(() => ({
+    APP_BASE_URL: "https://learnhub.test",
+    NEXTAUTH_SECRET: "test-secret",
+  })),
 }));
 
 vi.mock("@/modules/certificates/certificates", () => ({
