@@ -56,14 +56,24 @@ describe("native video page shells", () => {
 
   it("includes live learner video player wiring", () => {
     const page = readPage("src/app/org/[slug]/learn/[courseSlug]/page.tsx");
+    const panel = readPage("src/app/org/[slug]/learn/[courseSlug]/knowledge-check-panel.tsx");
 
     expect(page).toContain("requireOrganizationMemberBySlug");
     expect(page).toContain("VideoPlayer");
+    expect(page).toContain("KnowledgeCheckPanel");
     expect(page).toContain("data-video-launch-path");
     expect(page).toContain("data-video-progress-path");
     expect(page).toContain("/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/video/launch");
+    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/feedback");
+    expect(panel).toContain("Knowledge checks");
+    expect(panel).toContain("Submit answer");
+    expect(panel).toContain("Course rating");
+    expect(panel).toContain("[1, 2, 3, 4, 5]");
+    expect(panel).toContain("/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignmentId)}/checks/${encodeURIComponent(check.id)}/submit");
     expect(page).toContain("Assigned course required to launch this runtime.");
     expect(page).toContain("initialProgressPercent");
+    expect(page).not.toContain("correct: true");
+    expect(page).not.toContain("correct: false");
     expect(page).not.toContain("disabled");
   });
 });

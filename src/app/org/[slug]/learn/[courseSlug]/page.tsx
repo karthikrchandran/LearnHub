@@ -1,5 +1,6 @@
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 
+import { KnowledgeCheckPanel } from "./knowledge-check-panel";
 import { VideoPlayer } from "./video-player";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function CourseRuntimePage({ params }: CourseRuntimePagePro
         },
         select: {
           id: true,
+          courseId: true,
           status: true,
           progress: {
             select: {
@@ -65,6 +67,24 @@ export default async function CourseRuntimePage({ params }: CourseRuntimePagePro
 
   const videoLaunchPath = `/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/video/launch`;
   const videoProgressPath = `/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/video/progress`;
+  const checks = await prisma.courseKnowledgeCheckQuestion.findMany({
+    where: {
+      organizationId,
+      courseId: assignment.courseId,
+      active: true,
+    },
+    orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
+    select: {
+      id: true,
+      prompt: true,
+      questionType: true,
+      answers: {
+        where: { organizationId },
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, text: true },
+      },
+    },
+  });
 
   return (
     <main
@@ -76,6 +96,12 @@ export default async function CourseRuntimePage({ params }: CourseRuntimePagePro
         launchPath={videoLaunchPath}
         progressPath={videoProgressPath}
         initialProgressPercent={assignment.progress?.progressPercent ?? 0}
+      />
+      <KnowledgeCheckPanel
+        slug={slug}
+        assignmentId={assignment.id}
+        checks={checks}
+        feedbackEndpoint={`/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/feedback`}
       />
     </main>
   );
