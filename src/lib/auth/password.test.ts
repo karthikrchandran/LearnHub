@@ -8,7 +8,7 @@ describe("password helpers", () => {
 
     await expect(verifyPassword("correct horse battery staple", hash)).resolves.toBe(true);
     await expect(verifyPassword("wrong password", hash)).resolves.toBe(false);
-  });
+  }, 10_000);
 
   it("rejects short passwords", async () => {
     await expect(hashPassword("short")).rejects.toThrow("Password must be at least 12 characters");

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   assignCourse,
@@ -16,6 +16,7 @@ const startDate = new Date("2026-06-12T12:00:00.000Z");
 const publishedCourse: AssignmentCourse = {
   id: "course_1",
   organizationId: "org_1",
+  title: "Safety Basics",
   status: "PUBLISHED",
   estimatedCompletionBusinessDays: 3,
 };
@@ -25,6 +26,10 @@ const activeLearner: AssignmentMembership = {
   userId: "learner-user",
   organizationId: "org_1",
   managerMembershipId: "manager-membership",
+  learnerEmail: "learner@example.com",
+  learnerName: "Ada Lovelace",
+  managerEmail: "manager@example.com",
+  managerName: "Grace Hopper",
   status: "ACTIVE",
   roles: ["LEARNER"],
 };
@@ -32,6 +37,17 @@ const activeLearner: AssignmentMembership = {
 const selfEnrollmentOrganization: AssignmentOrganization = {
   id: "org_1",
   enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
+};
+
+type NotificationEnqueueFailureRecord = {
+  organizationId: string;
+  assignmentId: string;
+  certificateId?: string | null;
+  operation: string;
+  payload: unknown;
+  lastError: string;
+  failedAt: Date;
+  retryAt: Date;
 };
 
 const adminActor: MembershipAuthContext = {
@@ -89,6 +105,7 @@ class FakeAssignmentRepository implements AssignmentRepository {
   calls: string[] = [];
   createdAssignments: Array<Parameters<AssignmentRepository["createAssignment"]>[0]> = [];
   auditLogs: Array<Parameters<AssignmentRepository["recordAuditLog"]>[0]> = [];
+  enqueueFailures: NotificationEnqueueFailureRecord[] = [];
 
   async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
     this.transactions += 1;
@@ -134,11 +151,19 @@ class FakeAssignmentRepository implements AssignmentRepository {
     this.calls.push(`audit:${data.action}`);
     this.auditLogs.push(data);
   }
+
+  async recordNotificationEnqueueFailure(data: NotificationEnqueueFailureRecord): Promise<void> {
+    this.calls.push("notification-enqueue-failure");
+    this.enqueueFailures.push(data);
+  }
 }
 
 describe("assignment service", () => {
   it("lets an admin assign a published course to an active learner in the organization", async () => {
     const repository = createRepository();
+    const notifications = {
+      scheduleAssignmentNotifications: vi.fn(),
+    };
 
     const assignment = await assignCourse(
       {
@@ -147,8 +172,11 @@ describe("assignment service", () => {
         learnerMembershipId: "learner-membership",
         actor: adminActor,
         startDate,
+        now: new Date("2026-06-12T13:00:00.000Z"),
+        assignmentUrl: "https://learnhub.test/org/acme/learn",
       },
       repository,
+      notifications,
     );
 
     expect(assignment).toEqual({ id: "assignment_1" });
@@ -164,6 +192,18 @@ describe("assignment service", () => {
       },
     ]);
     expect(repository.auditLogs).toMatchObject([{ action: "assignment.created", targetId: "assignment_1" }]);
+    expect(notifications.scheduleAssignmentNotifications).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      assignmentId: "assignment_1",
+      learnerEmail: "learner@example.com",
+      learnerName: "Ada Lovelace",
+      courseTitle: "Safety Basics",
+      dueDate: new Date("2026-06-17T12:00:00.000Z"),
+      assignmentUrl: "https://learnhub.test/org/acme/learn",
+      managerEmail: "manager@example.com",
+      managerName: "Grace Hopper",
+      now: new Date("2026-06-12T13:00:00.000Z"),
+    });
     expect(repository.transactions).toBe(1);
     expect(repository.calls).toEqual([
       "find-course",
@@ -175,6 +215,60 @@ describe("assignment service", () => {
       "audit:assignment.created",
       "transaction:end",
     ]);
+  });
+
+  it("does not fail the committed assignment when notification enqueue fails", async () => {
+    const repository = createRepository();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await expect(
+        assignCourse(
+          {
+            organizationId: "org_1",
+            courseId: "course_1",
+            learnerMembershipId: "learner-membership",
+            actor: adminActor,
+            startDate,
+            now: new Date("2026-06-12T13:00:00.000Z"),
+            assignmentUrl: "https://learnhub.test/org/acme/learn",
+          },
+          repository,
+          {
+            scheduleAssignmentNotifications: async () => {
+              throw new Error("Notification database unavailable");
+            },
+          },
+        ),
+      ).resolves.toEqual({ id: "assignment_1" });
+
+      expect(repository.createdAssignments).toHaveLength(1);
+      expect(repository.auditLogs).toMatchObject([{ action: "assignment.created", targetId: "assignment_1" }]);
+      expect(repository.enqueueFailures).toEqual([
+        expect.objectContaining({
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+          certificateId: null,
+          operation: "ASSIGNMENT_NOTIFICATIONS",
+          lastError: "Notification database unavailable",
+          failedAt: new Date("2026-06-12T13:00:00.000Z"),
+          retryAt: new Date("2026-06-12T13:05:00.000Z"),
+        }),
+      ]);
+      expect(repository.enqueueFailures[0]?.payload).toMatchObject({
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        learnerEmail: "learner@example.com",
+        courseTitle: "Safety Basics",
+      });
+      expect(error).toHaveBeenCalledWith("Notification enqueue failed after assignment commit", {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        error: "Notification database unavailable",
+      });
+    } finally {
+      error.mockRestore();
+    }
   });
 
   it("lets a manager assign a published course only to an active direct report", async () => {

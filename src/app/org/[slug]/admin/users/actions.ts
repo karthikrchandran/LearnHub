@@ -130,15 +130,12 @@ export async function issueOrganizationUserPasswordResetFormAction(
   slug: string,
   formData: FormData,
 ) {
-  const [{ env }, { prisma }, { createEmailProvider }] = await Promise.all([
+  const [{ env }, { prisma }, { createEmailProviderFromEnv }] = await Promise.all([
     import("@/lib/env"),
     import("@/lib/prisma"),
     import("@/modules/providers/email/email-provider"),
   ]);
-  const emailProvider = createEmailProvider({
-    emailProvider: env.EMAIL_PROVIDER,
-    nodeEnv: process.env.NODE_ENV,
-  });
+  const emailProvider = createEmailProviderFromEnv(env, process.env.NODE_ENV);
   const result = await createIssueOrganizationUserPasswordResetAction({
     getActor: () => getActorForOrganization(slug),
     getOrganizationIdBySlug,

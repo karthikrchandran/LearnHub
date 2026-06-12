@@ -1,4 +1,9 @@
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
+import { env } from "@/lib/env";
+import { issueCertificateForCompletedAssignment } from "@/modules/certificates/certificates";
+import { createPrismaCertificateRepository } from "@/modules/certificates/prisma-repository";
+import { scheduleCertificateNotification } from "@/modules/notifications/notification-jobs";
+import { createPrismaNotificationRepository } from "@/modules/notifications/prisma-repository";
 import { createPrismaRuntimeRouteRepository } from "@/modules/runtime/prisma-repository";
 import {
   RuntimeRouteError,
@@ -37,6 +42,7 @@ export async function POST(request: Request, { params }: VideoProgressRouteConte
 
     const positionSecond = readNumber(body.positionSecond, "positionSecond");
     const watchedSecond = readNumber(body.watchedSecond, "watchedSecond");
+    const occurredAt = new Date();
     const result = await recordVideoProgress(
       {
         organizationId,
@@ -44,10 +50,27 @@ export async function POST(request: Request, { params }: VideoProgressRouteConte
         lessonId,
         positionSecond,
         watchedSecond,
-        occurredAt: new Date(),
+        occurredAt,
       },
       createPrismaVideoRepository(prisma),
     );
+
+    if (result.completed) {
+      const notificationRepository = createPrismaNotificationRepository(prisma);
+
+      await issueCertificateForCompletedAssignment(
+        {
+          organizationId,
+          assignmentId,
+          appBaseUrl: env.APP_BASE_URL,
+          now: occurredAt,
+        },
+        createPrismaCertificateRepository(prisma),
+        {
+          scheduleCertificateNotification: (input) => scheduleCertificateNotification(input, notificationRepository),
+        },
+      );
+    }
 
     return Response.json(result);
   } catch (error) {

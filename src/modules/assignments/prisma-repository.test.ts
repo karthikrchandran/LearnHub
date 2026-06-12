@@ -9,6 +9,7 @@ function createAssignmentClient() {
       findFirst: vi.fn(async () => ({
         id: "course_1",
         organizationId: "org_1",
+        title: "Safety Basics",
         status: "PUBLISHED",
         estimatedCompletionBusinessDays: 3,
       })),
@@ -21,6 +22,18 @@ function createAssignmentClient() {
         managerMembershipId: "manager-membership",
         status: "ACTIVE",
         roles: ["LEARNER"],
+        user: {
+          email: "learner@example.com",
+          firstName: "Ada",
+          lastName: "Lovelace",
+        },
+        managerMembership: {
+          user: {
+            email: "manager@example.com",
+            firstName: "Grace",
+            lastName: "Hopper",
+          },
+        },
       })),
     },
     organization: {
@@ -34,6 +47,9 @@ function createAssignmentClient() {
       create: vi.fn(async () => ({ id: "assignment_1" })),
     },
     auditLog: {
+      create: vi.fn(async () => ({})),
+    },
+    notificationEnqueueFailure: {
       create: vi.fn(async () => ({})),
     },
   };
@@ -60,6 +76,7 @@ describe("createPrismaAssignmentRepository", () => {
       select: {
         id: true,
         organizationId: true,
+        title: true,
         status: true,
         estimatedCompletionBusinessDays: true,
       },
@@ -73,6 +90,24 @@ describe("createPrismaAssignmentRepository", () => {
         managerMembershipId: true,
         status: true,
         roles: true,
+        user: {
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        managerMembership: {
+          select: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
       },
     });
     expect(client.organization.findUnique).toHaveBeenCalledWith({
@@ -168,5 +203,41 @@ describe("createPrismaAssignmentRepository", () => {
     expect(rootClient.auditLog.create).not.toHaveBeenCalled();
     expect(transactionClient.courseAssignment.create).toHaveBeenCalledTimes(1);
     expect(transactionClient.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("records failed notification enqueue attempts with retry metadata", async () => {
+    const client = createAssignmentClient();
+    const repository = createPrismaAssignmentRepository(
+      client as unknown as Parameters<typeof createPrismaAssignmentRepository>[0],
+    );
+    const payload = {
+      organizationId: "org_1",
+      assignmentId: "assignment_1",
+      learnerEmail: "learner@example.com",
+    };
+
+    await repository.recordNotificationEnqueueFailure!({
+      organizationId: "org_1",
+      assignmentId: "assignment_1",
+      certificateId: null,
+      operation: "ASSIGNMENT_NOTIFICATIONS",
+      payload,
+      lastError: "Notification database unavailable",
+      failedAt: new Date("2026-06-12T13:00:00.000Z"),
+      retryAt: new Date("2026-06-12T13:05:00.000Z"),
+    });
+
+    expect(client.notificationEnqueueFailure.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        certificateId: null,
+        operation: "ASSIGNMENT_NOTIFICATIONS",
+        payload,
+        lastError: "Notification database unavailable",
+        failedAt: new Date("2026-06-12T13:00:00.000Z"),
+        retryAt: new Date("2026-06-12T13:05:00.000Z"),
+      },
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { CredentialProvider } from "../providers/credentials/credential-provider";
+import type { CertificateNotificationScheduleInput, NotificationEnqueueFailureInput } from "../notifications/notification-jobs";
 
 export type CertificateAssignment = {
   id: string;
@@ -52,6 +53,7 @@ export interface CertificateRepository {
     providerUrl?: string;
     errorMessage?: string;
   }): Promise<void>;
+  recordNotificationEnqueueFailure?(input: NotificationEnqueueFailureInput): Promise<void>;
 }
 
 export type IssueCertificateInput = {
@@ -61,6 +63,10 @@ export type IssueCertificateInput = {
   now: Date;
   credentialProvider?: CredentialProvider;
   credentialProviderTemplateId?: string;
+};
+
+export type CertificateNotificationScheduler = {
+  scheduleCertificateNotification(input: CertificateNotificationScheduleInput): Promise<void> | void;
 };
 
 const VERIFICATION_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -79,6 +85,7 @@ function buildVerificationUrl(appBaseUrl: string, verificationCode: string): str
 export async function issueCertificateForCompletedAssignment(
   input: IssueCertificateInput,
   repository: CertificateRepository,
+  notifications?: CertificateNotificationScheduler,
 ): Promise<CertificateRecord> {
   const assignment = await repository.findAssignmentForCertificate({
     organizationId: input.organizationId,
@@ -117,6 +124,40 @@ export async function issueCertificateForCompletedAssignment(
     issuedAt: input.now,
   });
 
+  if (notifications) {
+    const notificationInput = {
+      organizationId: assignment.organizationId,
+      assignmentId: assignment.id,
+      certificateId: certificate.id,
+      learnerEmail: assignment.learnerEmail,
+      learnerName: assignment.learnerName,
+      courseTitle: assignment.courseTitle,
+      certificateUrl: certificate.verificationUrl,
+      now: input.now,
+    };
+
+    try {
+      await notifications.scheduleCertificateNotification(notificationInput);
+    } catch (error) {
+      await recordNotificationEnqueueFailure(repository, {
+        organizationId: assignment.organizationId,
+        assignmentId: assignment.id,
+        certificateId: certificate.id,
+        operation: "CERTIFICATE_NOTIFICATION",
+        payload: notificationInput,
+        lastError: error instanceof Error ? error.message : "Notification enqueue failed",
+        failedAt: input.now,
+        retryAt: addMinutes(input.now, 5),
+      });
+      console.error("Notification enqueue failed after certificate commit", {
+        organizationId: assignment.organizationId,
+        assignmentId: assignment.id,
+        certificateId: certificate.id,
+        error: error instanceof Error ? error.message : "Notification enqueue failed",
+      });
+    }
+  }
+
   if (input.credentialProvider && input.credentialProviderTemplateId && repository.recordCredentialIssuance) {
     try {
       const result = await input.credentialProvider.issueCredential({
@@ -148,4 +189,28 @@ export async function issueCertificateForCompletedAssignment(
   }
 
   return certificate;
+}
+
+async function recordNotificationEnqueueFailure(
+  repository: CertificateRepository,
+  failure: NotificationEnqueueFailureInput,
+): Promise<void> {
+  if (!repository.recordNotificationEnqueueFailure) {
+    return;
+  }
+
+  try {
+    await repository.recordNotificationEnqueueFailure(failure);
+  } catch (error) {
+    console.error("Notification enqueue failure persistence failed", {
+      organizationId: failure.organizationId,
+      assignmentId: failure.assignmentId,
+      certificateId: failure.certificateId ?? null,
+      error: error instanceof Error ? error.message : "Notification enqueue failure persistence failed",
+    });
+  }
+}
+
+function addMinutes(date: Date, minutes: number): Date {
+  return new Date(date.getTime() + minutes * 60_000);
 }

@@ -2,6 +2,7 @@ import {
   assignCourse,
   selfEnrollInCourse,
   type AssignmentRepository,
+  type AssignmentNotificationScheduler,
 } from "./assignment-service";
 import type { MembershipAuthContext } from "../auth/permissions";
 
@@ -15,6 +16,9 @@ export type AssignmentActionContext = {
 export type AssignCourseActionDependencies = {
   getActorAndOrganization(slug: string): Promise<AssignmentActionContext>;
   repository: AssignmentRepository;
+  notificationScheduler?: AssignmentNotificationScheduler;
+  buildAssignmentUrl?(slug: string): string;
+  now?(): Date;
 };
 
 export type SelfEnrollActionDependencies = AssignCourseActionDependencies;
@@ -37,8 +41,11 @@ export function createAssignCourseAction(dependencies: AssignCourseActionDepende
           learnerMembershipId: readFormString(formData, "learnerMembershipId"),
           actor: context.actor,
           startDate,
+          now: dependencies.now?.() ?? new Date(),
+          assignmentUrl: dependencies.buildAssignmentUrl?.(slug) ?? "",
         },
         dependencies.repository,
+        dependencies.notificationScheduler,
       );
 
       return { status: "success", message: "Course assigned." };
@@ -66,8 +73,11 @@ export function createSelfEnrollAction(dependencies: SelfEnrollActionDependencie
           learnerMembershipId: readFormString(formData, "learnerMembershipId"),
           actor: context.actor,
           startDate,
+          now: dependencies.now?.() ?? new Date(),
+          assignmentUrl: dependencies.buildAssignmentUrl?.(slug) ?? "",
         },
         dependencies.repository,
+        dependencies.notificationScheduler,
       );
 
       return { status: "success", message: "Course added." };

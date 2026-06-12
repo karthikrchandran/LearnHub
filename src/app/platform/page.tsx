@@ -3,6 +3,7 @@ import {
   createPrismaDashboardRepository,
   getPlatformDashboardSummary,
 } from "@/modules/organizations/dashboard";
+import { createPrismaNotificationRepository } from "@/modules/notifications/prisma-repository";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export default async function PlatformPage() {
       },
     },
   });
+  const notificationFailures = await createPrismaNotificationRepository(prisma).listPlatformNotificationFailures({
+    take: 10,
+  });
   const cards = [
     { label: "Organizations", value: summary.organizations },
     { label: "Active users", value: summary.activeUsers },
@@ -51,6 +55,49 @@ export default async function PlatformPage() {
             <p className="mt-2 text-2xl font-semibold text-slate-950">{card.value}</p>
           </div>
         ))}
+      </section>
+
+      <section className="rounded-md border border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-950">Failed notification jobs</h2>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+              <tr className="text-left text-slate-500">
+                <th className="px-3 py-2 font-medium">Organization</th>
+                <th className="px-3 py-2 font-medium">Type</th>
+                <th className="px-3 py-2 font-medium">Recipient</th>
+                <th className="px-3 py-2 font-medium">Attempts</th>
+                <th className="px-3 py-2 font-medium">Next run</th>
+                <th className="px-3 py-2 font-medium">Last error</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {notificationFailures.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4 text-slate-500" colSpan={6}>
+                    No failed notification jobs.
+                  </td>
+                </tr>
+              ) : (
+                notificationFailures.map((job) => (
+                  <tr key={job.id}>
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-slate-950">{job.organizationName ?? job.organizationId}</div>
+                      <div className="text-slate-500">{job.organizationSlug ?? job.organizationId}</div>
+                    </td>
+                    <td className="px-3 py-3 text-slate-700">{job.type}</td>
+                    <td className="px-3 py-3 text-slate-700">{job.recipientEmail}</td>
+                    <td className="px-3 py-3 text-slate-700">{job.attempts}</td>
+                    <td className="px-3 py-3 text-slate-700">
+                      {job.nextRunAt.toISOString().replace("T", " ").slice(0, 16)}
+                    </td>
+                    <td className="max-w-xs px-3 py-3 text-slate-700">{job.lastError ?? "None"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="rounded-md border border-slate-200 p-4">

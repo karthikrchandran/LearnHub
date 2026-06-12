@@ -69,6 +69,28 @@ enum CredentialIssuanceStatus {
   FAILED
 }
 
+enum NotificationJobType {
+  ASSIGNMENT_ASSIGNED
+  ASSIGNMENT_DUE_SOON
+  ASSIGNMENT_OVERDUE
+  MANAGER_ESCALATION
+  CERTIFICATE_ISSUED
+}
+
+enum NotificationJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum NotificationEnqueueFailureStatus {
+  PENDING
+  PROCESSING
+  RESOLVED
+}
+
 model User {
   id              String                   @id @default(cuid())
   email           String                   @unique
@@ -114,6 +136,8 @@ model Organization {
   learningEvents       LearningProgressEvent[]
   certificates         Certificate[]
   credentialIssuances  CredentialIssuance[]
+  notificationJobs     NotificationJob[]
+  notificationEnqueueFailures NotificationEnqueueFailure[]
   auditLogs            AuditLog[]
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
@@ -270,6 +294,8 @@ model CourseAssignment {
   videoProgress          VideoLessonProgress[]
   scormRegistration      ScormRegistration?
   certificate            Certificate?
+  notificationJobs       NotificationJob[]
+  notificationEnqueueFailures NotificationEnqueueFailure[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -479,10 +505,12 @@ model Certificate {
   course              Course                 @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)
   membership          OrganizationMembership @relation("MembershipCertificates", fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
   credentialIssuances CredentialIssuance[]
+  notificationJobs    NotificationJob[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
   @@unique([organizationId, assignmentId])
+  @@unique([organizationId, id])
   @@index([organizationId])
   @@index([organizationId, membershipId])
   @@index([organizationId, courseId])
@@ -505,6 +533,61 @@ model CredentialIssuance {
   @@index([organizationId])
   @@index([certificateId])
   @@index([organizationId, provider, status])
+}
+
+model NotificationJob {
+  id                String                @id @default(cuid())
+  organizationId    String
+  assignmentId      String
+  certificateId     String?
+  type              NotificationJobType
+  status            NotificationJobStatus @default(PENDING)
+  recipientEmail    String
+  recipientName     String?
+  subject           String
+  html              String
+  text              String
+  scheduledForDate  DateTime
+  nextRunAt         DateTime
+  attempts          Int                   @default(0)
+  providerMessageId String?
+  lastError         String?
+  sentAt            DateTime?
+  claimedAt         DateTime?
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment        CourseAssignment      @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  certificate       Certificate?          @relation(fields: [organizationId, certificateId], references: [organizationId, id], onDelete: NoAction)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([organizationId, assignmentId, type, scheduledForDate])
+  @@index([status, nextRunAt])
+  @@index([organizationId, status, nextRunAt])
+  @@index([organizationId, type])
+  @@index([certificateId])
+}
+
+model NotificationEnqueueFailure {
+  id             String                           @id @default(cuid())
+  organizationId String
+  assignmentId   String
+  certificateId  String?
+  operation      String
+  payload        Json
+  status         NotificationEnqueueFailureStatus @default(PENDING)
+  attempts       Int                              @default(0)
+  lastError      String?
+  failedAt       DateTime
+  retryAt        DateTime
+  organization   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignment     CourseAssignment                 @relation(fields: [organizationId, assignmentId], references: [organizationId, id], onDelete: Cascade)
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+
+  @@index([organizationId, status, retryAt])
+  @@index([status, retryAt])
+  @@index([assignmentId])
+  @@index([certificateId])
 }
 
 model AuditLog {
