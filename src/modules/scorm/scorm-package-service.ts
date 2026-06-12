@@ -30,6 +30,7 @@ export type UploadScormPackageData = {
   contentType: string;
   byteSize: number;
   storageKey: string;
+  contentRootKey: string;
   launchPath: string;
   manifestTitle: string | null;
   uploadedByUserId: string;
@@ -70,7 +71,9 @@ export async function uploadScormPackage(
   }
 
   const packageId = `pkg_${courseId}`;
-  const storageKey = `org/${organizationId}/courses/${courseId}/scorm/${packageId}/${originalFileName}`;
+  const packageRootKey = `org/${organizationId}/courses/${courseId}/scorm/${packageId}`;
+  const storageKey = `${packageRootKey}/${originalFileName}`;
+  const contentRootKey = `${packageRootKey}/content`;
 
   return repository.runInTransaction(async () => {
     const scormPackage = await repository.upsertPackage({
@@ -81,6 +84,7 @@ export async function uploadScormPackage(
       contentType,
       byteSize,
       storageKey,
+      contentRootKey,
       launchPath,
       manifestTitle: normalizeNullable(input.manifestTitle),
       uploadedByUserId: actorId,

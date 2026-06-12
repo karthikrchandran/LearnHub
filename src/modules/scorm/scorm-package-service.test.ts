@@ -95,6 +95,7 @@ describe("uploadScormPackage", () => {
         contentType: "application/zip",
         byteSize: 1024,
         storageKey: "org/org_1/courses/course_1/scorm/pkg_course_1/policy-orientation.zip",
+        contentRootKey: "org/org_1/courses/course_1/scorm/pkg_course_1/content",
         launchPath: "index.html",
         manifestTitle: "Policy Orientation",
         uploadedByUserId: "actor_1",

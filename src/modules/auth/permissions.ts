@@ -21,6 +21,13 @@ export type TargetMembership = {
   managerMembershipId: string | null;
 };
 
+export type TargetRuntimeAssignment = {
+  id: string;
+  organizationId: string;
+  membershipId: string;
+  learner: TargetMembership;
+};
+
 function membershipForOrganization(context: MembershipAuthContext, organizationId: string): AuthMembership | undefined {
   return context.memberships.find(
     (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
@@ -73,4 +80,38 @@ export function canViewMembershipProgress(context: MembershipAuthContext, target
   }
 
   return membership.roles.includes("MANAGER") && target.managerMembershipId === membership.id;
+}
+
+export function canLaunchRuntimeAssignment(
+  context: MembershipAuthContext,
+  assignment: TargetRuntimeAssignment,
+): boolean {
+  const membership = membershipForOrganization(context, assignment.organizationId);
+
+  return Boolean(
+    membership &&
+      assignment.learner.organizationId === assignment.organizationId &&
+      membership.id === assignment.membershipId &&
+      membership.id === assignment.learner.id &&
+      assignment.learner.userId === context.userId &&
+      membership.roles.includes("LEARNER"),
+  );
+}
+
+export function canViewRuntimeProgress(
+  context: MembershipAuthContext,
+  assignment: TargetRuntimeAssignment,
+): boolean {
+  if (assignment.learner.organizationId !== assignment.organizationId) {
+    return false;
+  }
+
+  return canViewMembershipProgress(context, assignment.learner);
+}
+
+export function canInspectRuntimeAssignment(
+  context: MembershipAuthContext,
+  assignment: TargetRuntimeAssignment,
+): boolean {
+  return canManageOrganization(context, assignment.organizationId);
 }

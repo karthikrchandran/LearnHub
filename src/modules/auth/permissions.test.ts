@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   canAssignDirectReport,
+  canInspectRuntimeAssignment,
   canManageOrganization,
   canManageOrganizationUsers,
+  canViewRuntimeProgress,
+  canLaunchRuntimeAssignment,
   canViewMembershipProgress,
   type MembershipAuthContext,
 } from "./permissions";
@@ -48,6 +51,18 @@ const learner: MembershipAuthContext = {
       managerMembershipId: null,
     },
   ],
+};
+
+const runtimeAssignment = {
+  id: "assignment_1",
+  organizationId: "org_1",
+  membershipId: "learner-membership",
+  learner: {
+    id: "learner-membership",
+    userId: "learner-user",
+    organizationId: "org_1",
+    managerMembershipId: "manager-membership",
+  },
 };
 
 describe("authorization permissions", () => {
@@ -289,5 +304,62 @@ describe("authorization permissions", () => {
         },
       ),
     ).toBe(false);
+  });
+
+  it("lets learners launch only their own runtime assignments", () => {
+    expect(canLaunchRuntimeAssignment(learner, runtimeAssignment)).toBe(true);
+    expect(
+      canLaunchRuntimeAssignment(learner, {
+        ...runtimeAssignment,
+        id: "other_assignment",
+        membershipId: "other-learner-membership",
+        learner: {
+          ...runtimeAssignment.learner,
+          id: "other-learner-membership",
+          userId: "other-user",
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("does not let managers launch as direct reports", () => {
+    expect(canViewRuntimeProgress(manager, runtimeAssignment)).toBe(true);
+    expect(canLaunchRuntimeAssignment(manager, runtimeAssignment)).toBe(false);
+  });
+
+  it("lets admins and platform owners inspect runtime assignments", () => {
+    expect(canInspectRuntimeAssignment(admin, runtimeAssignment)).toBe(true);
+    expect(canViewRuntimeProgress(admin, runtimeAssignment)).toBe(true);
+    expect(
+      canInspectRuntimeAssignment(
+        { userId: "owner", isPlatformOwner: true, memberships: [] },
+        { ...runtimeAssignment, organizationId: "org_any", learner: { ...runtimeAssignment.learner, organizationId: "org_any" } },
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects cross-organization runtime assignment access", () => {
+    const crossOrgAssignment = {
+      ...runtimeAssignment,
+      organizationId: "org_2",
+      learner: {
+        ...runtimeAssignment.learner,
+        organizationId: "org_2",
+      },
+    };
+
+    expect(canLaunchRuntimeAssignment(learner, crossOrgAssignment)).toBe(false);
+    expect(canViewRuntimeProgress(manager, crossOrgAssignment)).toBe(false);
+    expect(canInspectRuntimeAssignment(admin, crossOrgAssignment)).toBe(false);
+  });
+
+  it("rejects runtime access for inactive memberships", () => {
+    const inactiveLearner = {
+      ...learner,
+      memberships: [{ ...learner.memberships[0], status: "INACTIVE" as const }],
+    };
+
+    expect(canLaunchRuntimeAssignment(inactiveLearner, runtimeAssignment)).toBe(false);
+    expect(canViewRuntimeProgress(inactiveLearner, runtimeAssignment)).toBe(false);
   });
 });

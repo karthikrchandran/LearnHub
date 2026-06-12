@@ -1,4 +1,4 @@
-import type { LearningEventInput, RecordLearningEventResult } from "../progress/progress";
+import { type ProgressRepository, recordLearningEvent } from "../progress/progress";
 import { calculateScormProgress } from "./scorm-progress";
 import { parseScorm12Time } from "./scorm-time";
 
@@ -6,6 +6,7 @@ export type ScormRuntimePackage = {
   id: string;
   launchPath: string;
   storageKey: string;
+  contentRootKey: string;
   manifestTitle: string | null;
 };
 
@@ -48,7 +49,8 @@ export type CommitScormRuntimeInput = {
   occurredAt: Date;
 };
 
-export type ScormRuntimeRepository = {
+export type ScormRuntimeRepository = ProgressRepository & {
+  runInTransaction<T>(operation: () => Promise<T>): Promise<T>;
   findAssignmentForRuntime(input: {
     organizationId: string;
     assignmentId: string;
@@ -73,15 +75,10 @@ export type ScormRuntimeRepository = {
   }): Promise<ScormRegistrationState>;
 };
 
-export type RecordScormLearningEvent = (
-  event: LearningEventInput,
-) => Promise<RecordLearningEventResult>;
-
 const allowedCmiKeys = new Set([
   "cmi.core.lesson_status",
   "cmi.core.score.raw",
   "cmi.core.session_time",
-  "cmi.core.total_time",
   "cmi.core.exit",
   "cmi.core.lesson_location",
   "cmi.suspend_data",
@@ -121,54 +118,60 @@ export async function launchScormRegistration(
 export async function commitScormRuntime(
   input: CommitScormRuntimeInput,
   repository: ScormRuntimeRepository,
-  recordLearningEvent: RecordScormLearningEvent,
 ): Promise<{ progressPercent: number; completed: boolean; registration: ScormRegistrationState }> {
-  const assignment = await loadScormAssignment(input, repository);
-  const scormPackage = requirePackage(assignment);
-  const mergedCmiData = mergeAllowedCmiData(assignment.scormRegistration?.cmiData ?? {}, input.cmiData);
-  const lessonStatus = String(mergedCmiData["cmi.core.lesson_status"] ?? "not attempted");
-  const scoreRaw = parseScore(mergedCmiData["cmi.core.score.raw"]);
-  const sessionTimeSeconds = parseOptionalTime(mergedCmiData["cmi.core.session_time"]);
-  const previousTotal = assignment.scormRegistration?.totalTimeSeconds ?? 0;
-  const totalTimeSeconds = previousTotal + sessionTimeSeconds;
-  const progress = calculateScormProgress({
-    lessonStatus,
-    scoreRaw,
-    hasActivity: Object.keys(input.cmiData).length > 0 || sessionTimeSeconds > 0,
-  });
-  const registration = await repository.saveRuntimeCommit({
-    organizationId: assignment.organizationId,
-    assignmentId: assignment.id,
-    packageId: scormPackage.id,
-    cmiData: mergedCmiData,
-    lessonStatus: progress.lessonStatus,
-    scoreRaw,
-    sessionTimeSeconds,
-    totalTimeSeconds,
-    committedAt: input.occurredAt,
-  });
-  const eventResult = await recordLearningEvent({
-    organizationId: assignment.organizationId,
-    assignmentId: assignment.id,
-    source: "SCORM",
-    type: progress.eventType,
-    progressPercent: progress.progressPercent,
-    occurredAt: input.occurredAt,
-    rawPayload: {
+  return repository.runInTransaction(async () => {
+    const assignment = await loadScormAssignment(input, repository);
+    const scormPackage = requirePackage(assignment);
+    const mergedCmiData = mergeAllowedCmiData(assignment.scormRegistration?.cmiData ?? {}, input.cmiData);
+    const lessonStatus = String(mergedCmiData["cmi.core.lesson_status"] ?? "not attempted");
+    const scoreRaw = parseScore(mergedCmiData["cmi.core.score.raw"]);
+    const sessionTimeSeconds = parseOptionalTime(mergedCmiData["cmi.core.session_time"]);
+    const previousSessionTimeSeconds = assignment.scormRegistration?.sessionTimeSeconds ?? 0;
+    const previousTotalTimeSeconds = assignment.scormRegistration?.totalTimeSeconds ?? 0;
+    const priorSessionsTotalSeconds = Math.max(0, previousTotalTimeSeconds - previousSessionTimeSeconds);
+    const totalTimeSeconds = priorSessionsTotalSeconds + sessionTimeSeconds;
+    const progress = calculateScormProgress({
+      lessonStatus,
+      scoreRaw,
+      hasActivity: Object.keys(input.cmiData).length > 0 || sessionTimeSeconds > 0,
+    });
+    const registration = await repository.saveRuntimeCommit({
+      organizationId: assignment.organizationId,
+      assignmentId: assignment.id,
       packageId: scormPackage.id,
+      cmiData: mergedCmiData,
       lessonStatus: progress.lessonStatus,
       scoreRaw,
       sessionTimeSeconds,
       totalTimeSeconds,
-      cmiData: mergedCmiData,
-    },
-  });
+      committedAt: input.occurredAt,
+    });
+    const eventResult = await recordLearningEvent(
+      {
+        organizationId: assignment.organizationId,
+        assignmentId: assignment.id,
+        source: "SCORM",
+        type: progress.eventType,
+        progressPercent: progress.progressPercent,
+        occurredAt: input.occurredAt,
+        rawPayload: {
+          packageId: scormPackage.id,
+          lessonStatus: progress.lessonStatus,
+          scoreRaw,
+          sessionTimeSeconds,
+          totalTimeSeconds,
+          cmiData: mergedCmiData,
+        },
+      },
+      repository,
+    );
 
-  return {
-    progressPercent: eventResult.progressPercent,
-    completed: eventResult.completed,
-    registration,
-  };
+    return {
+      progressPercent: eventResult.progressPercent,
+      completed: eventResult.completed,
+      registration,
+    };
+  });
 }
 
 async function loadScormAssignment(
@@ -197,7 +200,7 @@ function requirePackage(assignment: ScormRuntimeAssignment): ScormRuntimePackage
 }
 
 function buildLaunchUrl(scormPackage: ScormRuntimePackage): string {
-  return `/scorm/${scormPackage.storageKey}/${scormPackage.launchPath}`;
+  return `/scorm/${scormPackage.contentRootKey}/${scormPackage.launchPath}`;
 }
 
 function mergeAllowedCmiData(

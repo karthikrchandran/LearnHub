@@ -388,6 +388,7 @@ model ScormPackage {
   contentType      String
   byteSize         Int
   storageKey       String
+  contentRootKey   String
   launchPath       String
   manifestTitle    String?
   uploadedByUserId String?

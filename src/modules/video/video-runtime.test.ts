@@ -84,7 +84,27 @@ const nativeAssignment: VideoRuntimeAssignment = {
 
 class FakeVideoRuntimeRepository implements VideoRuntimeRepository {
   assignment: VideoRuntimeAssignment | null = nativeAssignment;
+  transactions = 0;
+  failProgressUpdate = false;
   savedProgress: Parameters<VideoRuntimeRepository["upsertLessonProgress"]>[0][] = [];
+  learningEvents: LearningEventInput[] = [];
+  progressUpdates: Parameters<VideoRuntimeRepository["saveProgressUpdate"]>[0]["progress"][] = [];
+
+  async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
+    this.transactions += 1;
+    const savedProgress = structuredClone(this.savedProgress);
+    const learningEvents = structuredClone(this.learningEvents);
+    const progressUpdates = structuredClone(this.progressUpdates);
+
+    try {
+      return await operation();
+    } catch (error) {
+      this.savedProgress = savedProgress;
+      this.learningEvents = learningEvents;
+      this.progressUpdates = progressUpdates;
+      throw error;
+    }
+  }
 
   async findAssignmentForRuntime(): Promise<VideoRuntimeAssignment | null> {
     return this.assignment;
@@ -100,6 +120,29 @@ class FakeVideoRuntimeRepository implements VideoRuntimeRepository {
       completed: input.completed,
       lastWatchedAt: input.lastWatchedAt,
     };
+  }
+
+  async findAssignmentForProgress(): Promise<Awaited<ReturnType<VideoRuntimeRepository["findAssignmentForProgress"]>>> {
+    if (!this.assignment) {
+      return null;
+    }
+
+    return {
+      id: this.assignment.id,
+      organizationId: this.assignment.organizationId,
+      courseType: "NATIVE_VIDEO",
+      status: "ASSIGNED",
+      currentProgressPercent: this.progressUpdates.at(-1)?.progressPercent ?? 0,
+    };
+  }
+
+  async saveProgressUpdate(input: Parameters<VideoRuntimeRepository["saveProgressUpdate"]>[0]): Promise<void> {
+    if (this.failProgressUpdate) {
+      throw new Error("Learning progress persistence failed");
+    }
+
+    this.learningEvents.push(input.event);
+    this.progressUpdates.push(input.progress);
   }
 }
 
@@ -187,12 +230,8 @@ describe("launchVideoRuntime", () => {
 describe("recordVideoProgress", () => {
   it("clamps position and watched seconds to the lesson duration", async () => {
     const repository = createRepository();
-    const events: LearningEventInput[] = [];
 
-    await recordVideoProgress(createProgressInput(), repository, async (event) => {
-      events.push(event);
-      return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "COMPLETED", completed: true };
-    });
+    await recordVideoProgress(createProgressInput(), repository);
 
     expect(repository.savedProgress).toEqual([
       {
@@ -211,11 +250,7 @@ describe("recordVideoProgress", () => {
   it("marks a lesson complete at 100 percent watched", async () => {
     const repository = createRepository();
 
-    const result = await recordVideoProgress(createProgressInput(), repository, async (event) => ({
-      progressPercent: event.progressPercent ?? 0,
-      assignmentStatus: "COMPLETED",
-      completed: true,
-    }));
+    const result = await recordVideoProgress(createProgressInput(), repository);
 
     expect(result.lessonProgress).toMatchObject({
       lessonId: "lesson_1",
@@ -230,11 +265,6 @@ describe("recordVideoProgress", () => {
     const result = await recordVideoProgress(
       createProgressInput({ watchedSecond: 180 }),
       repository,
-      async (event) => ({
-        progressPercent: event.progressPercent ?? 0,
-        assignmentStatus: "IN_PROGRESS",
-        completed: false,
-      }),
     );
 
     expect(result.courseProgressPercent).toBe(50);
@@ -242,7 +272,6 @@ describe("recordVideoProgress", () => {
 
   it("sends a native progress event below 100 percent", async () => {
     const repository = createRepository();
-    const events: LearningEventInput[] = [];
 
     await recordVideoProgress(
       createProgressInput({
@@ -250,13 +279,9 @@ describe("recordVideoProgress", () => {
         positionSecond: 60,
       }),
       repository,
-      async (event) => {
-        events.push(event);
-        return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "IN_PROGRESS", completed: false };
-      },
     );
 
-    expect(events).toEqual([
+    expect(repository.learningEvents).toEqual([
       {
         organizationId: "org_1",
         assignmentId: "assignment_1",
@@ -287,7 +312,6 @@ describe("recordVideoProgress", () => {
       },
     ];
     const repository = createRepository(assignment);
-    const events: LearningEventInput[] = [];
 
     await recordVideoProgress(
       createProgressInput({
@@ -296,13 +320,9 @@ describe("recordVideoProgress", () => {
         watchedSecond: 120,
       }),
       repository,
-      async (event) => {
-        events.push(event);
-        return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "COMPLETED", completed: true };
-      },
     );
 
-    expect(events[0]).toMatchObject({
+    expect(repository.learningEvents[0]).toMatchObject({
       source: "NATIVE",
       type: "COMPLETED",
       progressPercent: 100,
@@ -314,5 +334,19 @@ describe("recordVideoProgress", () => {
         requiredLessonsTotal: 2,
       },
     });
+  });
+
+  it("rolls back lesson progress when learning progress persistence fails", async () => {
+    const repository = createRepository();
+    repository.failProgressUpdate = true;
+
+    await expect(recordVideoProgress(createProgressInput(), repository)).rejects.toThrow(
+      "Learning progress persistence failed",
+    );
+
+    expect(repository.transactions).toBe(1);
+    expect(repository.savedProgress).toEqual([]);
+    expect(repository.learningEvents).toEqual([]);
+    expect(repository.progressUpdates).toEqual([]);
   });
 });

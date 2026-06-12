@@ -9,7 +9,14 @@ import type {
 
 type PrismaScormClient = Pick<
   PrismaClient,
-  "$transaction" | "course" | "scormPackage" | "scormRegistration" | "courseAssignment" | "auditLog"
+  | "$transaction"
+  | "course"
+  | "scormPackage"
+  | "scormRegistration"
+  | "courseAssignment"
+  | "assignmentProgress"
+  | "learningProgressEvent"
+  | "auditLog"
 >;
 
 export type PrismaScormRepository = ScormPackageRepository & ScormRuntimeRepository;
@@ -53,6 +60,14 @@ type AssignmentRecord = {
   scormRegistration: RegistrationRecord | null;
 };
 
+function rawPayloadToJson(rawPayload: unknown): Prisma.InputJsonValue {
+  if (rawPayload === null || rawPayload === undefined) {
+    return {};
+  }
+
+  return rawPayload as Prisma.InputJsonValue;
+}
+
 export function createPrismaScormRepository(client: PrismaScormClient): PrismaScormRepository {
   let transactionClient: PrismaScormClient | null = null;
   const activeClient = () => transactionClient ?? client;
@@ -88,6 +103,7 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
           contentType: data.contentType,
           byteSize: data.byteSize,
           storageKey: data.storageKey,
+          contentRootKey: data.contentRootKey,
           launchPath: data.launchPath,
           manifestTitle: data.manifestTitle,
           uploadedByUserId: data.uploadedByUserId,
@@ -101,6 +117,7 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
           contentType: data.contentType,
           byteSize: data.byteSize,
           storageKey: data.storageKey,
+          contentRootKey: data.contentRootKey,
           launchPath: data.launchPath,
           manifestTitle: data.manifestTitle,
           uploadedByUserId: data.uploadedByUserId,
@@ -140,6 +157,7 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
                   id: true,
                   launchPath: true,
                   storageKey: true,
+                  contentRootKey: true,
                   manifestTitle: true,
                 },
               },
@@ -164,6 +182,7 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
         update: {
           packageId: input.packageId,
           launchCount: input.launchCount,
+          sessionTimeSeconds: 0,
           lastLaunchedAt: input.launchedAt,
         },
         create: {
@@ -171,6 +190,7 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
           assignmentId: input.assignmentId,
           packageId: input.packageId,
           launchCount: input.launchCount,
+          sessionTimeSeconds: 0,
           lastLaunchedAt: input.launchedAt,
         },
         select: registrationSelect,
@@ -206,6 +226,83 @@ export function createPrismaScormRepository(client: PrismaScormClient): PrismaSc
         },
         select: registrationSelect,
       }).then(mapRegistration);
+    },
+    async findAssignmentForProgress(input) {
+      const assignment = await activeClient().courseAssignment.findFirst({
+        where: {
+          id: input.assignmentId,
+          organizationId: input.organizationId,
+        },
+        select: {
+          id: true,
+          organizationId: true,
+          status: true,
+          course: {
+            select: {
+              type: true,
+            },
+          },
+          progress: {
+            select: {
+              progressPercent: true,
+            },
+          },
+        },
+      });
+
+      return assignment
+        ? {
+            id: assignment.id,
+            organizationId: assignment.organizationId,
+            courseType: assignment.course.type,
+            status: assignment.status,
+            currentProgressPercent: assignment.progress?.progressPercent ?? 0,
+          }
+        : null;
+    },
+    async saveProgressUpdate(input) {
+      await activeClient().learningProgressEvent.create({
+        data: {
+          organizationId: input.organizationId,
+          assignmentId: input.assignmentId,
+          source: input.event.source,
+          type: input.event.type,
+          progressPercent: input.event.progressPercent,
+          rawPayload: rawPayloadToJson(input.event.rawPayload),
+          occurredAt: input.event.occurredAt,
+        },
+      });
+
+      await activeClient().assignmentProgress.upsert({
+        where: {
+          organizationId_assignmentId: {
+            organizationId: input.organizationId,
+            assignmentId: input.assignmentId,
+          },
+        },
+        update: {
+          progressPercent: input.progress.progressPercent,
+          lastEventAt: input.event.occurredAt,
+        },
+        create: {
+          organizationId: input.organizationId,
+          assignmentId: input.assignmentId,
+          progressPercent: input.progress.progressPercent,
+          lastEventAt: input.event.occurredAt,
+        },
+      });
+
+      await activeClient().courseAssignment.update({
+        where: {
+          organizationId_id: {
+            organizationId: input.organizationId,
+            id: input.assignmentId,
+          },
+        },
+        data: {
+          status: input.progress.assignmentStatus,
+        },
+      });
     },
   };
 }

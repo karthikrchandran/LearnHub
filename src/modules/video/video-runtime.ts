@@ -1,6 +1,6 @@
 import {
-  type LearningEventInput,
-  type RecordLearningEventResult,
+  type ProgressRepository,
+  recordLearningEvent,
 } from "../progress/progress";
 import {
   clampVideoSecond,
@@ -82,7 +82,8 @@ export type RecordVideoProgressInput = {
   occurredAt: Date;
 };
 
-export type VideoRuntimeRepository = {
+export type VideoRuntimeRepository = ProgressRepository & {
+  runInTransaction<T>(operation: () => Promise<T>): Promise<T>;
   findAssignmentForRuntime(input: {
     organizationId: string;
     assignmentId: string;
@@ -98,10 +99,6 @@ export type VideoRuntimeRepository = {
     lastWatchedAt: Date;
   }): Promise<VideoRuntimeLessonProgress>;
 };
-
-export type RecordVideoLearningEvent = (
-  event: LearningEventInput,
-) => Promise<RecordLearningEventResult>;
 
 export type VideoRuntimeLessonView = VideoRuntimeLesson & {
   progress: VideoRuntimeLessonProgress;
@@ -145,59 +142,63 @@ export async function launchVideoRuntime(
 export async function recordVideoProgress(
   input: RecordVideoProgressInput,
   repository: VideoRuntimeRepository,
-  recordLearningEvent: RecordVideoLearningEvent,
 ): Promise<RecordVideoProgressResult> {
-  const assignment = await loadNativeAssignment(input, repository);
-  const lesson = assignment.course.lessons.find((candidate) => candidate.id === input.lessonId);
+  return repository.runInTransaction(async () => {
+    const assignment = await loadNativeAssignment(input, repository);
+    const lesson = assignment.course.lessons.find((candidate) => candidate.id === input.lessonId);
 
-  if (!lesson) {
-    throw new Error("Video lesson was not found");
-  }
+    if (!lesson) {
+      throw new Error("Video lesson was not found");
+    }
 
-  const positionSecond = clampVideoSecond(
-    requireNonNegativeSecond(input.positionSecond, "Position"),
-    lesson.durationSeconds,
-  );
-  const watchedSecond = Math.max(
-    existingProgressForLesson(assignment.videoProgress, lesson.id).maxWatchedSecond,
-    clampVideoSecond(requireNonNegativeSecond(input.watchedSecond, "Watched second"), lesson.durationSeconds),
-  );
-  const completed = watchedSecond >= lesson.durationSeconds;
-  const lessonProgress = await repository.upsertLessonProgress({
-    organizationId: assignment.organizationId,
-    courseId: assignment.courseId,
-    assignmentId: assignment.id,
-    lessonId: lesson.id,
-    lastPositionSecond: positionSecond,
-    maxWatchedSecond: watchedSecond,
-    completed,
-    lastWatchedAt: input.occurredAt,
-  });
-  const nextProgress = replaceLessonProgress(assignment.videoProgress, lessonProgress);
-  const progressSummary = summarizeRequiredLessonProgress(assignment.course.lessons, nextProgress);
-  const eventType = progressSummary.percent >= 100 ? "COMPLETED" : "PROGRESS";
-
-  const eventResult = await recordLearningEvent({
-    organizationId: assignment.organizationId,
-    assignmentId: assignment.id,
-    source: "NATIVE",
-    type: eventType,
-    progressPercent: progressSummary.percent,
-    occurredAt: input.occurredAt,
-    rawPayload: {
+    const positionSecond = clampVideoSecond(
+      requireNonNegativeSecond(input.positionSecond, "Position"),
+      lesson.durationSeconds,
+    );
+    const watchedSecond = Math.max(
+      existingProgressForLesson(assignment.videoProgress, lesson.id).maxWatchedSecond,
+      clampVideoSecond(requireNonNegativeSecond(input.watchedSecond, "Watched second"), lesson.durationSeconds),
+    );
+    const completed = watchedSecond >= lesson.durationSeconds;
+    const lessonProgress = await repository.upsertLessonProgress({
+      organizationId: assignment.organizationId,
+      courseId: assignment.courseId,
+      assignmentId: assignment.id,
       lessonId: lesson.id,
-      positionSecond,
-      watchedSecond,
-      requiredLessonsCompleted: progressSummary.completedRequiredCount,
-      requiredLessonsTotal: progressSummary.requiredLessonCount,
-    },
-  });
+      lastPositionSecond: positionSecond,
+      maxWatchedSecond: watchedSecond,
+      completed,
+      lastWatchedAt: input.occurredAt,
+    });
+    const nextProgress = replaceLessonProgress(assignment.videoProgress, lessonProgress);
+    const progressSummary = summarizeRequiredLessonProgress(assignment.course.lessons, nextProgress);
+    const eventType = progressSummary.percent >= 100 ? "COMPLETED" : "PROGRESS";
 
-  return {
-    lessonProgress,
-    courseProgressPercent: progressSummary.percent,
-    completed: eventResult.completed,
-  };
+    const eventResult = await recordLearningEvent(
+      {
+        organizationId: assignment.organizationId,
+        assignmentId: assignment.id,
+        source: "NATIVE",
+        type: eventType,
+        progressPercent: progressSummary.percent,
+        occurredAt: input.occurredAt,
+        rawPayload: {
+          lessonId: lesson.id,
+          positionSecond,
+          watchedSecond,
+          requiredLessonsCompleted: progressSummary.completedRequiredCount,
+          requiredLessonsTotal: progressSummary.requiredLessonCount,
+        },
+      },
+      repository,
+    );
+
+    return {
+      lessonProgress,
+      courseProgressPercent: progressSummary.percent,
+      completed: eventResult.completed,
+    };
+  });
 }
 
 async function loadNativeAssignment(

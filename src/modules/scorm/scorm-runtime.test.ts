@@ -22,6 +22,7 @@ const assignment: ScormRuntimeAssignment = {
       id: "package_1",
       launchPath: "index.html",
       storageKey: "org/org_1/courses/course_1/scorm/package_1/policy.zip",
+      contentRootKey: "org/org_1/courses/course_1/scorm/package_1/content",
       manifestTitle: "Policy Orientation",
     },
   },
@@ -41,8 +42,28 @@ const assignment: ScormRuntimeAssignment = {
 
 class FakeScormRuntimeRepository implements ScormRuntimeRepository {
   assignment: ScormRuntimeAssignment | null = assignment;
+  transactions = 0;
+  failProgressUpdate = false;
   launched: Parameters<ScormRuntimeRepository["upsertLaunchRegistration"]>[0][] = [];
   commits: Parameters<ScormRuntimeRepository["saveRuntimeCommit"]>[0][] = [];
+  learningEvents: LearningEventInput[] = [];
+  progressUpdates: Parameters<ScormRuntimeRepository["saveProgressUpdate"]>[0]["progress"][] = [];
+
+  async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
+    this.transactions += 1;
+    const commits = structuredClone(this.commits);
+    const learningEvents = structuredClone(this.learningEvents);
+    const progressUpdates = structuredClone(this.progressUpdates);
+
+    try {
+      return await operation();
+    } catch (error) {
+      this.commits = commits;
+      this.learningEvents = learningEvents;
+      this.progressUpdates = progressUpdates;
+      throw error;
+    }
+  }
 
   async findAssignmentForRuntime(): Promise<ScormRuntimeAssignment | null> {
     return this.assignment ? structuredClone(this.assignment) : null;
@@ -50,7 +71,7 @@ class FakeScormRuntimeRepository implements ScormRuntimeRepository {
 
   async upsertLaunchRegistration(input: Parameters<ScormRuntimeRepository["upsertLaunchRegistration"]>[0]) {
     this.launched.push(input);
-    return { ...assignment.scormRegistration!, launchCount: input.launchCount };
+    return { ...assignment.scormRegistration!, launchCount: input.launchCount, sessionTimeSeconds: 0 };
   }
 
   async saveRuntimeCommit(input: Parameters<ScormRuntimeRepository["saveRuntimeCommit"]>[0]) {
@@ -67,6 +88,29 @@ class FakeScormRuntimeRepository implements ScormRuntimeRepository {
       lastLaunchedAt: now,
       lastCommittedAt: input.committedAt,
     };
+  }
+
+  async findAssignmentForProgress(): Promise<Awaited<ReturnType<ScormRuntimeRepository["findAssignmentForProgress"]>>> {
+    if (!this.assignment) {
+      return null;
+    }
+
+    return {
+      id: this.assignment.id,
+      organizationId: this.assignment.organizationId,
+      courseType: "SCORM_1_2",
+      status: "ASSIGNED",
+      currentProgressPercent: this.progressUpdates.at(-1)?.progressPercent ?? 0,
+    };
+  }
+
+  async saveProgressUpdate(input: Parameters<ScormRuntimeRepository["saveProgressUpdate"]>[0]): Promise<void> {
+    if (this.failProgressUpdate) {
+      throw new Error("Learning progress persistence failed");
+    }
+
+    this.learningEvents.push(input.event);
+    this.progressUpdates.push(input.progress);
   }
 }
 
@@ -119,7 +163,7 @@ describe("launchScormRegistration", () => {
     expect(result).toEqual({
       assignmentId: "assignment_1",
       packageId: "package_1",
-      launchUrl: "/scorm/org/org_1/courses/course_1/scorm/package_1/policy.zip/index.html",
+      launchUrl: "/scorm/org/org_1/courses/course_1/scorm/package_1/content/index.html",
       cmiData: { "cmi.core.lesson_status": "incomplete" },
       launchCount: 2,
     });
@@ -136,7 +180,6 @@ describe("launchScormRegistration", () => {
 describe("commitScormRuntime", () => {
   it("merges allowed CMI values and records SCORM progress below completion", async () => {
     const repository = createRepository();
-    const events: LearningEventInput[] = [];
 
     const result = await commitScormRuntime(
       {
@@ -152,10 +195,6 @@ describe("commitScormRuntime", () => {
         occurredAt: now,
       },
       repository,
-      async (event) => {
-        events.push(event);
-        return { progressPercent: event.progressPercent ?? 0, assignmentStatus: "IN_PROGRESS", completed: false };
-      },
     );
 
     expect(result.progressPercent).toBe(80);
@@ -171,7 +210,7 @@ describe("commitScormRuntime", () => {
         "cmi.suspend_data": "bookmark=page2",
       },
     });
-    expect(events[0]).toMatchObject({
+    expect(repository.learningEvents[0]).toMatchObject({
       source: "SCORM",
       type: "PROGRESS",
       progressPercent: 80,
@@ -183,7 +222,7 @@ describe("commitScormRuntime", () => {
       ["completed", "COMPLETED"],
       ["passed", "PASSED"],
     ] as const) {
-      const events: LearningEventInput[] = [];
+      const repository = createRepository();
 
       await commitScormRuntime(
         {
@@ -192,18 +231,131 @@ describe("commitScormRuntime", () => {
           cmiData: { "cmi.core.lesson_status": lessonStatus },
           occurredAt: now,
         },
-        createRepository(),
-        async (event) => {
-          events.push(event);
-          return { progressPercent: 100, assignmentStatus: "COMPLETED", completed: true };
-        },
+        repository,
       );
 
-      expect(events[0]).toMatchObject({
+      expect(repository.learningEvents[0]).toMatchObject({
         source: "SCORM",
         type: eventType,
         progressPercent: 100,
       });
     }
+  });
+
+  it("does not double-count repeated session time commits in the same launch", async () => {
+    const repeatedSessionAssignment = structuredClone(assignment);
+    repeatedSessionAssignment.scormRegistration = {
+      ...assignment.scormRegistration!,
+      cmiData: { "cmi.core.lesson_status": "incomplete", "cmi.core.session_time": "00:05:00" },
+      sessionTimeSeconds: 300,
+      totalTimeSeconds: 900,
+    };
+    const repository = createRepository({ assignment: repeatedSessionAssignment });
+
+    await commitScormRuntime(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        cmiData: { "cmi.core.session_time": "00:07:00" },
+        occurredAt: now,
+      },
+      repository,
+    );
+
+    expect(repository.commits[0]).toMatchObject({
+      sessionTimeSeconds: 420,
+      totalTimeSeconds: 1020,
+    });
+  });
+
+  it("rejects malformed session time without persisting runtime or learning progress", async () => {
+    const repository = createRepository();
+
+    await expect(
+      commitScormRuntime(
+        {
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+          cmiData: { "cmi.core.session_time": "99:99:99" },
+          occurredAt: now,
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Invalid SCORM 1.2 time");
+
+    expect(repository.commits).toEqual([]);
+    expect(repository.learningEvents).toEqual([]);
+  });
+
+  it("ignores incoming total time and persists the LMS-derived total", async () => {
+    const repository = createRepository();
+
+    await commitScormRuntime(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        cmiData: {
+          "cmi.core.session_time": "00:03:00",
+          "cmi.core.total_time": "99:00:00",
+        },
+        occurredAt: now,
+      },
+      repository,
+    );
+
+    expect(repository.commits[0]).toMatchObject({
+      sessionTimeSeconds: 180,
+      totalTimeSeconds: 180,
+    });
+    expect(repository.commits[0].cmiData).not.toHaveProperty("cmi.core.total_time");
+  });
+
+  it("keeps failed SCORM attempts with scores incomplete", async () => {
+    const repository = createRepository();
+
+    const result = await commitScormRuntime(
+      {
+        organizationId: "org_1",
+        assignmentId: "assignment_1",
+        cmiData: {
+          "cmi.core.lesson_status": "failed",
+          "cmi.core.score.raw": "85",
+        },
+        occurredAt: now,
+      },
+      repository,
+    );
+
+    expect(result.completed).toBe(false);
+    expect(repository.learningEvents[0]).toMatchObject({
+      type: "FAILED",
+      progressPercent: 85,
+    });
+    expect(repository.progressUpdates[0]).toMatchObject({
+      assignmentStatus: "IN_PROGRESS",
+      progressPercent: 85,
+    });
+  });
+
+  it("rolls back runtime commit when learning progress persistence fails", async () => {
+    const repository = createRepository();
+    repository.failProgressUpdate = true;
+
+    await expect(
+      commitScormRuntime(
+        {
+          organizationId: "org_1",
+          assignmentId: "assignment_1",
+          cmiData: { "cmi.core.lesson_status": "completed" },
+          occurredAt: now,
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Learning progress persistence failed");
+
+    expect(repository.transactions).toBe(1);
+    expect(repository.commits).toEqual([]);
+    expect(repository.learningEvents).toEqual([]);
+    expect(repository.progressUpdates).toEqual([]);
   });
 });
