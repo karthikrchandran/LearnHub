@@ -11,14 +11,72 @@ type CourseRuntimePageProps = {
 
 export default async function CourseRuntimePage({ params }: CourseRuntimePageProps) {
   const { slug, courseSlug } = await params;
-  await requireOrganizationMemberBySlug(slug);
+  const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
+  const { prisma } = await import("@/lib/prisma");
+  const learnerMembership = context.memberships.find(
+    (membership) =>
+      membership.organizationId === organizationId &&
+      membership.status === "ACTIVE" &&
+      membership.roles.includes("LEARNER"),
+  );
+  const assignment = learnerMembership
+    ? await prisma.courseAssignment.findFirst({
+        where: {
+          organizationId,
+          membershipId: learnerMembership.id,
+          course: {
+            slug: courseSlug,
+            type: "NATIVE_VIDEO",
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          progress: {
+            select: {
+              progressPercent: true,
+            },
+          },
+          course: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      })
+    : null;
 
-  return (
-    <main className="mx-auto grid min-h-screen max-w-7xl gap-6 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <section className="flex flex-col gap-4">
+  if (!assignment) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 px-6 py-10">
         <header>
           <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Learning runtime</p>
           <h1 className="text-3xl font-semibold text-slate-950">{courseSlug}</h1>
+        </header>
+        <section className="rounded-md border border-slate-200 p-4">
+          <h2 className="text-lg font-semibold text-slate-950">Assigned course required</h2>
+          <p className="mt-2 text-sm text-slate-600">Assigned course required to launch this runtime.</p>
+        </section>
+      </main>
+    );
+  }
+
+  const videoLaunchPath = `/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/video/launch`;
+  const videoProgressPath = `/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/video/progress`;
+
+  return (
+    <main
+      className="mx-auto grid min-h-screen max-w-7xl gap-6 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_22rem]"
+      data-video-launch-path={videoLaunchPath}
+      data-video-progress-path={videoProgressPath}
+    >
+      <section className="flex flex-col gap-4">
+        <header>
+          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Learning runtime</p>
+          <h1 className="text-3xl font-semibold text-slate-950">{assignment.course.title}</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {assignment.status} / {assignment.progress?.progressPercent ?? 0}%
+          </p>
         </header>
 
         <div className="flex aspect-video items-center justify-center rounded-md border border-slate-200 bg-slate-950 text-sm font-medium text-white">

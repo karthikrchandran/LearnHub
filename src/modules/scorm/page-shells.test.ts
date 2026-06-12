@@ -24,6 +24,10 @@ describe("SCORM page shells", () => {
     const page = readPage("src/app/org/[slug]/learn/[courseSlug]/scorm/page.tsx");
 
     expect(page).toContain("requireOrganizationMemberBySlug");
+    expect(page).toContain("data-scorm-launch-path");
+    expect(page).toContain("data-scorm-commit-path");
+    expect(page).toContain("/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/scorm/launch");
+    expect(page).toContain("Assigned course required to launch this runtime.");
     expect(page).toContain("SCORM player");
     expect(page).toContain("Launch");
     expect(page).toContain("Progress");
