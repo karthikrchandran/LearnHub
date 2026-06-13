@@ -54,9 +54,15 @@ describe("native video page shells", () => {
     expect(actions).toContain("createPrismaKnowledgeCheckRepository");
   });
 
-  it("keeps the legacy learner course page on the compatibility redirect", () => {
-    const page = readPage("src/app/org/[slug]/learn/[courseSlug]/page.tsx");
+  it("includes learner lesson runtime paths and panels", () => {
+    const page = readPage("src/app/org/[slug]/learn/courses/[courseSlug]/lessons/[lessonSlug]/page.tsx");
 
-    expect(page).toContain("redirect(`/org/${slug}/learn/courses/${courseSlug}`)");
+    expect(page).toContain("VideoPlayer");
+    expect(page).toContain("KnowledgeCheckPanel");
+    expect(page).toContain("data-video-launch-path");
+    expect(page).toContain("data-video-progress-path");
+    expect(page).toContain("/video/launch");
+    expect(page).toContain("/video/progress");
+    expect(page).toContain("/feedback");
   });
 });

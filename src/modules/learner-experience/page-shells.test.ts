@@ -210,6 +210,18 @@ describe("learner experience page shells", () => {
     expect(legacy).toContain("redirect(`/org/${slug}/learn/courses/${courseSlug}`)");
   });
 
+  it("wires learner lesson runtime with outline and knowledge check entry", () => {
+    const lesson = read("src/app/org/[slug]/learn/courses/[courseSlug]/lessons/[lessonSlug]/page.tsx");
+
+    expect(lesson).toContain("VideoPlayer");
+    expect(lesson).toContain("KnowledgeCheckPanel");
+    expect(lesson).toContain("findLesson");
+    expect(lesson).toContain("data-video-launch-path");
+    expect(lesson).toContain("Next up");
+    expect(lesson).toContain("Chapters");
+    expect(lesson).toContain("Transcript");
+  });
+
   it("hides the assessments nav link until the assessments route is active", () => {
     const coursesMarkup = renderToStaticMarkup(
       createElement(
