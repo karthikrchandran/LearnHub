@@ -7,6 +7,17 @@ const platformOwner: PostLoginRedirectContext = {
   memberships: [],
 };
 
+const platformOwnerLearner: PostLoginRedirectContext = {
+  isPlatformOwner: true,
+  memberships: [
+    {
+      organizationSlug: "acme",
+      status: "ACTIVE",
+      roles: ["LEARNER"],
+    },
+  ],
+};
+
 const orgAdmin: PostLoginRedirectContext = {
   isPlatformOwner: false,
   memberships: [
@@ -67,6 +78,10 @@ describe("post-login redirects", () => {
 
   it("sends platform owners to the platform workspace", () => {
     expect(resolvePostLoginRedirect(platformOwner)).toBe("/platform");
+  });
+
+  it("keeps platform owners on the platform workspace even with learner memberships", () => {
+    expect(resolvePostLoginRedirect(platformOwnerLearner)).toBe("/platform");
   });
 
   it("sends organization users to their first active organization workspace", () => {

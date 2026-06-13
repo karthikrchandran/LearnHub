@@ -31,8 +31,8 @@ export default function HomePage() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <PrimaryButton href="/login">Sign in to your school</PrimaryButton>
-            <PrimaryButton href="/org/acme/learn" variant="light">
-              Preview Acme demo
+            <PrimaryButton href="/login" variant="light">
+              Explore learner experience
             </PrimaryButton>
           </div>
         </div>

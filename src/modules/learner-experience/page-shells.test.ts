@@ -116,6 +116,8 @@ describe("learner experience page shells", () => {
     expect(home).toContain("Sign in to your school");
     expect(home).not.toContain("Commercial LMS foundation");
     expect(home).not.toContain("Acme workspace");
+    expect(home).not.toContain("/org/acme");
+    expect(home).not.toContain("Acme demo");
     expect(home).not.toContain("<nav");
     expect(login).toContain("Welcome back to LearnHub");
     expect(login).toContain("Use your organization credentials");
