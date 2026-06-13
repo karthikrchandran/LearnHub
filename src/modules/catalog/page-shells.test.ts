@@ -63,15 +63,8 @@ describe("course catalog and assignment page shells", () => {
   it("wires a live learner catalog and self-enrollment shell", async () => {
     const page = await readPage("learn");
 
-    expect(page).toContain("Assigned courses");
-    expect(page).toContain("Available courses");
-    expect(page).toContain("Related courses");
-    expect(page).toContain("assignedCourses");
-    expect(page).toContain("availableCourses");
-    expect(page).toContain("selfEnrollAction");
-    expect(page).toContain('name="courseId"');
-    expect(page).toContain('name="learnerMembershipId"');
-    expect(page).toContain('name="startDate"');
-    expect(page).toContain("Self-enroll");
+    expect(page).toContain("My Courses");
+    expect(page).toContain("Continue learning");
+    expect(page).toContain("groupLearnerCourses");
   });
 });

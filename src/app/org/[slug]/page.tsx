@@ -3,7 +3,8 @@ import {
   createPrismaDashboardRepository,
   getOrganizationDashboardSummary,
 } from "@/modules/organizations/dashboard";
-import Link from "next/link";
+import { PrimaryButton } from "@/app/ui/learnhub-components";
+import { redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +17,39 @@ type OrganizationPageProps = {
 
 export default async function OrganizationPage({ params }: OrganizationPageProps) {
   const { slug } = await params;
-  const { organizationId } = await requireOrganizationMemberBySlug(slug);
+  const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
+  const activeMembership = context.memberships.find(
+    (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
+  );
+  const roles = activeMembership?.roles ?? [];
+  const isLearnerOnly =
+    !context.isPlatformOwner &&
+    roles.includes("LEARNER") &&
+    !roles.some((role) => role === "ADMIN" || role === "MANAGER");
+
+  if (isLearnerOnly) {
+    redirect(`/org/${slug}/learn`);
+  }
+
+  const isAdminEntry = context.isPlatformOwner || roles.includes("ADMIN");
+  const managementEntry = isAdminEntry
+    ? {
+        body: "Manage catalog setup, assignments, users, branding, and notifications.",
+        href: `/org/${slug}/admin/catalog`,
+        title: "Admin console",
+      }
+    : {
+        body: "Assign courses, monitor direct-report progress, and keep team learning moving.",
+        href: `/org/${slug}/admin/assignments`,
+        title: "Manager workspace",
+      };
+
   const { prisma } = await import("@/lib/prisma");
   const summary = await getOrganizationDashboardSummary(
     { organizationId },
     createPrismaDashboardRepository(prisma),
   );
+
   const cards = [
     { label: "Assigned courses", value: summary.assignedCourses },
     { label: "In progress", value: summary.inProgressAssignments },
@@ -65,29 +93,48 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </div>
         ))}
       </section>
-      <nav className="flex flex-wrap gap-3 text-sm font-medium">
-        <Link href={`/org/${slug}/learn`} className="rounded-md border border-slate-300 px-3 py-2 text-slate-800">
-          Learning
-        </Link>
-        <Link href={`/org/${slug}/admin/users`} className="rounded-md border border-slate-300 px-3 py-2 text-slate-800">
-          Users
-        </Link>
-        <Link href={`/org/${slug}/admin/settings`} className="rounded-md border border-slate-300 px-3 py-2 text-slate-800">
-          Branding
-        </Link>
-        <Link
-          href={`/org/${slug}/admin/notifications`}
-          className="rounded-md border border-slate-300 px-3 py-2 text-slate-800"
-        >
-          Notifications
-        </Link>
-        <Link
-          href={`/org/${slug}/reports`}
-          className="rounded-md bg-[var(--organization-accent)] px-3 py-2 text-slate-950"
-        >
-          Reports
-        </Link>
-      </nav>
+      <section className="grid gap-4 md:grid-cols-3">
+        <article className="flex flex-col justify-between rounded-md border border-slate-200 bg-white p-5">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Courses</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">Learner experience</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Continue assigned courses, browse the catalog, and view certificates.
+            </p>
+          </div>
+          <div className="mt-5">
+            <PrimaryButton href={`/org/${slug}/learn`} variant="blue">
+              Learner experience
+            </PrimaryButton>
+          </div>
+        </article>
+        <article className="flex flex-col justify-between rounded-md border border-slate-200 bg-white p-5">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Management</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">{managementEntry.title}</h2>
+            <p className="mt-2 text-sm text-slate-600">{managementEntry.body}</p>
+          </div>
+          <div className="mt-5">
+            <PrimaryButton href={managementEntry.href} variant="light">
+              {managementEntry.title}
+            </PrimaryButton>
+          </div>
+        </article>
+        <article className="flex flex-col justify-between rounded-md border border-slate-200 bg-white p-5">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Insights</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">Reports</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Review learner progress, completion, scoring, timing, and credential trends.
+            </p>
+          </div>
+          <div className="mt-5">
+            <PrimaryButton href={`/org/${slug}/reports`} variant="light">
+              Reports
+            </PrimaryButton>
+          </div>
+        </article>
+      </section>
     </main>
   );
 }

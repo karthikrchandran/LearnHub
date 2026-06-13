@@ -33,9 +33,9 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-md border border-slate-200 p-5">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_16px_40px_rgba(22,34,58,0.08)]">
       <div className="space-y-2">
-        <label htmlFor="email" className="block text-sm font-medium text-slate-800">
+        <label htmlFor="email" className="block text-sm font-bold text-[var(--learnhub-ink)]">
           Email
         </label>
         <input
@@ -44,11 +44,11 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950"
+          className="w-full rounded-xl border border-[var(--learnhub-line)] px-3 py-2 text-sm text-[var(--learnhub-ink)] outline-none focus:border-[var(--learnhub-blue)] focus:ring-2 focus:ring-[var(--learnhub-blue)]/20"
         />
       </div>
       <div className="space-y-2">
-        <label htmlFor="password" className="block text-sm font-medium text-slate-800">
+        <label htmlFor="password" className="block text-sm font-bold text-[var(--learnhub-ink)]">
           Password
         </label>
         <input
@@ -57,18 +57,18 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950"
+          className="w-full rounded-xl border border-[var(--learnhub-line)] px-3 py-2 text-sm text-[var(--learnhub-ink)] outline-none focus:border-[var(--learnhub-blue)] focus:ring-2 focus:ring-[var(--learnhub-blue)]/20"
         />
       </div>
       {error ? (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-bold text-red-700">
           {error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-400"
+        className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-[var(--learnhub-ink)] px-4 text-sm font-bold text-white disabled:bg-slate-400"
       >
         {isSubmitting ? "Signing in..." : "Sign in"}
       </button>

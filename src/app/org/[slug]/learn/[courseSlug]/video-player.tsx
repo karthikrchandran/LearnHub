@@ -54,9 +54,10 @@ type VideoPlayerProps = {
   launchPath: string;
   progressPath: string;
   initialProgressPercent: number;
+  initialLessonId?: string;
 };
 
-export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }: VideoPlayerProps) {
+export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, initialLessonId }: VideoPlayerProps) {
   const [runtime, setRuntime] = useState<VideoRuntimeLaunch | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [positionSecond, setPositionSecond] = useState(0);
@@ -81,10 +82,15 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
           return;
         }
 
+        const initialLesson = initialLessonId
+          ? nextRuntime.lessons.find((lesson) => lesson.id === initialLessonId)
+          : null;
+        const nextLesson = initialLesson ?? nextRuntime.currentLesson;
+
         setRuntime(nextRuntime);
-        setSelectedLessonId(nextRuntime.currentLesson.id);
-        setPositionSecond(nextRuntime.currentLesson.progress.lastPositionSecond);
-        setWatchedSecond(nextRuntime.currentLesson.progress.maxWatchedSecond);
+        setSelectedLessonId(nextLesson.id);
+        setPositionSecond(nextLesson.progress.lastPositionSecond);
+        setWatchedSecond(nextLesson.progress.maxWatchedSecond);
         setProgressPercent(nextRuntime.courseProgressPercent);
         setStatusMessage("Player ready");
       } catch (error) {
@@ -99,7 +105,7 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
     return () => {
       active = false;
     };
-  }, [launchPath]);
+  }, [initialLessonId, launchPath]);
 
   const currentLesson = useMemo(() => {
     if (!runtime) {
@@ -158,6 +164,8 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
     );
   }
 
+  const playbackUrl = playablePlaybackUrl(currentLesson.playbackUrl);
+
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="flex flex-col gap-4">
@@ -169,11 +177,11 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
           </p>
         </header>
 
-        {currentLesson.playbackUrl ? (
+        {playbackUrl ? (
           <video
             controls
             className="aspect-video w-full rounded-md bg-slate-950"
-            src={currentLesson.playbackUrl}
+            src={playbackUrl}
             onTimeUpdate={(event) => updateVideoPosition(event.currentTarget.currentTime)}
             onLoadedMetadata={(event) => {
               event.currentTarget.currentTime = currentLesson.progress.lastPositionSecond;
@@ -258,6 +266,24 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
       </aside>
     </section>
   );
+}
+
+function playablePlaybackUrl(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (url.hostname === "video.learnhub.local") {
+      return null;
+    }
+
+    return value;
+  } catch {
+    return null;
+  }
 }
 
 function formatSeconds(value: number): string {
