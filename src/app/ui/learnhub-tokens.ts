@@ -16,6 +16,15 @@ export const learnhubColors = {
 
 export type CourseTone = "blue" | "teal" | "green" | "amber" | "rose" | "violet";
 
+export const learnhubToneClasses: Record<CourseTone, string> = {
+  blue: "bg-[var(--learnhub-blue)] text-[var(--learnhub-surface)]",
+  teal: "bg-[var(--learnhub-teal)] text-[var(--learnhub-ink)]",
+  green: "bg-[var(--learnhub-green)] text-[var(--learnhub-surface)]",
+  amber: "bg-[var(--learnhub-amber)] text-[var(--learnhub-ink)]",
+  rose: "bg-[var(--learnhub-rose)] text-[var(--learnhub-surface)]",
+  violet: "bg-[var(--learnhub-violet)] text-[var(--learnhub-surface)]",
+};
+
 const categoryToneMap: Record<string, CourseTone> = {
   compliance: "blue",
   security: "teal",

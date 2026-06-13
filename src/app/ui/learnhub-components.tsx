@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { courseGradientForCategory } from "./learnhub-tokens";
+import { courseGradientForCategory, learnhubToneClasses, type CourseTone } from "./learnhub-tokens";
 
 type NavItem = {
   label: string;
@@ -62,13 +62,14 @@ export function LearnerAppShell({
     <main className="min-h-screen bg-[var(--learnhub-app)]">
       <div className="grid min-h-screen lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="bg-[var(--learnhub-ink)] px-4 py-6 text-slate-300">
-          <div className="mb-8 flex items-center gap-3 text-lg font-black text-white">
+          <div className="mb-8 flex min-w-0 items-center gap-3 text-lg font-black text-white">
             <BrandMark label={organizationName} />
-            {organizationName}
+            <span className="min-w-0 truncate">{organizationName}</span>
           </div>
           <nav className="grid gap-2">
             {navItems.map((item) => (
               <Link
+                aria-current={item.active ? "page" : undefined}
                 key={item.href}
                 className={
                   item.active
@@ -88,23 +89,21 @@ export function LearnerAppShell({
   );
 }
 
-export function Badge({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "teal" | "green" | "amber" | "rose" }) {
-  const classes = {
-    blue: "bg-blue-50 text-blue-800",
-    teal: "bg-teal-50 text-teal-800",
-    green: "bg-green-50 text-green-800",
-    amber: "bg-amber-50 text-amber-800",
-    rose: "bg-rose-50 text-rose-800",
-  };
-
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${classes[tone]}`}>{children}</span>;
+export function Badge({ children, tone = "blue" }: { children: ReactNode; tone?: CourseTone }) {
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${learnhubToneClasses[tone]}`}>{children}</span>;
 }
 
 export function ProgressBar({ value }: { value: number }) {
-  const safeValue = Math.min(100, Math.max(0, value));
+  const safeValue = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
 
   return (
-    <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+    <div
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={safeValue}
+      className="h-2.5 overflow-hidden rounded-full bg-slate-200"
+      role="progressbar"
+    >
       <span className="block h-full rounded-full bg-[var(--learnhub-teal)]" style={{ width: `${safeValue}%` }} />
     </div>
   );
@@ -113,7 +112,7 @@ export function ProgressBar({ value }: { value: number }) {
 export function CourseCover({ title, categorySlug }: { title: string; categorySlug?: string | null }) {
   return (
     <div className={`flex h-32 items-end bg-gradient-to-br ${courseGradientForCategory(categorySlug)} p-4 text-white`}>
-      <h3 className="text-xl font-black leading-tight">{title}</h3>
+      <p className="line-clamp-2 min-w-0 break-words text-xl font-black leading-tight">{title}</p>
     </div>
   );
 }
@@ -137,9 +136,9 @@ export function CourseCard({
     <article className="overflow-hidden rounded-2xl border border-[var(--learnhub-line)] bg-white shadow-[0_16px_40px_rgba(22,34,58,0.08)]">
       <CourseCover title={title} categorySlug={categorySlug} />
       <div className="grid min-h-56 gap-3 p-4">
-        <div>
-          <h3 className="text-lg font-black text-[var(--learnhub-ink)]">{title}</h3>
-          <p className="mt-2 text-sm text-[var(--learnhub-muted)]">{description}</p>
+        <div className="min-w-0">
+          <h3 className="min-w-0 break-words text-lg font-black text-[var(--learnhub-ink)]">{title}</h3>
+          <p className="mt-2 min-w-0 break-words text-sm text-[var(--learnhub-muted)]">{description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {meta.map((item) => (
@@ -187,9 +186,9 @@ export function CertificateCard({
       <div className="grid h-20 place-items-center rounded-2xl bg-gradient-to-br from-[#f5b544] to-[#235bdb] text-sm font-black text-white">
         {locked ? "LOCKED" : "CERT"}
       </div>
-      <div>
-        <h3 className="text-lg font-black text-[var(--learnhub-ink)]">{title}</h3>
-        <p className="mt-1 text-sm text-[var(--learnhub-muted)]">{body}</p>
+      <div className="min-w-0">
+        <h3 className="min-w-0 break-words text-lg font-black text-[var(--learnhub-ink)]">{title}</h3>
+        <p className="mt-1 min-w-0 break-words text-sm text-[var(--learnhub-muted)]">{body}</p>
       </div>
       <div>{action}</div>
     </article>

@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
+import { Badge, ProgressBar } from "@/app/ui/learnhub-components";
+import { courseGradientForCategory, courseToneForCategory } from "@/app/ui/learnhub-tokens";
 
 const root = process.cwd();
 
@@ -27,5 +32,39 @@ describe("learner experience page shells", () => {
     expect(globals).toContain("--learnhub-ink");
     expect(globals).toContain("--learnhub-blue");
     expect(globals).toContain("--learnhub-teal");
+  });
+
+  it("maps course categories to stable LearnHub tones and gradients", () => {
+    expect(courseToneForCategory("security")).toBe("teal");
+    expect(courseToneForCategory("customer-care")).toBe("violet");
+    expect(courseToneForCategory("missing")).toBe("blue");
+    expect(courseToneForCategory(null)).toBe("blue");
+    expect(courseGradientForCategory("customer-care")).toBe("from-[#7457d5] to-[#235bdb]");
+  });
+
+  it("renders tone-aware badges with the shared LearnHub palette", () => {
+    const markup = renderToStaticMarkup(createElement(Badge, { tone: "violet" }, "Customer care"));
+
+    expect(markup).toContain("var(--learnhub-violet)");
+    expect(markup).toContain("var(--learnhub-surface)");
+  });
+
+  it("renders accessible progress with finite clamped values", () => {
+    const negativeMarkup = renderToStaticMarkup(createElement(ProgressBar, { value: -10 }));
+    const overflowMarkup = renderToStaticMarkup(createElement(ProgressBar, { value: 140 }));
+    const nanMarkup = renderToStaticMarkup(createElement(ProgressBar, { value: Number.NaN }));
+    const infinityMarkup = renderToStaticMarkup(createElement(ProgressBar, { value: Number.POSITIVE_INFINITY }));
+
+    expect(negativeMarkup).toContain('role="progressbar"');
+    expect(negativeMarkup).toContain('aria-valuemin="0"');
+    expect(negativeMarkup).toContain('aria-valuemax="100"');
+    expect(negativeMarkup).toContain('aria-valuenow="0"');
+    expect(negativeMarkup).toContain("width:0%");
+    expect(overflowMarkup).toContain('aria-valuenow="100"');
+    expect(overflowMarkup).toContain("width:100%");
+    expect(nanMarkup).toContain('aria-valuenow="0"');
+    expect(nanMarkup).toContain("width:0%");
+    expect(infinityMarkup).toContain('aria-valuenow="0"');
+    expect(infinityMarkup).toContain("width:0%");
   });
 });
