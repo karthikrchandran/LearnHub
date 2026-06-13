@@ -90,7 +90,7 @@ export function LearnerAppShell({
 }
 
 export function Badge({ children, tone = "blue" }: { children: ReactNode; tone?: CourseTone }) {
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${learnhubToneClasses[tone]}`}>{children}</span>;
+  return <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${learnhubToneClasses[tone]}`}>{children}</span>;
 }
 
 export function ProgressBar({ value }: { value: number }) {
@@ -183,7 +183,7 @@ export function CertificateCard({
 }) {
   return (
     <article className="grid gap-4 rounded-2xl border border-[var(--learnhub-line)] bg-white p-4 shadow-[0_14px_36px_rgba(22,34,58,0.07)] md:grid-cols-[6rem_minmax(0,1fr)_auto] md:items-center">
-      <div className="grid h-20 place-items-center rounded-2xl bg-gradient-to-br from-[#f5b544] to-[#235bdb] text-sm font-black text-white">
+      <div className="grid h-20 place-items-center rounded-2xl border border-[var(--learnhub-amber)] bg-[var(--learnhub-paper)] text-sm font-black text-[var(--learnhub-ink)] shadow-inner">
         {locked ? "LOCKED" : "CERT"}
       </div>
       <div className="min-w-0">

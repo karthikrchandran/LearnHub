@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Badge, ProgressBar } from "@/app/ui/learnhub-components";
+import { Badge, CertificateCard, ProgressBar } from "@/app/ui/learnhub-components";
 import { courseGradientForCategory, courseToneForCategory } from "@/app/ui/learnhub-tokens";
 
 const root = process.cwd();
@@ -46,7 +46,34 @@ describe("learner experience page shells", () => {
     const markup = renderToStaticMarkup(createElement(Badge, { tone: "violet" }, "Customer care"));
 
     expect(markup).toContain("var(--learnhub-violet)");
-    expect(markup).toContain("var(--learnhub-surface)");
+    expect(markup).toContain("var(--learnhub-ink)");
+  });
+
+  it("keeps every badge tone on a contrast-safe small-text contract", () => {
+    const tones = ["blue", "teal", "green", "amber", "rose", "violet"] as const;
+
+    for (const tone of tones) {
+      const markup = renderToStaticMarkup(createElement(Badge, { tone }, tone));
+
+      expect(markup).toContain("text-[var(--learnhub-ink)]");
+      expect(markup).toContain("border-[");
+      expect(markup).not.toContain("text-[var(--learnhub-surface)]");
+      expect(markup).not.toContain("text-white");
+    }
+  });
+
+  it("renders certificate stamp text on a contrast-safe surface", () => {
+    const markup = renderToStaticMarkup(
+      createElement(CertificateCard, {
+        action: createElement("span", null, "View"),
+        body: "Completed on Jun 12",
+        title: "Privacy Basics",
+      }),
+    );
+
+    expect(markup).toContain("bg-[var(--learnhub-paper)]");
+    expect(markup).toContain("text-[var(--learnhub-ink)]");
+    expect(markup).not.toContain("text-white");
   });
 
   it("renders accessible progress with finite clamped values", () => {

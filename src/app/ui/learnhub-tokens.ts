@@ -17,12 +17,12 @@ export const learnhubColors = {
 export type CourseTone = "blue" | "teal" | "green" | "amber" | "rose" | "violet";
 
 export const learnhubToneClasses: Record<CourseTone, string> = {
-  blue: "bg-[var(--learnhub-blue)] text-[var(--learnhub-surface)]",
-  teal: "bg-[var(--learnhub-teal)] text-[var(--learnhub-ink)]",
-  green: "bg-[var(--learnhub-green)] text-[var(--learnhub-surface)]",
-  amber: "bg-[var(--learnhub-amber)] text-[var(--learnhub-ink)]",
-  rose: "bg-[var(--learnhub-rose)] text-[var(--learnhub-surface)]",
-  violet: "bg-[var(--learnhub-violet)] text-[var(--learnhub-surface)]",
+  blue: "border-[var(--learnhub-blue)] bg-[color-mix(in_srgb,var(--learnhub-blue)_12%,white)] text-[var(--learnhub-ink)]",
+  teal: "border-[var(--learnhub-teal)] bg-[color-mix(in_srgb,var(--learnhub-teal)_14%,white)] text-[var(--learnhub-ink)]",
+  green: "border-[var(--learnhub-green)] bg-[color-mix(in_srgb,var(--learnhub-green)_12%,white)] text-[var(--learnhub-ink)]",
+  amber: "border-[var(--learnhub-amber)] bg-[color-mix(in_srgb,var(--learnhub-amber)_18%,white)] text-[var(--learnhub-ink)]",
+  rose: "border-[var(--learnhub-rose)] bg-[color-mix(in_srgb,var(--learnhub-rose)_12%,white)] text-[var(--learnhub-ink)]",
+  violet: "border-[var(--learnhub-violet)] bg-[color-mix(in_srgb,var(--learnhub-violet)_12%,white)] text-[var(--learnhub-ink)]",
 };
 
 const categoryToneMap: Record<string, CourseTone> = {
