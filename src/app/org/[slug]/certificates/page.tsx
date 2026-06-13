@@ -40,10 +40,12 @@ export default async function CertificatesPage({ params }: CertificatesPageProps
   if (!learnerMembership) {
     return (
       <LearnerAppShell organizationName={organization.name} slug={slug} active="certificates">
-        <div className="mx-auto grid max-w-7xl gap-6">
-          <header>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Certificate wallet</p>
-            <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Your earned credentials.</h1>
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">Certificate wallet</p>
+              <h1>Your earned credentials.</h1>
+            </div>
           </header>
           <EmptyActionState
             body="Sign in with an active learner membership to view earned certificates and upcoming credentials."
@@ -68,13 +70,13 @@ export default async function CertificatesPage({ params }: CertificatesPageProps
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="certificates">
-      <div className="mx-auto grid max-w-7xl gap-6">
-        <header>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Certificate wallet</p>
-          <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Your earned credentials.</h1>
-          <p className="mt-3 max-w-3xl text-base text-[var(--learnhub-muted-strong)]">
-            Verify completed certificates, download issued artifacts, and see which course credentials are still locked.
-          </p>
+      <div className="lh-main-inner">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Certificate wallet</p>
+            <h1>Your earned credentials.</h1>
+            <p>Verify completed certificates, download issued artifacts, and see which credentials are still locked.</p>
+          </div>
         </header>
 
         <section className="grid gap-4 md:grid-cols-3">
@@ -101,7 +103,7 @@ export default async function CertificatesPage({ params }: CertificatesPageProps
               title="No certificates earned yet"
             />
           ) : (
-            <div className="grid gap-4">
+            <div className="lh-certificate-list">
               {certificates.map((certificate) => (
                 <EarnedCertificateCard certificate={certificate} key={certificate.id} />
               ))}
@@ -122,7 +124,7 @@ export default async function CertificatesPage({ params }: CertificatesPageProps
               title="No locked certificates"
             />
           ) : (
-            <div className="grid gap-4">
+            <div className="lh-certificate-list">
               {lockedCertificates.map((certificate) => (
                 <CertificateCard
                   action={
@@ -161,7 +163,7 @@ function EarnedCertificateCard({ certificate }: { certificate: LearnerCertificat
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
+    <section className="lh-metric-card">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-muted-strong)]">{label}</p>
       <p className="mt-2 text-3xl font-black text-[var(--learnhub-ink)]">{value}</p>
     </section>

@@ -47,10 +47,12 @@ export default async function LessonPage({ params }: LessonPageProps) {
   if (!learnerMembership) {
     return (
       <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
-        <div className="mx-auto grid max-w-7xl gap-6">
-          <header>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Lesson runtime</p>
-            <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Learner access required</h1>
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">Lesson runtime</p>
+              <h1>Learner access required</h1>
+            </div>
           </header>
           <EmptyActionState
             body="Sign in with an active learner membership to launch lessons, save progress, and submit course feedback."
@@ -102,8 +104,8 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
-      <div className="mx-auto grid max-w-[92rem] gap-5">
-        <header className="rounded-2xl bg-[var(--learnhub-ink)] p-6 text-white shadow-[0_22px_60px_rgba(17,24,39,0.2)]">
+      <div className="lh-main-inner lh-main-wide">
+        <header className="lh-lesson-header">
           <Link
             className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-teal)]"
             href={`/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(courseSlug)}`}
@@ -120,7 +122,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
           </div>
         </header>
 
-        <div className="grid gap-5 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
+        <div className="lh-lesson-layout">
           <LessonOutline
             courseSlug={courseSlug}
             currentLessonId={lesson.id}
@@ -131,7 +133,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
           <main className="grid content-start gap-5">
             <section
-              className="rounded-2xl border border-slate-800 bg-slate-950 p-3 shadow-[0_22px_60px_rgba(15,23,42,0.24)]"
+              className="lh-video-box"
               data-video-launch-path={videoLaunchPath}
               data-video-progress-path={videoProgressPath}
             >
@@ -172,10 +174,12 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
 function AssignmentRequiredState({ slug, courseSlug, courseTitle }: { slug: string; courseSlug: string; courseTitle: string }) {
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
-      <header>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Lesson runtime</p>
-        <h1 className="mt-2 min-w-0 break-words text-4xl font-black text-[var(--learnhub-ink)]">{courseTitle}</h1>
+    <div className="lh-main-inner">
+      <header className="lh-main-head">
+        <div>
+          <p className="lh-eyebrow">Lesson runtime</p>
+          <h1>{courseTitle}</h1>
+        </div>
       </header>
       <EmptyActionState
         action={
@@ -214,7 +218,7 @@ function LessonOutline({
   const ungroupedLessons = lessons.filter((lesson) => !lesson.moduleId);
 
   return (
-    <aside className="grid content-start gap-4 rounded-2xl bg-[var(--learnhub-ink)] p-4 text-white">
+    <aside className="lh-lesson-outline">
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-teal)]">Course outline</p>
         <h2 className="mt-2 text-xl font-black text-white">Lessons</h2>
@@ -291,8 +295,8 @@ function LessonOutlineLinks({
 
 function LessonChapters({ chapters }: { chapters: CourseLesson["chapters"] }) {
   return (
-    <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
-      <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Chapters</p>
+    <section className="lh-aside-card">
+      <p className="lh-eyebrow">Chapters</p>
       <h2 className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">Chapters</h2>
       <div className="mt-4 grid gap-3">
         {chapters.length === 0 ? (
@@ -315,8 +319,8 @@ function LessonChapters({ chapters }: { chapters: CourseLesson["chapters"] }) {
 
 function LessonTranscript({ cues }: { cues: CourseLesson["transcriptCues"] }) {
   return (
-    <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
-      <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Transcript</p>
+    <section className="lh-aside-card">
+      <p className="lh-eyebrow">Transcript</p>
       <h2 className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">Transcript</h2>
       <div className="mt-4 grid gap-3">
         {cues.length === 0 ? (
@@ -348,8 +352,8 @@ function NextUpPanel({
   lessonProgress: CourseAssignment["videoProgress"][number] | null;
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
-      <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Next up</p>
+    <section className="lh-aside-card">
+      <p className="lh-eyebrow">Next up</p>
       {nextLesson ? (
         <>
           <h2 className="mt-2 min-w-0 break-words text-2xl font-black text-[var(--learnhub-ink)]">{nextLesson.title}</h2>

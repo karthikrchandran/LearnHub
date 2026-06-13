@@ -64,7 +64,7 @@ describe("course catalog and assignment page shells", () => {
     const page = await readPage("learn");
 
     expect(page).toContain("My Courses");
-    expect(page).toContain("Continue learning");
+    expect(page).toContain("lh-feature-panel");
     expect(page).toContain("groupLearnerCourses");
   });
 });

@@ -57,10 +57,12 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
   if (!learnerMembership) {
     return (
       <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
-        <div className="mx-auto grid max-w-7xl gap-6">
-          <header>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">My Courses</p>
-            <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Keep your learning moving.</h1>
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">My Courses</p>
+              <h1>Pick up where you left off.</h1>
+            </div>
           </header>
           <EmptyActionState
             body="Sign in with an active learner membership to view assigned courses, progress, and recommendations."
@@ -85,56 +87,58 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
     available: LearnerCourseView[];
   };
   const continueCourse = grouped.inProgress[0];
+  const featuredCourses = [
+    continueCourse,
+    grouped.assigned[0],
+    grouped.completed[0],
+    grouped.available[0],
+    ...courses,
+  ].filter((course): course is LearnerCourseView => Boolean(course));
+  const uniqueFeaturedCourses = Array.from(
+    new Map(featuredCourses.map((course) => [`${course.status}-${course.id}`, course])).values(),
+  ).slice(0, 3);
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
-      <div className="mx-auto grid max-w-7xl gap-6">
-        <header>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">My Courses</p>
-          <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Keep your learning moving.</h1>
-          <p className="mt-3 max-w-3xl text-base text-[var(--learnhub-muted-strong)]">
-            Track assigned work, resume active courses, and find recommended courses from your organization catalog.
-          </p>
+      <div className="lh-main-inner">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Welcome back</p>
+            <h1>Pick up where you left off.</h1>
+            <p>Assigned courses, active lessons, and certificates are ready when you are.</p>
+          </div>
+          <div className="lh-searchbar">Search my courses</div>
         </header>
 
         {continueCourse ? <ContinueLearningPanel course={continueCourse} slug={slug} /> : null}
 
-        <CourseSection
-          courses={grouped.assigned}
-          emptyActionHref={`/org/${slug}/learn/catalog`}
-          emptyActionLabel="Browse catalog"
-          emptyBody="New assignments from your manager or admin will appear here."
-          emptyTitle="No assigned courses"
-          slug={slug}
-          title="Assigned"
-        />
-        <CourseSection
-          courses={grouped.inProgress}
-          emptyActionHref={`/org/${slug}/learn/catalog`}
-          emptyActionLabel="Find another course"
-          emptyBody="Start an assigned or recommended course to see active progress here."
-          emptyTitle="No courses in progress"
-          slug={slug}
-          title="In Progress"
-        />
-        <CourseSection
-          courses={grouped.completed}
-          emptyActionHref={`/org/${slug}/certificates`}
-          emptyActionLabel="View certificates"
-          emptyBody="Completed courses and earned credentials will collect here."
-          emptyTitle="No completed courses"
-          slug={slug}
-          title="Completed"
-        />
-        <CourseSection
-          courses={grouped.available}
-          emptyActionHref={`/org/${slug}/learn/catalog`}
-          emptyActionLabel="Open catalog"
-          emptyBody="When published courses are available for your role, they will appear here."
-          emptyTitle="No recommended courses"
-          slug={slug}
-          title="Recommended"
-        />
+        {uniqueFeaturedCourses.length > 0 ? (
+          <div className="lh-grid-3">
+            {uniqueFeaturedCourses.map((course) => (
+              <CourseCard
+                action={<CourseActionButton course={course} slug={slug} />}
+                categorySlug={course.categorySlug}
+                description={course.description || "Course details will appear as your organization updates this catalog item."}
+                key={`${course.status}-${course.id}`}
+                label={courseLabel(course)}
+                meta={courseMeta(course)}
+                progressPercent={course.assignmentId ? course.progressPercent : undefined}
+                title={course.title}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyActionState
+            action={
+              <PrimaryButton href={`/org/${slug}/learn/catalog`} variant="light">
+                Browse catalog
+              </PrimaryButton>
+            }
+            body="Assigned and recommended courses will appear here as your organization publishes learning."
+            title="No courses yet"
+          />
+        )}
+
       </div>
     </LearnerAppShell>
   );
@@ -142,70 +146,37 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
 
 function ContinueLearningPanel({ course, slug }: { course: LearnerCourseView; slug: string }) {
   return (
-    <section className="grid gap-5 rounded-2xl bg-[var(--learnhub-ink)] p-6 text-white shadow-[0_20px_50px_rgba(17,24,39,0.18)] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    <section className="lh-feature-panel">
       <div className="min-w-0">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-teal)]">Resume next</p>
-        <h2 className="text-3xl font-black text-white">Continue learning</h2>
-        <p className="mt-2 min-w-0 break-words text-lg font-bold">{course.title}</p>
-        <p className="mt-2 max-w-3xl text-sm text-slate-300">{course.progressPercent}% complete</p>
+        <p className="lh-course-cover-label">In progress</p>
+        <h2>{course.title}</h2>
+        <p>Next lesson is ready. Complete the remaining lesson work and knowledge check to unlock your certificate.</p>
+        <div className="lh-feature-actions">
+          <CourseActionButton course={course} slug={slug} />
+          <PrimaryButton href={`/org/${slug}/learn/assessments`} variant="light">
+            View checks
+          </PrimaryButton>
+        </div>
       </div>
-      <CourseActionButton course={course} slug={slug} />
+      <div className="lh-progress-ring">{course.progressPercent}%</div>
     </section>
   );
 }
 
-function CourseSection({
-  title,
-  courses,
-  slug,
-  emptyTitle,
-  emptyBody,
-  emptyActionHref,
-  emptyActionLabel,
-}: {
-  title: string;
-  courses: LearnerCourseView[];
-  slug: string;
-  emptyTitle: string;
-  emptyBody: string;
-  emptyActionHref: string;
-  emptyActionLabel: string;
-}) {
-  return (
-    <section>
-      <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
-        <h2 className="text-2xl font-black text-[var(--learnhub-ink)]">{title}</h2>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[var(--learnhub-muted-strong)]">
-          {courses.length}
-        </span>
-      </div>
-      {courses.length === 0 ? (
-        <EmptyActionState
-          action={
-            <PrimaryButton href={emptyActionHref} variant="light">
-              {emptyActionLabel}
-            </PrimaryButton>
-          }
-          body={emptyBody}
-          title={emptyTitle}
-        />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {courses.map((course) => (
-            <CourseCard
-              action={<CourseActionButton course={course} slug={slug} />}
-              categorySlug={course.categorySlug}
-              description={course.description || "Course details will appear as your organization updates this catalog item."}
-              key={`${course.status}-${course.id}`}
-              meta={courseMeta(course)}
-              progressPercent={course.assignmentId ? course.progressPercent : undefined}
-              title={course.title}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
+function courseLabel(course: LearnerCourseView): string {
+  if (course.status === "IN_PROGRESS") {
+    return "In progress";
+  }
+
+  if (course.status === "COMPLETED") {
+    return "Completed";
+  }
+
+  if (course.status === "AVAILABLE") {
+    return "Available";
+  }
+
+  return "Assigned";
 }
 
 function CourseActionButton({ course, slug }: { course: LearnerCourseView; slug: string }) {

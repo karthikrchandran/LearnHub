@@ -62,11 +62,23 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="catalog">
-      <div className="mx-auto grid max-w-7xl gap-6">
-        <header>
-          <p>Course Catalog</p>
-          <h1>Find the next course for your role.</h1>
+      <div className="lh-main-inner">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Course Catalog</p>
+            <h1>Find the next course for your role.</h1>
+            <p>Browse recommended compliance, leadership, security, and certificate-ready courses.</p>
+          </div>
+          <div className="lh-searchbar">Search catalog</div>
         </header>
+
+        <div className="lh-filters" aria-label="Catalog filters">
+          <span className="lh-filter active">All</span>
+          <span className="lh-filter">Compliance</span>
+          <span className="lh-filter">Leadership</span>
+          <span className="lh-filter">Security</span>
+          <span className="lh-filter">Certificate eligible</span>
+        </div>
 
         {enrollmentError ? (
           <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800" role="alert">
@@ -85,7 +97,7 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
             title="No catalog courses right now"
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="lh-grid-3">
             {availableCourses.map((course) => (
               <CourseCard
                 action={
@@ -93,10 +105,7 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
                     <input type="hidden" name="courseId" value={course.id} />
                     <input type="hidden" name="learnerMembershipId" value={learnerMembership.id} />
                     <input type="hidden" name="startDate" value={today} />
-                    <button
-                      className="inline-flex min-h-10 items-center rounded-full border border-[var(--learnhub-line)] bg-white px-4 text-sm font-bold text-[var(--learnhub-ink)]"
-                      type="submit"
-                    >
+                    <button className="lh-button lh-button-light" type="submit">
                       Enroll
                     </button>
                   </form>
@@ -104,6 +113,7 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
                 categorySlug={course.category?.slug ?? null}
                 description={course.description || "Course details will appear as your organization updates this catalog item."}
                 key={course.id}
+                label="Available"
                 meta={courseMeta(course)}
                 title={course.title}
               />

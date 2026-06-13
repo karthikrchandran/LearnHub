@@ -40,6 +40,59 @@ describe("learner experience page shells", () => {
     expect(globals).toContain("--learnhub-teal");
   });
 
+  it("anchors learner pages to the approved mockup shell classes", () => {
+    const components = read("src/app/ui/learnhub-components.tsx");
+    const globals = read("src/app/globals.css");
+    const myCourses = read("src/app/org/[slug]/learn/page.tsx");
+    const catalog = read("src/app/org/[slug]/learn/catalog/page.tsx");
+    const overview = read("src/app/org/[slug]/learn/courses/[courseSlug]/page.tsx");
+    const lesson = read("src/app/org/[slug]/learn/courses/[courseSlug]/lessons/[lessonSlug]/page.tsx");
+    const assessments = read("src/app/org/[slug]/learn/assessments/page.tsx");
+    const certificates = read("src/app/org/[slug]/certificates/page.tsx");
+
+    for (const selector of [
+      ".lh-learner-shell",
+      ".lh-side",
+      ".lh-side-nav",
+      ".lh-main",
+      ".lh-main-head",
+      ".lh-searchbar",
+      ".lh-feature-panel",
+      ".lh-progress-ring",
+      ".lh-grid-3",
+      ".lh-learn-card",
+      ".lh-course-cover",
+      ".lh-course-hero",
+      ".lh-curriculum",
+      ".lh-lesson-layout",
+      ".lh-video-box",
+      ".lh-assessment-board",
+      ".lh-certificate",
+      ".lh-cert-badge",
+    ]) {
+      expect(globals).toContain(selector);
+    }
+
+    expect(components).toContain("lh-learner-shell");
+    expect(components).toContain("lh-side");
+    expect(components).toContain("lh-side-nav");
+    expect(components).toContain("Profile");
+    expect(components).toContain("lh-learn-card");
+    expect(components).toContain("lh-certificate");
+    expect(myCourses).toContain("lh-main-head");
+    expect(myCourses).toContain("lh-searchbar");
+    expect(myCourses).toContain("lh-feature-panel");
+    expect(myCourses).toContain("lh-progress-ring");
+    expect(myCourses).toContain("lh-grid-3");
+    expect(catalog).toContain("lh-filters");
+    expect(overview).toContain("lh-course-hero");
+    expect(overview).toContain("lh-curriculum");
+    expect(lesson).toContain("lh-lesson-layout");
+    expect(lesson).toContain("lh-video-box");
+    expect(assessments).toContain("lh-assessment-board");
+    expect(certificates).toContain("lh-certificate-list");
+  });
+
   it("maps course categories to stable LearnHub tones and gradients", () => {
     expect(courseToneForCategory("security")).toBe("teal");
     expect(courseToneForCategory("customer-care")).toBe("violet");
@@ -51,8 +104,8 @@ describe("learner experience page shells", () => {
   it("renders tone-aware badges with the shared LearnHub palette", () => {
     const markup = renderToStaticMarkup(createElement(BadgeForCreateElement, { tone: "violet" }, "Customer care"));
 
-    expect(markup).toContain("var(--learnhub-violet)");
-    expect(markup).toContain("var(--learnhub-ink)");
+    expect(markup).toContain("lh-tag");
+    expect(markup).toContain("lh-tag-violet");
   });
 
   it("keeps every badge tone on a contrast-safe small-text contract", () => {
@@ -61,8 +114,8 @@ describe("learner experience page shells", () => {
     for (const tone of tones) {
       const markup = renderToStaticMarkup(createElement(BadgeForCreateElement, { tone }, tone));
 
-      expect(markup).toContain("text-[var(--learnhub-ink)]");
-      expect(markup).toContain("border-[");
+      expect(markup).toContain("lh-tag");
+      expect(markup).toContain(`lh-tag-${tone}`);
       expect(markup).not.toContain("text-[var(--learnhub-surface)]");
       expect(markup).not.toContain("text-white");
     }
@@ -77,18 +130,16 @@ describe("learner experience page shells", () => {
       }),
     );
 
-    expect(markup).toContain("bg-[var(--learnhub-paper)]");
-    expect(markup).toContain("text-[var(--learnhub-ink)]");
+    expect(markup).toContain("lh-certificate");
+    expect(markup).toContain("lh-cert-badge");
     expect(markup).not.toContain("text-white");
   });
 
-  it("renders course cover titles above a reusable dark scrim", () => {
+  it("renders course cover titles on the approved mockup gradient cover", () => {
     const markup = renderToStaticMarkup(createElement(CourseCover, { categorySlug: "leadership", title: "Bright gradient course" }));
 
-    expect(markup).toContain("relative");
-    expect(markup).toContain("bg-black/45");
-    expect(markup).toContain("absolute inset-0");
-    expect(markup).toContain("relative z-10");
+    expect(markup).toContain("lh-course-cover");
+    expect(markup).toContain("lh-tone-amber");
     expect(markup).toContain("Bright gradient course");
   });
 
@@ -180,7 +231,7 @@ describe("learner experience page shells", () => {
     const catalog = read("src/app/org/[slug]/learn/catalog/page.tsx");
 
     expect(myCourses).toContain("My Courses");
-    expect(myCourses).toContain("Continue learning");
+    expect(myCourses).toContain("lh-feature-panel");
     expect(myCourses).toContain("groupLearnerCourses");
     expect(myCourses).toContain("LearnerAppShell");
     expect(myCourses).toContain("CourseCard");
@@ -224,7 +275,7 @@ describe("learner experience page shells", () => {
     expect(lesson).toContain("Transcript");
   });
 
-  it("hides the assessments nav link until the assessments route is active", () => {
+  it("renders the mockup sidebar nav with assessments and profile available everywhere", () => {
     const coursesMarkup = renderToStaticMarkup(
       createElement(
         LearnerAppShellForCreateElement,
@@ -240,7 +291,8 @@ describe("learner experience page shells", () => {
       ),
     );
 
-    expect(coursesMarkup).not.toContain("Assessments");
+    expect(coursesMarkup).toContain("Assessments");
+    expect(coursesMarkup).toContain("Profile");
     expect(assessmentsMarkup).toContain("Assessments");
     expect(assessmentsMarkup).toContain("/org/acme/learn/assessments");
   });

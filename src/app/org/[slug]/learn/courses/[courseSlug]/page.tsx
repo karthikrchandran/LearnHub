@@ -46,10 +46,12 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
   if (!learnerMembership) {
     return (
       <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
-        <div className="mx-auto grid max-w-7xl gap-6">
-          <header>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Course details</p>
-            <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Learner access required</h1>
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">Course details</p>
+              <h1>Learner access required</h1>
+            </div>
           </header>
           <EmptyActionState
             body="Sign in with an active learner membership to view course requirements, curriculum, and launch options."
@@ -88,18 +90,18 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
-      <div className="mx-auto grid max-w-7xl gap-6">
-        <section className="grid overflow-hidden rounded-2xl border border-[var(--learnhub-line)] bg-white shadow-[0_20px_50px_rgba(22,34,58,0.1)] lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="grid gap-5 p-6 lg:p-8">
+      <div className="lh-main-inner">
+        <section className="lh-course-hero">
+          <div className="lh-course-hero-copy">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Course details</p>
+              <p className="lh-eyebrow">Course details</p>
               <h1 className="mt-2 min-w-0 break-words text-4xl font-black text-[var(--learnhub-ink)]">{course.title}</h1>
-              <p className="mt-3 max-w-3xl text-base text-[var(--learnhub-muted-strong)]">
+              <p className="lh-card-copy">
                 {course.description || "Course details will appear as your organization updates this catalog item."}
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="lh-meta">
               <Badge>{formatCourseType(course.type)}</Badge>
               <Badge>{formatMinutes(course.expectedDurationMinutes)}</Badge>
               <Badge>{formatBusinessDays(course.estimatedCompletionBusinessDays)}</Badge>
@@ -140,10 +142,7 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
                     <input name="courseId" type="hidden" value={course.id} />
                     <input name="learnerMembershipId" type="hidden" value={learnerMembership.id} />
                     <input name="startDate" type="hidden" value={today} />
-                    <button
-                      className="inline-flex min-h-10 items-center justify-center rounded-full bg-[var(--learnhub-blue)] px-4 text-sm font-bold text-white"
-                      type="submit"
-                    >
+                    <button className="lh-button lh-button-blue" type="submit">
                       Enroll in course
                     </button>
                   </form>
@@ -158,7 +157,7 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
               />
             )}
           </div>
-          <CourseCover categorySlug={course.category?.slug ?? null} title={course.title} />
+          <CourseCover categorySlug={course.category?.slug ?? null} label={course.category?.name ?? "Course"} title={course.title} />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
@@ -170,15 +169,15 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
         <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
           <div className="grid gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Curriculum</p>
+              <p className="lh-eyebrow">Curriculum</p>
               <h2 className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">Lessons in this course</h2>
             </div>
             <CurriculumList courseSlug={courseSlug} lessons={course.videoLessons} modules={course.modules} slug={slug} />
           </div>
 
           <aside className="grid content-start gap-4">
-            <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">What you will earn</p>
+            <section className="lh-aside-card">
+              <p className="lh-eyebrow">What you will earn</p>
               <h2 className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">
                 {assignment?.certificate ? "Certificate earned" : "Certificate on completion"}
               </h2>
@@ -192,8 +191,8 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
               ) : null}
             </section>
 
-            <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Course details</p>
+            <section className="lh-aside-card">
+              <p className="lh-eyebrow">Course details</p>
               <dl className="mt-4 grid gap-3 text-sm">
                 <DetailRow label="Format" value={formatCourseType(course.type)} />
                 <DetailRow label="Duration" value={formatMinutes(course.expectedDurationMinutes)} />
@@ -232,12 +231,12 @@ function CurriculumList({
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="lh-curriculum">
       {modules.map((courseModule) => {
         const moduleLessons = lessons.filter((lesson) => lesson.moduleId === courseModule.id);
 
         return (
-          <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-4" key={courseModule.id}>
+          <section className="lh-curriculum-card" key={courseModule.id}>
             <h3 className="min-w-0 break-words text-lg font-black text-[var(--learnhub-ink)]">{courseModule.title}</h3>
             {moduleLessons.length === 0 ? (
               <p className="mt-2 text-sm text-[var(--learnhub-muted)]">Lessons are being prepared for this module.</p>
@@ -249,7 +248,7 @@ function CurriculumList({
       })}
 
       {ungroupedLessons.length > 0 ? (
-        <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-4">
+        <section className="lh-curriculum-card">
           <h3 className="text-lg font-black text-[var(--learnhub-ink)]">Additional lessons</h3>
           <LessonRows courseSlug={courseSlug} lessons={ungroupedLessons} slug={slug} />
         </section>
@@ -260,10 +259,10 @@ function CurriculumList({
 
 function LessonRows({ slug, courseSlug, lessons }: { slug: string; courseSlug: string; lessons: CourseLesson[] }) {
   return (
-    <div className="mt-3 divide-y divide-[var(--learnhub-line)]">
+    <div className="mt-3">
       {lessons.map((lesson) => (
         <Link
-          className="grid gap-2 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+          className="lh-lesson-row"
           href={`/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(courseSlug)}/lessons/${encodeURIComponent(lesson.slug)}`}
           key={lesson.id}
         >
@@ -282,7 +281,7 @@ function LessonRows({ slug, courseSlug, lessons }: { slug: string; courseSlug: s
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
+    <section className="lh-metric-card">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-muted-strong)]">{label}</p>
       <p className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">{value}</p>
       {detail ? <p className="mt-1 text-sm text-[var(--learnhub-muted)]">{detail}</p> : null}

@@ -47,10 +47,12 @@ export default async function AssessmentsPage({ params }: AssessmentsPageProps) 
   if (!learnerMembership) {
     return (
       <LearnerAppShell organizationName={organization.name} slug={slug} active="assessments">
-        <div className="mx-auto grid max-w-7xl gap-6">
-          <header>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Assessments</p>
-            <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Quizzes and knowledge checks.</h1>
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">Assessments</p>
+              <h1>Quizzes and knowledge checks.</h1>
+            </div>
           </header>
           <EmptyActionState
             body="Sign in with an active learner membership to view pending checks and submitted results."
@@ -72,13 +74,13 @@ export default async function AssessmentsPage({ params }: AssessmentsPageProps) 
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="assessments">
-      <div className="mx-auto grid max-w-7xl gap-6">
-        <header>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">Assessments</p>
-          <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Quizzes and knowledge checks.</h1>
-          <p className="mt-3 max-w-3xl text-base text-[var(--learnhub-muted-strong)]">
-            Review required checks first, then use completed results to revisit lessons that need another pass.
-          </p>
+      <div className="lh-main-inner">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Assessments</p>
+            <h1>Quizzes and knowledge checks.</h1>
+            <p>Review required checks first, then revisit submitted results when you need another pass.</p>
+          </div>
         </header>
 
         <section className="grid gap-4 md:grid-cols-3">
@@ -87,55 +89,46 @@ export default async function AssessmentsPage({ params }: AssessmentsPageProps) 
           <MetricCard label="Submitted attempts" value={String(completedAttempts.length)} />
         </section>
 
-        <section>
-          <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
-            <h2 className="text-2xl font-black text-[var(--learnhub-ink)]">Pending</h2>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[var(--learnhub-muted-strong)]">
-              {pendingChecks.length}
-            </span>
-          </div>
-          {pendingChecks.length === 0 ? (
-            <EmptyActionState
-              action={
-                <PrimaryButton href={`/org/${encodeURIComponent(slug)}/learn`} variant="light">
-                  Back to courses
-                </PrimaryButton>
-              }
-              body="All required checks currently have a correct attempt. New assigned checks will appear here."
-              title="All required checks completed"
-            />
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {pendingChecks.map((pending) => (
+        <section className="lh-assessment-board">
+          <div className="lh-question-list">
+            <div className="mb-1 flex min-w-0 items-center justify-between gap-3">
+              <h2 className="text-2xl font-black text-[var(--learnhub-ink)]">Pending</h2>
+              <span className="lh-tag">{pendingChecks.length}</span>
+            </div>
+            {pendingChecks.length === 0 ? (
+              <EmptyActionState
+                action={
+                  <PrimaryButton href={`/org/${encodeURIComponent(slug)}/learn`} variant="light">
+                    Back to courses
+                  </PrimaryButton>
+                }
+                body="All required checks currently have a correct attempt. New assigned checks will appear here."
+                title="All required checks completed"
+              />
+            ) : (
+              pendingChecks.map((pending) => (
                 <PendingCheckCard key={`${pending.assignment.id}-${pending.check.id}`} pending={pending} slug={slug} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
-            <h2 className="text-2xl font-black text-[var(--learnhub-ink)]">Completed</h2>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[var(--learnhub-muted-strong)]">
-              {completedAttempts.length}
-            </span>
+              ))
+            )}
           </div>
-          {completedAttempts.length === 0 ? (
-            <EmptyActionState
-              body="Submitted knowledge check results will appear here with score, result, submitted date, and feedback status."
-              title="No completed attempts yet"
-            />
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {completedAttempts.map((completed) => (
-                <CompletedAttemptCard
-                  completed={completed}
-                  key={completed.attempt.id}
-                  slug={slug}
-                />
-              ))}
+
+          <aside className="lh-question-list">
+            <div className="lh-aside-card">
+              <p className="lh-eyebrow">Completed</p>
+              <h2 className="text-2xl font-black text-[var(--learnhub-ink)]">{completedAttempts.length} submitted</h2>
+              <p className="lh-card-copy">Completed answers collect here with score, result, submission date, and feedback status.</p>
             </div>
-          )}
+            {completedAttempts.length === 0 ? (
+              <EmptyActionState
+                body="Submitted knowledge check results will appear here with score, result, submitted date, and feedback status."
+                title="No completed attempts yet"
+              />
+            ) : (
+              completedAttempts.map((completed) => (
+                <CompletedAttemptCard completed={completed} key={completed.attempt.id} slug={slug} />
+              ))
+            )}
+          </aside>
         </section>
       </div>
     </LearnerAppShell>
@@ -146,7 +139,7 @@ function PendingCheckCard({ pending, slug }: { pending: PendingCheck; slug: stri
   const retryNeeded = Boolean(pending.latestAttempt && !pending.latestAttempt.correct);
 
   return (
-    <article className="grid gap-4 rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
+    <article className="lh-question">
       <div className="flex flex-wrap gap-2">
         <Badge tone={retryNeeded ? "amber" : "blue"}>{retryNeeded ? "Retry needed" : "Not started"}</Badge>
         <Badge>{formatQuestionType(pending.check.questionType)}</Badge>
@@ -179,7 +172,7 @@ function PendingCheckCard({ pending, slug }: { pending: PendingCheck; slug: stri
 
 function CompletedAttemptCard({ completed, slug }: { completed: CompletedAttempt; slug: string }) {
   return (
-    <article className="grid gap-4 rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
+    <article className="lh-question">
       <div className="flex flex-wrap gap-2">
         <Badge tone={completed.attempt.correct ? "green" : "amber"}>
           {completed.attempt.correct ? "Correct" : "Review needed"}
@@ -213,7 +206,7 @@ function CompletedAttemptCard({ completed, slug }: { completed: CompletedAttempt
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-2xl border border-[var(--learnhub-line)] bg-white p-5 shadow-[0_14px_36px_rgba(22,34,58,0.07)]">
+    <section className="lh-metric-card">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-muted-strong)]">{label}</p>
       <p className="mt-2 text-3xl font-black text-[var(--learnhub-ink)]">{value}</p>
     </section>
