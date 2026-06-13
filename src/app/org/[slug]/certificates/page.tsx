@@ -149,7 +149,7 @@ function EarnedCertificateCard({ certificate }: { certificate: LearnerCertificat
     <CertificateCard
       action={
         <div className="flex flex-wrap gap-2">
-          <PrimaryButton href={certificate.verificationUrl} variant="light">Verify</PrimaryButton>
+          <PrimaryButton href={`/certificates/${encodeURIComponent(certificate.verificationCode)}`} variant="light">Verify</PrimaryButton>
           <PrimaryButton href={`/certificates/${encodeURIComponent(certificate.verificationCode)}/download`} variant="blue">Download</PrimaryButton>
         </div>
       }

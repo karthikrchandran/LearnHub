@@ -258,8 +258,9 @@ describe("learner experience page shells", () => {
     expect(certificates).toContain("repository.listCertificates({ organizationId, membershipId: learnerMembership.id })");
     expect(certificates).toContain("CertificateCard");
     expect(certificates).toContain("locked certificates");
-    expect(certificates).toContain('<PrimaryButton href={certificate.verificationUrl} variant="light">Verify</PrimaryButton>');
+    expect(certificates).toContain('<PrimaryButton href={`/certificates/${encodeURIComponent(certificate.verificationCode)}`} variant="light">Verify</PrimaryButton>');
     expect(certificates).toContain('<PrimaryButton href={`/certificates/${encodeURIComponent(certificate.verificationCode)}/download`} variant="blue">Download</PrimaryButton>');
+    expect(certificates).not.toContain('<PrimaryButton href={certificate.verificationUrl} variant="light">Verify</PrimaryButton>');
     expect(certificates).not.toContain(".filter((assignment) => assignment.certificate || assignment.course.credentialProvider)");
     expect(certificates).not.toContain(".filter((course) => course.credentialProvider)");
     expect(certificates).toContain("LearnHub certificate");
