@@ -247,15 +247,22 @@ describe("learner experience page shells", () => {
     const assessments = read("src/app/org/[slug]/learn/assessments/page.tsx");
     const certificates = read("src/app/org/[slug]/certificates/page.tsx");
 
-    expect(assessments).toContain("Quizzes and knowledge checks");
-    expect(assessments).toContain("listAssessments");
+    expect(assessments).toContain('active="assessments"');
+    expect(assessments).toContain("Quizzes and knowledge checks.");
+    expect(assessments).toContain("repository.listAssessments({ organizationId, membershipId: learnerMembership.id })");
     expect(assessments).toContain("Pending");
     expect(assessments).toContain("Completed");
     expect(assessments).toContain("LearnerAppShell");
+    expect(certificates).toContain('active="certificates"');
     expect(certificates).toContain("Certificate wallet");
-    expect(certificates).toContain("listCertificates");
+    expect(certificates).toContain("repository.listCertificates({ organizationId, membershipId: learnerMembership.id })");
     expect(certificates).toContain("CertificateCard");
     expect(certificates).toContain("locked certificates");
+    expect(certificates).toContain('<PrimaryButton href={certificate.verificationUrl} variant="light">Verify</PrimaryButton>');
+    expect(certificates).toContain('<PrimaryButton href={`/certificates/${encodeURIComponent(certificate.verificationCode)}/download`} variant="blue">Download</PrimaryButton>');
+    expect(certificates).not.toContain(".filter((assignment) => assignment.certificate || assignment.course.credentialProvider)");
+    expect(certificates).not.toContain(".filter((course) => course.credentialProvider)");
+    expect(certificates).toContain("LearnHub certificate");
     expect(certificates).not.toContain("<table");
   });
 });

@@ -190,7 +190,6 @@ function buildLockedCertificates({
 }): LockedCertificate[] {
   const assignedCertificates = assignments
     .filter((assignment) => !earnedCourseIds.has(assignment.courseId))
-    .filter((assignment) => assignment.certificate || assignment.course.credentialProvider)
     .map((assignment) => ({
       id: `assignment-${assignment.id}`,
       title: assignment.course.title,
@@ -201,11 +200,10 @@ function buildLockedCertificates({
 
   const availableCertificates = availableCourses
     .filter((course) => !earnedCourseIds.has(course.id))
-    .filter((course) => course.credentialProvider)
     .map((course) => ({
       id: `available-${course.id}`,
       title: course.title,
-      body: `${formatCourseType(course.type)} / ${course.expectedDurationMinutes} min / Certificate eligible when enrolled and completed.`,
+      body: `${formatCourseType(course.type)} / ${course.expectedDurationMinutes} min / ${credentialLabel(course.credentialProvider)} eligible when enrolled and completed.`,
       href: `/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(course.slug)}`,
       actionLabel: "View course",
     }));
