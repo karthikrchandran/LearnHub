@@ -168,4 +168,20 @@ describe("learner experience page shells", () => {
     expect(seed).not.toContain("Demo native video course foundation record.");
     expect(seed).not.toContain("Demo published course for manager assignment flows.");
   });
+
+  it("wires My Courses and Catalog learner pages", () => {
+    const myCourses = read("src/app/org/[slug]/learn/page.tsx");
+    const catalog = read("src/app/org/[slug]/learn/catalog/page.tsx");
+
+    expect(myCourses).toContain("My Courses");
+    expect(myCourses).toContain("Continue learning");
+    expect(myCourses).toContain("groupLearnerCourses");
+    expect(myCourses).toContain("LearnerAppShell");
+    expect(myCourses).toContain("CourseCard");
+    expect(catalog).toContain("Course Catalog");
+    expect(catalog).toContain("Find the next course for your role");
+    expect(catalog).toContain("selfEnrollFormAction");
+    expect(catalog).toContain("LearnerAppShell");
+    expect(catalog).not.toContain("No available published courses.");
+  });
 });
