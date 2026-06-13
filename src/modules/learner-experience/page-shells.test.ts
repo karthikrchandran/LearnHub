@@ -242,4 +242,20 @@ describe("learner experience page shells", () => {
     expect(assessmentsMarkup).toContain("Assessments");
     expect(assessmentsMarkup).toContain("/org/acme/learn/assessments");
   });
+
+  it("wires learner assessments and certificate wallet", () => {
+    const assessments = read("src/app/org/[slug]/learn/assessments/page.tsx");
+    const certificates = read("src/app/org/[slug]/certificates/page.tsx");
+
+    expect(assessments).toContain("Quizzes and knowledge checks");
+    expect(assessments).toContain("listAssessments");
+    expect(assessments).toContain("Pending");
+    expect(assessments).toContain("Completed");
+    expect(assessments).toContain("LearnerAppShell");
+    expect(certificates).toContain("Certificate wallet");
+    expect(certificates).toContain("listCertificates");
+    expect(certificates).toContain("CertificateCard");
+    expect(certificates).toContain("locked certificates");
+    expect(certificates).not.toContain("<table");
+  });
 });
