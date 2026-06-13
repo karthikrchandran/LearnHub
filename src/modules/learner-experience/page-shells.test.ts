@@ -193,15 +193,16 @@ describe("learner experience page shells", () => {
     expect(catalog).not.toContain("No available published courses.");
   });
 
-  it("keeps future course overview links compatible until the overview route ships", () => {
-    const compatibilityRoute = read("src/app/org/[slug]/learn/courses/[courseSlug]/page.tsx");
+  it("wires learner course overview and legacy course redirect", () => {
+    const overview = read("src/app/org/[slug]/learn/courses/[courseSlug]/page.tsx");
+    const legacy = read("src/app/org/[slug]/learn/[courseSlug]/page.tsx");
 
-    expect(compatibilityRoute).toContain("requireOrganizationMemberBySlug");
-    expect(compatibilityRoute).toContain("membershipId");
-    expect(compatibilityRoute).toContain("SCORM_1_2");
-    expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/${courseSlug}/scorm`)");
-    expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/${courseSlug}`)");
-    expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/catalog`)");
+    expect(overview).toContain("Course details");
+    expect(overview).toContain("What you will earn");
+    expect(overview).toContain("Curriculum");
+    expect(overview).toContain("LearnerAppShell");
+    expect(overview).toContain("findCourseOverview");
+    expect(legacy).toContain("redirect(`/org/${slug}/learn/courses/${courseSlug}`)");
   });
 
   it("hides the assessments nav link until the assessments route is active", () => {
