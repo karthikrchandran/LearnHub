@@ -1,17 +1,17 @@
 export const learnhubColors = {
-  ink: "#111827",
-  muted: "#667085",
-  mutedStrong: "#475467",
-  paper: "#fffaf0",
-  app: "#f6f8fb",
+  ink: "#0f172a",
+  muted: "#64748b",
+  mutedStrong: "#475569",
+  paper: "#f8fafc",
+  app: "#f1f5f9",
   surface: "#ffffff",
-  line: "#d7dce5",
-  blue: "#235bdb",
-  teal: "#12b8a6",
-  green: "#1b8a5a",
-  amber: "#f5b544",
-  rose: "#d94a64",
-  violet: "#7457d5",
+  line: "#cbd5e1",
+  blue: "#2563eb",
+  teal: "#60a5fa",
+  green: "#1d4ed8",
+  amber: "#93c5fd",
+  rose: "#1e3a8a",
+  violet: "#334155",
 } as const;
 
 export type CourseTone = "blue" | "teal" | "green" | "amber" | "rose" | "violet";
@@ -45,17 +45,17 @@ export function courseToneForCategory(categorySlug: string | null | undefined): 
 export function courseGradientForCategory(categorySlug: string | null | undefined): string {
   switch (courseToneForCategory(categorySlug)) {
     case "teal":
-      return "from-[#235bdb] to-[#12b8a6]";
+      return "from-[#1e3a8a] to-[#2563eb]";
     case "green":
-      return "from-[#1b8a5a] to-[#12b8a6]";
+      return "from-[#1d4ed8] to-[#60a5fa]";
     case "amber":
-      return "from-[#f5b544] to-[#d94a64]";
+      return "from-[#334155] to-[#2563eb]";
     case "rose":
-      return "from-[#d94a64] to-[#7457d5]";
+      return "from-[#1e40af] to-[#64748b]";
     case "violet":
-      return "from-[#7457d5] to-[#235bdb]";
+      return "from-[#1e3a8a] to-[#334155]";
     case "blue":
     default:
-      return "from-[#235bdb] to-[#12b8a6]";
+      return "from-[#1e3a8a] to-[#2563eb]";
   }
 }

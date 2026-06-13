@@ -26,10 +26,13 @@ describe("learner experience page shells", () => {
     const globals = read("src/app/globals.css");
 
     expect(tokens).toContain("learnhubColors");
-    expect(tokens).toContain("#111827");
-    expect(tokens).toContain("#235bdb");
-    expect(tokens).toContain("#12b8a6");
-    expect(tokens).toContain("#fffaf0");
+    expect(tokens).toContain("#0f172a");
+    expect(tokens).toContain("#1e3a8a");
+    expect(tokens).toContain("#2563eb");
+    expect(tokens).toContain("#93c5fd");
+    expect(tokens).not.toContain("#f5b544");
+    expect(tokens).not.toContain("#d94a64");
+    expect(tokens).not.toContain("#7457d5");
     expect(tokens).toContain("courseGradientForCategory");
     expect(components).toContain("LearnerAppShell");
     expect(components).toContain("CourseCard");
@@ -38,6 +41,11 @@ describe("learner experience page shells", () => {
     expect(globals).toContain("--learnhub-ink");
     expect(globals).toContain("--learnhub-blue");
     expect(globals).toContain("--learnhub-teal");
+    expect(globals).toContain("--learnhub-sky");
+    expect(globals).toContain("#93c5fd");
+    expect(globals).not.toContain("#f5b544");
+    expect(globals).not.toContain("#d94a64");
+    expect(globals).not.toContain("#7457d5");
   });
 
   it("anchors learner pages to the approved mockup shell classes", () => {
@@ -98,7 +106,8 @@ describe("learner experience page shells", () => {
     expect(courseToneForCategory("customer-care")).toBe("violet");
     expect(courseToneForCategory("missing")).toBe("blue");
     expect(courseToneForCategory(null)).toBe("blue");
-    expect(courseGradientForCategory("customer-care")).toBe("from-[#7457d5] to-[#235bdb]");
+    expect(courseGradientForCategory("customer-care")).toBe("from-[#1e3a8a] to-[#334155]");
+    expect(courseGradientForCategory("leadership")).toBe("from-[#334155] to-[#2563eb]");
   });
 
   it("renders tone-aware badges with the shared LearnHub palette", () => {
