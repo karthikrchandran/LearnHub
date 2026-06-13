@@ -196,7 +196,12 @@ describe("learner experience page shells", () => {
   it("keeps future course overview links compatible until the overview route ships", () => {
     const compatibilityRoute = read("src/app/org/[slug]/learn/courses/[courseSlug]/page.tsx");
 
+    expect(compatibilityRoute).toContain("requireOrganizationMemberBySlug");
+    expect(compatibilityRoute).toContain("membershipId");
+    expect(compatibilityRoute).toContain("SCORM_1_2");
+    expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/${courseSlug}/scorm`)");
     expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/${courseSlug}`)");
+    expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/catalog`)");
   });
 
   it("hides the assessments nav link until the assessments route is active", () => {
