@@ -108,9 +108,11 @@ const certificateStateSelect = {
 } satisfies Prisma.CertificateDefaultArgs;
 
 const knowledgeCheckAttemptSelect = {
-  orderBy: [{ questionId: "asc" }, { submittedAt: "desc" }],
+  orderBy: [{ questionId: "asc" }, { submittedAt: "desc" }, { attemptNumber: "desc" }],
   select: {
+    id: true,
     questionId: true,
+    attemptNumber: true,
     selectedAnswerIds: true,
     correct: true,
     scorePercent: true,

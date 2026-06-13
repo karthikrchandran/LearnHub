@@ -203,6 +203,7 @@ describe("Prisma learner experience repository", () => {
     const query = client.courseAssignment.findMany.mock.calls[0][0];
     const courseSelect = query.select.course.select;
     const checkSelect = courseSelect.knowledgeCheckQuestions.select;
+    const attemptSelect = query.select.knowledgeCheckAttempts.select;
 
     expect(query).toEqual(expect.objectContaining({
       where: {
@@ -240,6 +241,12 @@ describe("Prisma learner experience repository", () => {
     }));
     expect(courseSelect).not.toHaveProperty("modules");
     expect(courseSelect).not.toHaveProperty("videoLessons");
+    expect(attemptSelect).toEqual(expect.objectContaining({
+      id: true,
+      attemptNumber: true,
+      questionId: true,
+      submittedAt: true,
+    }));
     expectSafeAnswerSelect(checkSelect.answers);
   });
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CertificateCard, EmptyActionState, LearnerAppShell, PrimaryButton } from "@/app/ui/learnhub-components";
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 import { createPrismaLearnerExperienceRepository } from "@/modules/learner-experience/prisma-repository";
+import { buildLockedCertificates } from "@/modules/learner-experience/read-model";
 
 export const dynamic = "force-dynamic";
 
@@ -14,16 +15,6 @@ type CertificatesPageProps = {
 
 type LearnerExperienceRepository = ReturnType<typeof createPrismaLearnerExperienceRepository>;
 type LearnerCertificate = Awaited<ReturnType<LearnerExperienceRepository["listCertificates"]>>[number];
-type LearnerAssignment = Awaited<ReturnType<LearnerExperienceRepository["listLearnerAssignments"]>>[number];
-type AvailableCourse = Awaited<ReturnType<LearnerExperienceRepository["listAvailableCourses"]>>[number];
-
-type LockedCertificate = {
-  id: string;
-  title: string;
-  body: string;
-  href: string;
-  actionLabel: string;
-};
 
 export default async function CertificatesPage({ params }: CertificatesPageProps) {
   const { slug } = await params;
@@ -177,51 +168,6 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildLockedCertificates({
-  assignments,
-  availableCourses,
-  earnedCourseIds,
-  slug,
-}: {
-  assignments: LearnerAssignment[];
-  availableCourses: AvailableCourse[];
-  earnedCourseIds: Set<string>;
-  slug: string;
-}): LockedCertificate[] {
-  const assignedCertificates = assignments
-    .filter((assignment) => !earnedCourseIds.has(assignment.courseId))
-    .map((assignment) => ({
-      id: `assignment-${assignment.id}`,
-      title: assignment.course.title,
-      body: lockedAssignmentBody(assignment),
-      href: `/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(assignment.course.slug)}`,
-      actionLabel: assignment.status === "COMPLETED" ? "Review course" : "Continue course",
-    }));
-
-  const availableCertificates = availableCourses
-    .filter((course) => !earnedCourseIds.has(course.id))
-    .map((course) => ({
-      id: `available-${course.id}`,
-      title: course.title,
-      body: `${formatCourseType(course.type)} / ${course.expectedDurationMinutes} min / ${credentialLabel(course.credentialProvider)} eligible when enrolled and completed.`,
-      href: `/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(course.slug)}`,
-      actionLabel: "View course",
-    }));
-
-  return [...assignedCertificates, ...availableCertificates];
-}
-
-function lockedAssignmentBody(assignment: LearnerAssignment): string {
-  const dueDate = assignment.dueDate ? ` / Due ${formatDate(assignment.dueDate)}` : "";
-  const progress = assignment.progress?.progressPercent ?? (assignment.status === "COMPLETED" ? 100 : 0);
-
-  if (assignment.status === "COMPLETED") {
-    return `Completed / certificate issue pending / ${credentialLabel(assignment.course.credentialProvider)}`;
-  }
-
-  return `${formatAssignmentStatus(assignment.status)} / ${progress}% complete${dueDate} / ${credentialLabel(assignment.course.credentialProvider)}`;
-}
-
 function credentialStatus(certificate: LearnerCertificate): string {
   const issuance = certificate.credentialIssuances[0];
 
@@ -232,19 +178,11 @@ function credentialStatus(certificate: LearnerCertificate): string {
   return `${issuance.provider}: ${formatAssignmentStatus(issuance.status)}`;
 }
 
-function credentialLabel(provider: string | null): string {
-  return provider ? `${provider} credential` : "LearnHub certificate";
-}
-
 function formatAssignmentStatus(status: string): string {
   return status
     .split("_")
     .map((part) => part.slice(0, 1) + part.slice(1).toLowerCase())
     .join(" ");
-}
-
-function formatCourseType(type: string): string {
-  return type === "SCORM_1_2" ? "SCORM" : "Native video";
 }
 
 function formatDate(date: Date): string {

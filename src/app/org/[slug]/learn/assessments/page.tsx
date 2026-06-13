@@ -3,6 +3,12 @@ import { notFound } from "next/navigation";
 import { Badge, EmptyActionState, LearnerAppShell, PrimaryButton } from "@/app/ui/learnhub-components";
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 import { createPrismaLearnerExperienceRepository } from "@/modules/learner-experience/prisma-repository";
+import {
+  buildCompletedKnowledgeCheckAttempts,
+  buildPendingRequiredChecks,
+  type CompletedKnowledgeCheckAttempt,
+  type PendingRequiredCheck,
+} from "@/modules/learner-experience/read-model";
 
 export const dynamic = "force-dynamic";
 
@@ -14,20 +20,8 @@ type AssessmentsPageProps = {
 
 type LearnerExperienceRepository = ReturnType<typeof createPrismaLearnerExperienceRepository>;
 type AssessmentAssignment = Awaited<ReturnType<LearnerExperienceRepository["listAssessments"]>>[number];
-type AssessmentQuestion = AssessmentAssignment["course"]["knowledgeCheckQuestions"][number];
-type AssessmentAttempt = AssessmentAssignment["knowledgeCheckAttempts"][number];
-
-type PendingCheck = {
-  assignment: AssessmentAssignment;
-  check: AssessmentQuestion;
-  latestAttempt: AssessmentAttempt | null;
-};
-
-type CompletedAttempt = {
-  assignment: AssessmentAssignment;
-  check: AssessmentQuestion;
-  attempt: AssessmentAttempt;
-};
+type PendingCheck = PendingRequiredCheck<AssessmentAssignment>;
+type CompletedAttempt = CompletedKnowledgeCheckAttempt<AssessmentAssignment>;
 
 export default async function AssessmentsPage({ params }: AssessmentsPageProps) {
   const { slug } = await params;
@@ -68,8 +62,8 @@ export default async function AssessmentsPage({ params }: AssessmentsPageProps) 
   }
 
   const assessments = await repository.listAssessments({ organizationId, membershipId: learnerMembership.id });
-  const pendingChecks = pendingRequiredChecks(assessments);
-  const completedAttempts = completedKnowledgeCheckAttempts(assessments);
+  const pendingChecks = buildPendingRequiredChecks(assessments);
+  const completedAttempts = buildCompletedKnowledgeCheckAttempts(assessments);
   const requiredCount = assessments.reduce(
     (sum, assignment) => sum + assignment.course.knowledgeCheckQuestions.filter((check) => check.required).length,
     0,
@@ -136,7 +130,7 @@ export default async function AssessmentsPage({ params }: AssessmentsPageProps) 
               {completedAttempts.map((completed) => (
                 <CompletedAttemptCard
                   completed={completed}
-                  key={`${completed.assignment.id}-${completed.check.id}-${completed.attempt.submittedAt.toISOString()}`}
+                  key={completed.attempt.id}
                   slug={slug}
                 />
               ))}
@@ -233,37 +227,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 min-w-0 break-words font-bold text-[var(--learnhub-ink)]">{value}</dd>
     </div>
   );
-}
-
-function pendingRequiredChecks(assignments: AssessmentAssignment[]): PendingCheck[] {
-  return assignments.flatMap((assignment) =>
-    assignment.course.knowledgeCheckQuestions
-      .filter((check) => check.required)
-      .filter((check) => !assignment.knowledgeCheckAttempts.some((attempt) => attempt.questionId === check.id && attempt.correct))
-      .map((check) => ({
-        assignment,
-        check,
-        latestAttempt: latestAttemptForQuestion(assignment.knowledgeCheckAttempts, check.id),
-      })),
-  );
-}
-
-function completedKnowledgeCheckAttempts(assignments: AssessmentAssignment[]): CompletedAttempt[] {
-  return assignments
-    .flatMap((assignment) =>
-      assignment.knowledgeCheckAttempts.flatMap((attempt) => {
-        const check = assignment.course.knowledgeCheckQuestions.find((candidate) => candidate.id === attempt.questionId);
-
-        return check ? [{ assignment, check, attempt }] : [];
-      }),
-    )
-    .sort((left, right) => right.attempt.submittedAt.getTime() - left.attempt.submittedAt.getTime());
-}
-
-function latestAttemptForQuestion(attempts: AssessmentAttempt[], questionId: string): AssessmentAttempt | null {
-  return attempts
-    .filter((attempt) => attempt.questionId === questionId)
-    .sort((left, right) => right.submittedAt.getTime() - left.submittedAt.getTime())[0] ?? null;
 }
 
 function formatQuestionType(type: string): string {
