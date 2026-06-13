@@ -243,6 +243,7 @@ export function createPrismaLearnerExperienceRepository(client: LearnerExperienc
           organizationId: input.organizationId,
           slug: input.courseSlug,
           status: "PUBLISHED",
+          type: "NATIVE_VIDEO",
           videoLessons: { some: { slug: input.lessonSlug } },
         },
         select: {

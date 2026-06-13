@@ -165,6 +165,7 @@ describe("Prisma learner experience repository", () => {
       organizationId: "org_1",
       slug: "security",
       status: "PUBLISHED",
+      type: "NATIVE_VIDEO",
       videoLessons: { some: { slug: "spot-phishing" } },
     });
     expect(query.select.videoLessons).toEqual(expect.objectContaining({

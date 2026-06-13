@@ -54,9 +54,10 @@ type VideoPlayerProps = {
   launchPath: string;
   progressPath: string;
   initialProgressPercent: number;
+  initialLessonId?: string;
 };
 
-export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }: VideoPlayerProps) {
+export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, initialLessonId }: VideoPlayerProps) {
   const [runtime, setRuntime] = useState<VideoRuntimeLaunch | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [positionSecond, setPositionSecond] = useState(0);
@@ -81,10 +82,15 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
           return;
         }
 
+        const initialLesson = initialLessonId
+          ? nextRuntime.lessons.find((lesson) => lesson.id === initialLessonId)
+          : null;
+        const nextLesson = initialLesson ?? nextRuntime.currentLesson;
+
         setRuntime(nextRuntime);
-        setSelectedLessonId(nextRuntime.currentLesson.id);
-        setPositionSecond(nextRuntime.currentLesson.progress.lastPositionSecond);
-        setWatchedSecond(nextRuntime.currentLesson.progress.maxWatchedSecond);
+        setSelectedLessonId(nextLesson.id);
+        setPositionSecond(nextLesson.progress.lastPositionSecond);
+        setWatchedSecond(nextLesson.progress.maxWatchedSecond);
         setProgressPercent(nextRuntime.courseProgressPercent);
         setStatusMessage("Player ready");
       } catch (error) {
@@ -99,7 +105,7 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent }
     return () => {
       active = false;
     };
-  }, [launchPath]);
+  }, [initialLessonId, launchPath]);
 
   const currentLesson = useMemo(() => {
     if (!runtime) {

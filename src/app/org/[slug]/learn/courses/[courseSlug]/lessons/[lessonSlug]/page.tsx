@@ -22,7 +22,6 @@ type LessonCourse = NonNullable<Awaited<ReturnType<LearnerExperienceRepository["
 type CourseAssignment = LessonCourse["assignments"][number];
 type CourseLesson = LessonCourse["videoLessons"][number];
 type CourseModule = LessonCourse["modules"][number];
-type CourseKnowledgeCheck = LessonCourse["knowledgeCheckQuestions"][number];
 
 export default async function LessonPage({ params }: LessonPageProps) {
   const { slug, courseSlug, lessonSlug } = await params;
@@ -140,6 +139,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
                 launchPath={videoLaunchPath}
                 progressPath={videoProgressPath}
                 initialProgressPercent={progressPercent}
+                initialLessonId={lesson.id}
               />
             </section>
 
