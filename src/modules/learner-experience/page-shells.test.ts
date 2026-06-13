@@ -8,6 +8,8 @@ import { Badge, CertificateCard, CourseCover, ProgressBar } from "@/app/ui/learn
 import { courseGradientForCategory, courseToneForCategory } from "@/app/ui/learnhub-tokens";
 
 const root = process.cwd();
+type BadgeTone = NonNullable<Parameters<typeof Badge>[0]["tone"]>;
+const BadgeForCreateElement = Badge as (props: { children?: string; tone?: BadgeTone }) => ReturnType<typeof Badge>;
 
 function read(relativePath: string): string {
   return readFileSync(join(root, relativePath), "utf8");
@@ -43,7 +45,7 @@ describe("learner experience page shells", () => {
   });
 
   it("renders tone-aware badges with the shared LearnHub palette", () => {
-    const markup = renderToStaticMarkup(createElement(Badge, { tone: "violet" }, "Customer care"));
+    const markup = renderToStaticMarkup(createElement(BadgeForCreateElement, { tone: "violet" }, "Customer care"));
 
     expect(markup).toContain("var(--learnhub-violet)");
     expect(markup).toContain("var(--learnhub-ink)");
@@ -53,7 +55,7 @@ describe("learner experience page shells", () => {
     const tones = ["blue", "teal", "green", "amber", "rose", "violet"] as const;
 
     for (const tone of tones) {
-      const markup = renderToStaticMarkup(createElement(Badge, { tone }, tone));
+      const markup = renderToStaticMarkup(createElement(BadgeForCreateElement, { tone }, tone));
 
       expect(markup).toContain("text-[var(--learnhub-ink)]");
       expect(markup).toContain("border-[");
@@ -103,5 +105,22 @@ describe("learner experience page shells", () => {
     expect(nanMarkup).toContain("width:0%");
     expect(infinityMarkup).toContain('aria-valuenow="0"');
     expect(infinityMarkup).toContain("width:0%");
+  });
+
+  it("renders distinct public landing, login, and tenant entry surfaces", () => {
+    const home = read("src/app/page.tsx");
+    const login = read("src/app/login/page.tsx");
+    const org = read("src/app/org/[slug]/page.tsx");
+
+    expect(home).toContain("Launch branded learning programs");
+    expect(home).toContain("Sign in to your school");
+    expect(home).not.toContain("Commercial LMS foundation");
+    expect(home).not.toContain("Acme workspace");
+    expect(login).toContain("Welcome back to LearnHub");
+    expect(login).toContain("Use your organization credentials");
+    expect(org).toContain("Learner experience");
+    expect(org).toContain("Admin console");
+    expect(org).toContain("Reports");
+    expect(org).toContain("redirect(`/org/${slug}/learn`)");
   });
 });

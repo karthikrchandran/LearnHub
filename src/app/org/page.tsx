@@ -22,6 +22,7 @@ export default async function OrganizationRedirectPage() {
       memberships: {
         orderBy: { createdAt: "asc" },
         select: {
+          roles: true,
           status: true,
           organization: {
             select: {
@@ -40,6 +41,7 @@ export default async function OrganizationRedirectPage() {
             isPlatformOwner: user.isPlatformOwner,
             memberships: user.memberships.map((membership) => ({
               organizationSlug: membership.organization.slug,
+              roles: membership.roles,
               status: membership.status,
             })),
           }

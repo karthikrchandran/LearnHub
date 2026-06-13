@@ -27,6 +27,17 @@ const inactiveOrgMember: PostLoginRedirectContext = {
   ],
 };
 
+const learnerOnly: PostLoginRedirectContext = {
+  isPlatformOwner: false,
+  memberships: [
+    {
+      organizationSlug: "acme",
+      status: "ACTIVE",
+      roles: ["LEARNER"],
+    },
+  ],
+};
+
 describe("post-login redirects", () => {
   it("sends signed-out users back to login", () => {
     expect(resolvePostLoginRedirect(null)).toBe("/login");
@@ -42,5 +53,9 @@ describe("post-login redirects", () => {
 
   it("falls back to platform when the user has no active organization workspace", () => {
     expect(resolvePostLoginRedirect(inactiveOrgMember)).toBe("/platform");
+  });
+
+  it("sends learner-only users directly to My Courses", () => {
+    expect(resolvePostLoginRedirect(learnerOnly)).toBe("/org/acme/learn");
   });
 });
