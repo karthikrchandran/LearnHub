@@ -38,6 +38,28 @@ const learnerOnly: PostLoginRedirectContext = {
   ],
 };
 
+const learnerManager: PostLoginRedirectContext = {
+  isPlatformOwner: false,
+  memberships: [
+    {
+      organizationSlug: "acme",
+      status: "ACTIVE",
+      roles: ["LEARNER", "MANAGER"],
+    },
+  ],
+};
+
+const learnerAdmin: PostLoginRedirectContext = {
+  isPlatformOwner: false,
+  memberships: [
+    {
+      organizationSlug: "acme",
+      status: "ACTIVE",
+      roles: ["LEARNER", "ADMIN"],
+    },
+  ],
+};
+
 describe("post-login redirects", () => {
   it("sends signed-out users back to login", () => {
     expect(resolvePostLoginRedirect(null)).toBe("/login");
@@ -57,5 +79,13 @@ describe("post-login redirects", () => {
 
   it("sends learner-only users directly to My Courses", () => {
     expect(resolvePostLoginRedirect(learnerOnly)).toBe("/org/acme/learn");
+  });
+
+  it("sends learner managers to their organization workspace", () => {
+    expect(resolvePostLoginRedirect(learnerManager)).toBe("/org/acme");
+  });
+
+  it("sends learner admins to their organization workspace", () => {
+    expect(resolvePostLoginRedirect(learnerAdmin)).toBe("/org/acme");
   });
 });

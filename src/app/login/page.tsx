@@ -10,7 +10,7 @@ export default function LoginPage() {
           LearnHub
         </div>
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.14em] text-teal-200">Acme Learning</p>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-teal-200">Organization learning</p>
           <h1 className="mt-3 text-5xl font-black leading-tight">
             Return to your courses, assessments, and certificates.
           </h1>

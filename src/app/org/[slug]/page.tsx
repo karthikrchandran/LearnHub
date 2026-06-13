@@ -18,20 +18,37 @@ type OrganizationPageProps = {
 export default async function OrganizationPage({ params }: OrganizationPageProps) {
   const { slug } = await params;
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
+  const activeMembership = context.memberships.find(
+    (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
+  );
+  const roles = activeMembership?.roles ?? [];
+  const isLearnerOnly =
+    !context.isPlatformOwner &&
+    roles.includes("LEARNER") &&
+    !roles.some((role) => role === "ADMIN" || role === "MANAGER");
+
+  if (isLearnerOnly) {
+    redirect(`/org/${slug}/learn`);
+  }
+
+  const isAdminEntry = context.isPlatformOwner || roles.includes("ADMIN");
+  const managementEntry = isAdminEntry
+    ? {
+        body: "Manage catalog setup, assignments, users, branding, and notifications.",
+        href: `/org/${slug}/admin/catalog`,
+        title: "Admin console",
+      }
+    : {
+        body: "Assign courses, monitor direct-report progress, and keep team learning moving.",
+        href: `/org/${slug}/admin/assignments`,
+        title: "Manager workspace",
+      };
+
   const { prisma } = await import("@/lib/prisma");
   const summary = await getOrganizationDashboardSummary(
     { organizationId },
     createPrismaDashboardRepository(prisma),
   );
-  const activeMembership = context.memberships.find(
-    (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
-  );
-  const roles = activeMembership?.roles ?? [];
-  const isLearnerOnly = roles.includes("LEARNER") && !roles.some((role) => role === "ADMIN" || role === "MANAGER");
-
-  if (isLearnerOnly) {
-    redirect(`/org/${slug}/learn`);
-  }
 
   const cards = [
     { label: "Assigned courses", value: summary.assignedCourses },
@@ -94,14 +111,12 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
         <article className="flex flex-col justify-between rounded-md border border-slate-200 bg-white p-5">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Management</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Admin console</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Manage catalog setup, assignments, users, branding, and notifications.
-            </p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">{managementEntry.title}</h2>
+            <p className="mt-2 text-sm text-slate-600">{managementEntry.body}</p>
           </div>
           <div className="mt-5">
-            <PrimaryButton href={`/org/${slug}/admin/catalog`} variant="light">
-              Admin console
+            <PrimaryButton href={managementEntry.href} variant="light">
+              {managementEntry.title}
             </PrimaryButton>
           </div>
         </article>

@@ -8,14 +8,14 @@ export default function HomePage() {
           <BrandMark />
           LearnHub
         </div>
-        <nav className="hidden items-center gap-6 text-sm font-bold text-[var(--learnhub-muted-strong)] md:flex">
+        <div className="hidden items-center gap-6 text-sm font-bold text-[var(--learnhub-muted-strong)] md:flex">
           <span>Courses</span>
           <span>For teams</span>
           <span>Certificates</span>
           <PrimaryButton href="/login" variant="light">
             Sign in
           </PrimaryButton>
-        </nav>
+        </div>
       </header>
       <section className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-center">
         <div>

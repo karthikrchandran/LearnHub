@@ -116,11 +116,27 @@ describe("learner experience page shells", () => {
     expect(home).toContain("Sign in to your school");
     expect(home).not.toContain("Commercial LMS foundation");
     expect(home).not.toContain("Acme workspace");
+    expect(home).not.toContain("<nav");
     expect(login).toContain("Welcome back to LearnHub");
     expect(login).toContain("Use your organization credentials");
+    expect(login).toContain("Organization learning");
+    expect(login).not.toContain("Acme Learning");
     expect(org).toContain("Learner experience");
     expect(org).toContain("Admin console");
     expect(org).toContain("Reports");
     expect(org).toContain("redirect(`/org/${slug}/learn`)");
+  });
+
+  it("keeps tenant entry redirects and management CTAs role-aware", () => {
+    const org = read("src/app/org/[slug]/page.tsx");
+    const learnerRedirectIndex = org.indexOf("redirect(`/org/${slug}/learn`)");
+    const dashboardSummaryIndex = org.indexOf("const summary = await getOrganizationDashboardSummary");
+
+    expect(org).toContain("!context.isPlatformOwner");
+    expect(learnerRedirectIndex).toBeGreaterThan(-1);
+    expect(dashboardSummaryIndex).toBeGreaterThan(-1);
+    expect(learnerRedirectIndex).toBeLessThan(dashboardSummaryIndex);
+    expect(org).toContain("Manager workspace");
+    expect(org).toContain("/admin/assignments");
   });
 });
