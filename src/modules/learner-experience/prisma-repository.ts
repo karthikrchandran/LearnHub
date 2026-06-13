@@ -10,7 +10,16 @@ type LearnerExperiencePrismaClient = {
   knowledgeCheckAttempt: Pick<PrismaClient["knowledgeCheckAttempt"], "findMany">;
 };
 
-const learnerCourseSelect = {
+const categorySelect = {
+  select: { name: true, slug: true },
+} satisfies Prisma.CourseCategoryDefaultArgs;
+
+const tagLinksSelect = {
+  select: { tag: { select: { name: true, slug: true } } },
+  orderBy: { tag: { name: "asc" } },
+} satisfies Prisma.CourseTagLinkFindManyArgs;
+
+const courseCardSelect = {
   id: true,
   title: true,
   slug: true,
@@ -19,41 +28,67 @@ const learnerCourseSelect = {
   expectedDurationMinutes: true,
   estimatedCompletionBusinessDays: true,
   credentialProvider: true,
-  category: { select: { name: true, slug: true } },
-  tagLinks: {
-    select: { tag: { select: { name: true, slug: true } } },
-    orderBy: { tag: { name: "asc" } },
-  },
-  modules: {
+  category: categorySelect,
+  tagLinks: tagLinksSelect,
+} satisfies Prisma.CourseSelect;
+
+const modulesSelect = {
+  orderBy: { sortOrder: "asc" },
+  select: { id: true, title: true, slug: true, sortOrder: true },
+} satisfies Prisma.CourseModuleFindManyArgs;
+
+const lessonDetailSelect = {
+  id: true,
+  moduleId: true,
+  title: true,
+  slug: true,
+  sortOrder: true,
+  durationSeconds: true,
+  required: true,
+  chapters: {
     orderBy: { sortOrder: "asc" },
-    select: { id: true, title: true, slug: true, sortOrder: true },
+    select: { title: true, startSecond: true, endSecond: true },
   },
+  transcriptCues: {
+    orderBy: { startSecond: "asc" },
+    take: 5,
+    select: { startSecond: true, endSecond: true, text: true },
+  },
+} satisfies Prisma.VideoLessonSelect;
+
+const safeAnswerChoicesSelect = {
+  orderBy: { sortOrder: "asc" },
+  select: { id: true, text: true },
+} satisfies Prisma.CourseKnowledgeCheckAnswerFindManyArgs;
+
+const learnerKnowledgeCheckSelect = {
+  id: true,
+  lessonId: true,
+  prompt: true,
+  required: true,
+  questionType: true,
+  answers: safeAnswerChoicesSelect,
+} satisfies Prisma.CourseKnowledgeCheckQuestionSelect;
+
+const activeCourseChecksSelect = {
+  where: { active: true },
+  orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
+  select: learnerKnowledgeCheckSelect,
+} satisfies Prisma.CourseKnowledgeCheckQuestionFindManyArgs;
+
+const courseOverviewSelect = {
+  ...courseCardSelect,
+  modules: modulesSelect,
   videoLessons: {
     orderBy: { sortOrder: "asc" },
-    select: {
-      id: true,
-      moduleId: true,
-      title: true,
-      slug: true,
-      sortOrder: true,
-      durationSeconds: true,
-      required: true,
-      chapters: {
-        orderBy: { sortOrder: "asc" },
-        select: { title: true, startSecond: true, endSecond: true },
-      },
-      transcriptCues: {
-        orderBy: { startSecond: "asc" },
-        take: 5,
-        select: { startSecond: true, endSecond: true, text: true },
-      },
-    },
+    select: lessonDetailSelect,
   },
-  knowledgeCheckQuestions: {
-    where: { active: true },
-    orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
-    select: { id: true, lessonId: true, prompt: true, required: true, questionType: true },
-  },
+  knowledgeCheckQuestions: activeCourseChecksSelect,
+} satisfies Prisma.CourseSelect;
+
+const assessmentCourseSelect = {
+  ...courseCardSelect,
+  knowledgeCheckQuestions: activeCourseChecksSelect,
 } satisfies Prisma.CourseSelect;
 
 const assignmentProgressSelect = {
@@ -104,7 +139,7 @@ const scormRegistrationSelect = {
   },
 } satisfies Prisma.ScormRegistrationDefaultArgs;
 
-const learnerAssignmentSelect = {
+const courseCardAssignmentSelect = {
   id: true,
   courseId: true,
   membershipId: true,
@@ -113,10 +148,7 @@ const learnerAssignmentSelect = {
   dueDate: true,
   progress: assignmentProgressSelect,
   certificate: certificateStateSelect,
-  videoProgress: videoProgressSelect,
-  scormRegistration: scormRegistrationSelect,
-  knowledgeCheckAttempts: knowledgeCheckAttemptSelect,
-  course: { select: learnerCourseSelect },
+  course: { select: courseCardSelect },
 } satisfies Prisma.CourseAssignmentSelect;
 
 const courseEnrollmentSelect = {
@@ -133,13 +165,47 @@ const courseEnrollmentSelect = {
   knowledgeCheckAttempts: knowledgeCheckAttemptSelect,
 } satisfies Prisma.CourseAssignmentSelect;
 
+const assessmentAssignmentSelect = {
+  id: true,
+  courseId: true,
+  membershipId: true,
+  status: true,
+  startDate: true,
+  dueDate: true,
+  progress: assignmentProgressSelect,
+  knowledgeCheckAttempts: knowledgeCheckAttemptSelect,
+  course: { select: assessmentCourseSelect },
+} satisfies Prisma.CourseAssignmentSelect;
+
+function lessonCourseSelect(lessonSlug: string) {
+  return {
+    ...courseOverviewSelect,
+    videoLessons: {
+      where: { slug: lessonSlug },
+      take: 1,
+      select: lessonDetailSelect,
+    },
+    knowledgeCheckQuestions: {
+      where: {
+        active: true,
+        OR: [
+          { lesson: { slug: lessonSlug } },
+          { lessonId: null },
+        ],
+      },
+      orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
+      select: learnerKnowledgeCheckSelect,
+    },
+  } satisfies Prisma.CourseSelect;
+}
+
 export function createPrismaLearnerExperienceRepository(client: LearnerExperiencePrismaClient) {
   return {
     listLearnerAssignments(input: { organizationId: string; membershipId: string }) {
       return client.courseAssignment.findMany({
         where: { organizationId: input.organizationId, membershipId: input.membershipId },
         orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
-        select: learnerAssignmentSelect,
+        select: courseCardAssignmentSelect,
       });
     },
     listAvailableCourses(input: { organizationId: string; excludedCourseIds: string[] }) {
@@ -150,7 +216,7 @@ export function createPrismaLearnerExperienceRepository(client: LearnerExperienc
           id: { notIn: input.excludedCourseIds },
         },
         orderBy: { title: "asc" },
-        select: learnerCourseSelect,
+        select: courseCardSelect,
       });
     },
     findCourseOverview(input: { organizationId: string; courseSlug: string; membershipId: string }) {
@@ -161,7 +227,7 @@ export function createPrismaLearnerExperienceRepository(client: LearnerExperienc
           status: "PUBLISHED",
         },
         select: {
-          ...learnerCourseSelect,
+          ...courseOverviewSelect,
           assignments: {
             where: { organizationId: input.organizationId, membershipId: input.membershipId },
             take: 1,
@@ -171,31 +237,21 @@ export function createPrismaLearnerExperienceRepository(client: LearnerExperienc
       });
     },
     findLesson(input: { organizationId: string; courseSlug: string; lessonSlug: string; membershipId: string }) {
+      const select = lessonCourseSelect(input.lessonSlug);
+
       return client.course.findFirst({
         where: {
           organizationId: input.organizationId,
           slug: input.courseSlug,
           status: "PUBLISHED",
+          videoLessons: { some: { slug: input.lessonSlug } },
         },
         select: {
-          ...learnerCourseSelect,
+          ...select,
           assignments: {
             where: { organizationId: input.organizationId, membershipId: input.membershipId },
             take: 1,
             select: courseEnrollmentSelect,
-          },
-          videoLessons: {
-            where: { slug: input.lessonSlug },
-            take: 1,
-            select: learnerCourseSelect.videoLessons.select,
-          },
-          knowledgeCheckQuestions: {
-            where: {
-              active: true,
-              lesson: { slug: input.lessonSlug },
-            },
-            orderBy: [{ lessonId: "asc" }, { sortOrder: "asc" }],
-            select: learnerCourseSelect.knowledgeCheckQuestions.select,
           },
         },
       });
@@ -210,7 +266,7 @@ export function createPrismaLearnerExperienceRepository(client: LearnerExperienc
           },
         },
         orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
-        select: learnerAssignmentSelect,
+        select: assessmentAssignmentSelect,
       });
     },
     listCertificates(input: { organizationId: string; membershipId: string }) {
