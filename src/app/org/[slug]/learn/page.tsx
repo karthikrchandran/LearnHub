@@ -53,13 +53,27 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
       membership.status === "ACTIVE" &&
       membership.roles.includes("LEARNER"),
   );
-  const assignedCourses = learnerMembership
-    ? await repository.listLearnerAssignments({ organizationId, membershipId: learnerMembership.id })
-    : [];
+
+  if (!learnerMembership) {
+    return (
+      <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
+        <div className="mx-auto grid max-w-7xl gap-6">
+          <header>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--learnhub-blue)]">My Courses</p>
+            <h1 className="mt-2 text-4xl font-black text-[var(--learnhub-ink)]">Keep your learning moving.</h1>
+          </header>
+          <EmptyActionState
+            body="Sign in with an active learner membership to view assigned courses, progress, and recommendations."
+            title="Learner access required"
+          />
+        </div>
+      </LearnerAppShell>
+    );
+  }
+
+  const assignedCourses = await repository.listLearnerAssignments({ organizationId, membershipId: learnerMembership.id });
   const assignedCourseIds = assignedCourses.map((assignment) => assignment.courseId);
-  const availableCourses = learnerMembership
-    ? await repository.listAvailableCourses({ organizationId, excludedCourseIds: assignedCourseIds })
-    : [];
+  const availableCourses = await repository.listAvailableCourses({ organizationId, excludedCourseIds: assignedCourseIds });
   const courses = [
     ...assignedCourses.map(toAssignedCourseView),
     ...availableCourses.map(toAvailableCourseView),

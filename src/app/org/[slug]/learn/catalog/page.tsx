@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 import { CourseCard, EmptyActionState, LearnerAppShell } from "@/app/ui/learnhub-components";
@@ -12,13 +12,16 @@ type CatalogPageProps = {
   params: Promise<{
     slug: string;
   }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type LearnerExperienceRepository = ReturnType<typeof createPrismaLearnerExperienceRepository>;
 type AvailableCourse = Awaited<ReturnType<LearnerExperienceRepository["listAvailableCourses"]>>[number];
 
-export default async function CatalogPage({ params }: CatalogPageProps) {
+export default async function CatalogPage({ params, searchParams }: CatalogPageProps) {
   const { slug } = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const enrollmentError = firstSearchParam(resolvedSearchParams.enrollmentError);
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
   const { prisma } = await import("@/lib/prisma");
   const repository = createPrismaLearnerExperienceRepository(prisma);
@@ -48,7 +51,13 @@ export default async function CatalogPage({ params }: CatalogPageProps) {
   const selfEnrollAction = async (formData: FormData) => {
     "use server";
 
-    await selfEnrollFormAction(slug, formData);
+    const result = await selfEnrollFormAction(slug, formData);
+
+    if (result.status === "success") {
+      redirect(`/org/${slug}/learn`);
+    }
+
+    redirect(`/org/${slug}/learn/catalog?enrollmentError=${encodeURIComponent(result.message)}`);
   };
 
   return (
@@ -58,6 +67,12 @@ export default async function CatalogPage({ params }: CatalogPageProps) {
           <p>Course Catalog</p>
           <h1>Find the next course for your role.</h1>
         </header>
+
+        {enrollmentError ? (
+          <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800" role="alert">
+            {enrollmentError}
+          </section>
+        ) : null}
 
         {!learnerMembership ? (
           <EmptyActionState
@@ -78,7 +93,10 @@ export default async function CatalogPage({ params }: CatalogPageProps) {
                     <input type="hidden" name="courseId" value={course.id} />
                     <input type="hidden" name="learnerMembershipId" value={learnerMembership.id} />
                     <input type="hidden" name="startDate" value={today} />
-                    <button className="inline-flex min-h-10 items-center rounded-full border border-[var(--learnhub-line)] bg-white px-4 text-sm font-bold text-[var(--learnhub-ink)]">
+                    <button
+                      className="inline-flex min-h-10 items-center rounded-full border border-[var(--learnhub-line)] bg-white px-4 text-sm font-bold text-[var(--learnhub-ink)]"
+                      type="submit"
+                    >
                       Enroll
                     </button>
                   </form>
@@ -108,4 +126,12 @@ function courseMeta(course: AvailableCourse): string[] {
 
 function formatCourseType(type: string): string {
   return type === "SCORM_1_2" ? "SCORM" : "Native video";
+}
+
+function firstSearchParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
 }

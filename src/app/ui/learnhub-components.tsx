@@ -54,7 +54,9 @@ export function LearnerAppShell({
   const navItems: NavItem[] = [
     { label: "My Courses", href: `/org/${slug}/learn`, active: active === "courses" },
     { label: "Catalog", href: `/org/${slug}/learn/catalog`, active: active === "catalog" },
-    { label: "Assessments", href: `/org/${slug}/learn/assessments`, active: active === "assessments" },
+    ...(active === "assessments"
+      ? [{ label: "Assessments", href: `/org/${slug}/learn/assessments`, active: true }]
+      : []),
     { label: "Certificates", href: `/org/${slug}/certificates`, active: active === "certificates" },
   ];
 

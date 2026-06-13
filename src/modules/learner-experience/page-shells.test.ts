@@ -4,12 +4,16 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Badge, CertificateCard, CourseCover, ProgressBar } from "@/app/ui/learnhub-components";
+import { Badge, CertificateCard, CourseCover, LearnerAppShell, ProgressBar } from "@/app/ui/learnhub-components";
 import { courseGradientForCategory, courseToneForCategory } from "@/app/ui/learnhub-tokens";
 
 const root = process.cwd();
 type BadgeTone = NonNullable<Parameters<typeof Badge>[0]["tone"]>;
 const BadgeForCreateElement = Badge as (props: { children?: string; tone?: BadgeTone }) => ReturnType<typeof Badge>;
+type LearnerAppShellProps = Parameters<typeof LearnerAppShell>[0];
+const LearnerAppShellForCreateElement = LearnerAppShell as (
+  props: Omit<LearnerAppShellProps, "children"> & { children?: LearnerAppShellProps["children"] },
+) => ReturnType<typeof LearnerAppShell>;
 
 function read(relativePath: string): string {
   return readFileSync(join(root, relativePath), "utf8");
@@ -178,10 +182,41 @@ describe("learner experience page shells", () => {
     expect(myCourses).toContain("groupLearnerCourses");
     expect(myCourses).toContain("LearnerAppShell");
     expect(myCourses).toContain("CourseCard");
+    expect(myCourses).toContain("Learner access required");
     expect(catalog).toContain("Course Catalog");
     expect(catalog).toContain("Find the next course for your role");
     expect(catalog).toContain("selfEnrollFormAction");
     expect(catalog).toContain("LearnerAppShell");
+    expect(catalog).toContain("enrollmentError");
+    expect(catalog).toContain("redirect(");
+    expect(catalog).toContain('type="submit"');
     expect(catalog).not.toContain("No available published courses.");
+  });
+
+  it("keeps future course overview links compatible until the overview route ships", () => {
+    const compatibilityRoute = read("src/app/org/[slug]/learn/courses/[courseSlug]/page.tsx");
+
+    expect(compatibilityRoute).toContain("redirect(`/org/${slug}/learn/${courseSlug}`)");
+  });
+
+  it("hides the assessments nav link until the assessments route is active", () => {
+    const coursesMarkup = renderToStaticMarkup(
+      createElement(
+        LearnerAppShellForCreateElement,
+        { organizationName: "Acme Learning", slug: "acme", active: "courses" },
+        createElement("span", null, "My Courses"),
+      ),
+    );
+    const assessmentsMarkup = renderToStaticMarkup(
+      createElement(
+        LearnerAppShellForCreateElement,
+        { organizationName: "Acme Learning", slug: "acme", active: "assessments" },
+        createElement("span", null, "Assessments"),
+      ),
+    );
+
+    expect(coursesMarkup).not.toContain("Assessments");
+    expect(assessmentsMarkup).toContain("Assessments");
+    expect(assessmentsMarkup).toContain("/org/acme/learn/assessments");
   });
 });
