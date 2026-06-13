@@ -181,8 +181,7 @@ function lessonCourseSelect(lessonSlug: string) {
   return {
     ...courseOverviewSelect,
     videoLessons: {
-      where: { slug: lessonSlug },
-      take: 1,
+      orderBy: { sortOrder: "asc" },
       select: lessonDetailSelect,
     },
     knowledgeCheckQuestions: {

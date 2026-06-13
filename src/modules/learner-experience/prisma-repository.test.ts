@@ -168,13 +168,14 @@ describe("Prisma learner experience repository", () => {
       videoLessons: { some: { slug: "spot-phishing" } },
     });
     expect(query.select.videoLessons).toEqual(expect.objectContaining({
-      where: { slug: "spot-phishing" },
-      take: 1,
+      orderBy: { sortOrder: "asc" },
       select: expect.objectContaining({
         chapters: expect.any(Object),
         transcriptCues: expect.any(Object),
       }),
     }));
+    expect(query.select.videoLessons).not.toHaveProperty("where");
+    expect(query.select.videoLessons).not.toHaveProperty("take");
     expect(checkArgs).toEqual(expect.objectContaining({
       where: {
         active: true,
