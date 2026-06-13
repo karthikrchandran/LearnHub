@@ -29,7 +29,7 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
   const repository = createPrismaLearnerExperienceRepository(prisma);
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { name: true },
+    select: { enrollmentPolicy: true, name: true },
   });
 
   if (!organization) {
@@ -71,6 +71,8 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
   const progressPercent = assignment ? assignment.progress?.progressPercent ?? (assignment.status === "COMPLETED" ? 100 : 0) : 0;
   const assessmentCount = course.knowledgeCheckQuestions.length;
   const requiredAssessmentCount = course.knowledgeCheckQuestions.filter((check) => check.required).length;
+  const canSelfEnroll = organization.enrollmentPolicy === "ASSIGNMENT_AND_SELF_ENROLLMENT";
+  const scormRuntimeHref = `/org/${encodeURIComponent(slug)}/learn/${encodeURIComponent(courseSlug)}/scorm`;
   const today = new Date().toISOString().slice(0, 10);
   const enrollAction = async (formData: FormData) => {
     "use server";
@@ -113,18 +115,25 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
                     </p>
                     <p className="text-2xl font-black text-[var(--learnhub-ink)]">{progressPercent}% complete</p>
                   </div>
-                  {currentLesson ? (
-                    <PrimaryButton
-                      href={`/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(courseSlug)}/lessons/${encodeURIComponent(currentLesson.slug)}`}
-                      variant="blue"
-                    >
-                      {assignment.status === "IN_PROGRESS" ? "Resume lesson" : "Start lesson"}
-                    </PrimaryButton>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    {course.type === "SCORM_1_2" ? (
+                      <PrimaryButton href={scormRuntimeHref} variant="blue">
+                        {assignment.status === "IN_PROGRESS" ? "Resume SCORM course" : "Launch SCORM course"}
+                      </PrimaryButton>
+                    ) : null}
+                    {course.type !== "SCORM_1_2" && currentLesson ? (
+                      <PrimaryButton
+                        href={`/org/${encodeURIComponent(slug)}/learn/courses/${encodeURIComponent(courseSlug)}/lessons/${encodeURIComponent(currentLesson.slug)}`}
+                        variant="blue"
+                      >
+                        {assignment.status === "IN_PROGRESS" ? "Resume lesson" : "Start lesson"}
+                      </PrimaryButton>
+                    ) : null}
+                  </div>
                 </div>
                 <ProgressBar value={progressPercent} />
               </div>
-            ) : (
+            ) : canSelfEnroll ? (
               <EmptyActionState
                 action={
                   <form action={enrollAction}>
@@ -140,6 +149,11 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
                   </form>
                 }
                 body="Enroll to add this course to My Courses and unlock the learner runtime when lessons are available."
+                title="Assignment required"
+              />
+            ) : (
+              <EmptyActionState
+                body="An admin or manager must assign this course before you can launch it."
                 title="Assignment required"
               />
             )}

@@ -202,6 +202,11 @@ describe("learner experience page shells", () => {
     expect(overview).toContain("Curriculum");
     expect(overview).toContain("LearnerAppShell");
     expect(overview).toContain("findCourseOverview");
+    expect(overview).toContain("enrollmentPolicy: true");
+    expect(overview).toContain('organization.enrollmentPolicy === "ASSIGNMENT_AND_SELF_ENROLLMENT"');
+    expect(overview).toContain("/learn/${encodeURIComponent(courseSlug)}/scorm");
+    expect(overview).toContain("lessons/${encodeURIComponent(currentLesson.slug)}");
+    expect(overview).toContain("lessons/${encodeURIComponent(lesson.slug)}");
     expect(legacy).toContain("redirect(`/org/${slug}/learn/courses/${courseSlug}`)");
   });
 
