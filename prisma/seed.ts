@@ -173,272 +173,644 @@ async function main() {
     },
   });
 
-  const category = await prisma.courseCategory.upsert({
-    where: {
-      organizationId_slug: {
-        organizationId: organization.id,
-        slug: "compliance",
-      },
-    },
-    update: {
-      name: "Compliance",
-    },
-    create: {
-      organizationId: organization.id,
-      name: "Compliance",
-      slug: "compliance",
-    },
-  });
+  async function upsertCategory(slug: string, name: string) {
+    return prisma.courseCategory.upsert({
+      where: { organizationId_slug: { organizationId: organization.id, slug } },
+      update: { name },
+      create: { organizationId: organization.id, slug, name },
+    });
+  }
 
-  const tag = await prisma.courseTag.upsert({
-    where: {
-      organizationId_slug: {
-        organizationId: organization.id,
-        slug: "onboarding",
-      },
-    },
-    update: {
-      name: "Onboarding",
-    },
-    create: {
-      organizationId: organization.id,
-      name: "Onboarding",
-      slug: "onboarding",
-    },
-  });
+  async function upsertTag(slug: string, name: string) {
+    return prisma.courseTag.upsert({
+      where: { organizationId_slug: { organizationId: organization.id, slug } },
+      update: { name },
+      create: { organizationId: organization.id, slug, name },
+    });
+  }
 
-  const course = await prisma.course.upsert({
-    where: {
-      organizationId_slug: {
-        organizationId: organization.id,
-        slug: "workplace-security-basics",
-      },
-    },
-    update: {
-      title: "Workplace Security Basics",
-      description: "Demo native video course foundation record.",
-      status: "PUBLISHED",
-      type: "NATIVE_VIDEO",
-      estimatedCompletionBusinessDays: 5,
-      expectedDurationMinutes: 45,
-      categoryId: category.id,
-    },
-    create: {
-      organizationId: organization.id,
-      title: "Workplace Security Basics",
-      slug: "workplace-security-basics",
-      description: "Demo native video course foundation record.",
-      status: "PUBLISHED",
-      type: "NATIVE_VIDEO",
-      estimatedCompletionBusinessDays: 5,
-      expectedDurationMinutes: 45,
-      categoryId: category.id,
-    },
-  });
+  type QuestionType = "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "TRUE_FALSE";
+  type AnswerSeed = {
+    id: string;
+    text: string;
+    correct: boolean;
+    feedback: string;
+    sortOrder: number;
+  };
 
-  await prisma.courseTagLink.upsert({
-    where: {
-      organizationId_courseId_tagId: {
+  async function upsertPublishedNativeCourse(input: {
+    slug: string;
+    title: string;
+    description: string;
+    status: "PUBLISHED";
+    type: "NATIVE_VIDEO";
+    expectedDurationMinutes: number;
+    estimatedCompletionBusinessDays: number;
+    categoryId: string;
+    tagIds: string[];
+  }) {
+    const course = await prisma.course.upsert({
+      where: {
+        organizationId_slug: {
+          organizationId: organization.id,
+          slug: input.slug,
+        },
+      },
+      update: {
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        type: input.type,
+        estimatedCompletionBusinessDays: input.estimatedCompletionBusinessDays,
+        expectedDurationMinutes: input.expectedDurationMinutes,
+        categoryId: input.categoryId,
+      },
+      create: {
+        organizationId: organization.id,
+        title: input.title,
+        slug: input.slug,
+        description: input.description,
+        status: input.status,
+        type: input.type,
+        estimatedCompletionBusinessDays: input.estimatedCompletionBusinessDays,
+        expectedDurationMinutes: input.expectedDurationMinutes,
+        categoryId: input.categoryId,
+      },
+    });
+
+    for (const tagId of input.tagIds) {
+      await prisma.courseTagLink.upsert({
+        where: {
+          organizationId_courseId_tagId: {
+            organizationId: organization.id,
+            courseId: course.id,
+            tagId,
+          },
+        },
+        update: {},
+        create: {
+          organizationId: organization.id,
+          courseId: course.id,
+          tagId,
+        },
+      });
+    }
+
+    return course;
+  }
+
+  async function upsertNativeCourseSurface(
+    course: { id: string },
+    input: {
+      moduleSlug: string;
+      moduleTitle: string;
+      lessons: [string, string, number][];
+    },
+  ) {
+    const courseModule = await prisma.courseModule.upsert({
+      where: {
+        organizationId_courseId_slug: {
+          organizationId: organization.id,
+          courseId: course.id,
+          slug: input.moduleSlug,
+        },
+      },
+      update: {
+        title: input.moduleTitle,
+        sortOrder: 0,
+      },
+      create: {
         organizationId: organization.id,
         courseId: course.id,
-        tagId: tag.id,
+        title: input.moduleTitle,
+        slug: input.moduleSlug,
+        sortOrder: 0,
       },
-    },
-    update: {},
-    create: {
-      organizationId: organization.id,
-      courseId: course.id,
-      tagId: tag.id,
-    },
-  });
+    });
 
-  const leadershipTag = await prisma.courseTag.upsert({
-    where: {
-      organizationId_slug: {
+    const lessonsBySlug: Record<string, { id: string }> = {};
+
+    for (const [sortOrder, [lessonSlug, title, durationSeconds]] of input.lessons.entries()) {
+      const lesson = await prisma.videoLesson.upsert({
+        where: {
+          organizationId_courseId_slug: {
+            organizationId: organization.id,
+            courseId: course.id,
+            slug: lessonSlug,
+          },
+        },
+        update: {
+          moduleId: courseModule.id,
+          title,
+          sortOrder,
+          durationSeconds,
+          required: true,
+          providerAssetId: null,
+          providerUploadId: null,
+          providerPlaybackId: null,
+          providerStatus: "READY",
+          providerError: null,
+          playbackUrl: `https://video.learnhub.local/demo/${lessonSlug}.mp4`,
+          transcriptLanguage: "en",
+        },
+        create: {
+          organizationId: organization.id,
+          courseId: course.id,
+          moduleId: courseModule.id,
+          title,
+          slug: lessonSlug,
+          sortOrder,
+          durationSeconds,
+          required: true,
+          providerStatus: "READY",
+          playbackUrl: `https://video.learnhub.local/demo/${lessonSlug}.mp4`,
+          transcriptLanguage: "en",
+        },
+      });
+
+      lessonsBySlug[lessonSlug] = lesson;
+
+      const firstBreak = Math.floor(durationSeconds / 3);
+      const secondBreak = Math.floor((durationSeconds * 2) / 3);
+
+      await prisma.videoChapter.deleteMany({
+        where: {
+          organizationId: organization.id,
+          lessonId: lesson.id,
+        },
+      });
+
+      await prisma.videoChapter.createMany({
+        data: [
+          {
+            organizationId: organization.id,
+            lessonId: lesson.id,
+            title: "Set the Context",
+            startSecond: 0,
+            endSecond: firstBreak,
+            sortOrder: 0,
+          },
+          {
+            organizationId: organization.id,
+            lessonId: lesson.id,
+            title: "Practice the Skill",
+            startSecond: firstBreak,
+            endSecond: secondBreak,
+            sortOrder: 1,
+          },
+          {
+            organizationId: organization.id,
+            lessonId: lesson.id,
+            title: "Apply on the Job",
+            startSecond: secondBreak,
+            endSecond: null,
+            sortOrder: 2,
+          },
+        ],
+      });
+
+      await prisma.videoTranscriptCue.deleteMany({
+        where: {
+          organizationId: organization.id,
+          lessonId: lesson.id,
+        },
+      });
+
+      await prisma.videoTranscriptCue.createMany({
+        data: [
+          {
+            organizationId: organization.id,
+            lessonId: lesson.id,
+            startSecond: 0,
+            endSecond: firstBreak,
+            text: `${title} opens with why this topic matters to Acme learners.`,
+          },
+          {
+            organizationId: organization.id,
+            lessonId: lesson.id,
+            startSecond: firstBreak,
+            endSecond: secondBreak,
+            text: "The lesson demonstrates practical decisions and common mistakes to avoid.",
+          },
+          {
+            organizationId: organization.id,
+            lessonId: lesson.id,
+            startSecond: secondBreak,
+            endSecond: null,
+            text: "Learners close by choosing one action to apply during their next shift or team meeting.",
+          },
+        ],
+      });
+    }
+
+    return lessonsBySlug;
+  }
+
+  async function upsertKnowledgeCheckQuestion(input: {
+    id: string;
+    courseId: string;
+    lessonId: string;
+    prompt: string;
+    questionType: QuestionType;
+    sortOrder: number;
+    explanation: string;
+    answers: AnswerSeed[];
+  }) {
+    const question = await prisma.courseKnowledgeCheckQuestion.upsert({
+      where: { id: input.id },
+      update: {
+        courseId: input.courseId,
+        lessonId: input.lessonId,
+        sourceGlobalQuestionId: null,
+        prompt: input.prompt,
+        questionType: input.questionType,
+        sortOrder: input.sortOrder,
+        required: true,
+        active: true,
+        explanation: input.explanation,
+      },
+      create: {
+        id: input.id,
         organizationId: organization.id,
-        slug: "leadership",
+        courseId: input.courseId,
+        lessonId: input.lessonId,
+        prompt: input.prompt,
+        questionType: input.questionType,
+        sortOrder: input.sortOrder,
+        required: true,
+        active: true,
+        explanation: input.explanation,
       },
-    },
-    update: {
-      name: "Leadership",
-    },
-    create: {
-      organizationId: organization.id,
-      name: "Leadership",
-      slug: "leadership",
-    },
-  });
+    });
 
-  const coachingCourse = await prisma.course.upsert({
-    where: {
-      organizationId_slug: {
+    const answers = await Promise.all(
+      input.answers.map((answer) =>
+        prisma.courseKnowledgeCheckAnswer.upsert({
+          where: { id: answer.id },
+          update: {
+            questionId: question.id,
+            text: answer.text,
+            correct: answer.correct,
+            feedback: answer.feedback,
+            sortOrder: answer.sortOrder,
+          },
+          create: {
+            id: answer.id,
+            organizationId: organization.id,
+            questionId: question.id,
+            text: answer.text,
+            correct: answer.correct,
+            feedback: answer.feedback,
+            sortOrder: answer.sortOrder,
+          },
+        }),
+      ),
+    );
+
+    await prisma.courseKnowledgeCheckAnswer.deleteMany({
+      where: {
         organizationId: organization.id,
-        slug: "manager-coaching-basics",
+        questionId: question.id,
+        id: { notIn: input.answers.map((answer) => answer.id) },
       },
-    },
-    update: {
-      title: "Manager Coaching Basics",
-      description: "Demo published course for manager assignment flows.",
-      status: "PUBLISHED",
-      type: "NATIVE_VIDEO",
-      estimatedCompletionBusinessDays: 3,
-      expectedDurationMinutes: 30,
-      categoryId: category.id,
-    },
-    create: {
-      organizationId: organization.id,
-      title: "Manager Coaching Basics",
-      slug: "manager-coaching-basics",
-      description: "Demo published course for manager assignment flows.",
-      status: "PUBLISHED",
-      type: "NATIVE_VIDEO",
-      estimatedCompletionBusinessDays: 3,
-      expectedDurationMinutes: 30,
-      categoryId: category.id,
-    },
+    });
+
+    return { question, answers };
+  }
+
+  const complianceCategory = await upsertCategory("compliance", "Compliance");
+  const securityCategory = await upsertCategory("security", "Security");
+  const leadershipCategory = await upsertCategory("leadership", "Leadership");
+  const privacyCategory = await upsertCategory("privacy", "Data Privacy");
+  const customerCareCategory = await upsertCategory("customer-care", "Customer Care");
+  const safetyCategory = await upsertCategory("safety", "Safety");
+
+  const onboardingTag = await upsertTag("onboarding", "Onboarding");
+  const securityTag = await upsertTag("security", "Security");
+  const leadershipTag = await upsertTag("leadership", "Leadership");
+  const privacyTag = await upsertTag("privacy", "Privacy");
+  const customerCareTag = await upsertTag("customer-care", "Customer Care");
+  const safetyTag = await upsertTag("safety", "Safety");
+  const inclusionTag = await upsertTag("inclusion", "Inclusion");
+
+  const securityCourse = await upsertPublishedNativeCourse({
+    slug: "workplace-security-basics",
+    title: "Workplace Security Basics",
+    description: "Learn how to spot phishing, protect company devices, and report suspicious requests before they become incidents.",
+    status: "PUBLISHED",
+    type: "NATIVE_VIDEO",
+    expectedDurationMinutes: 45,
+    estimatedCompletionBusinessDays: 5,
+    categoryId: securityCategory.id,
+    tagIds: [onboardingTag.id, securityTag.id],
   });
 
-  await prisma.courseTagLink.upsert({
-    where: {
-      organizationId_courseId_tagId: {
-        organizationId: organization.id,
-        courseId: coachingCourse.id,
-        tagId: leadershipTag.id,
-      },
-    },
-    update: {},
-    create: {
-      organizationId: organization.id,
-      courseId: coachingCourse.id,
-      tagId: leadershipTag.id,
-    },
+  const coachingCourse = await upsertPublishedNativeCourse({
+    slug: "manager-coaching-basics",
+    title: "Manager Coaching Basics",
+    description: "Practice one-on-one coaching habits that help managers listen, ask better questions, and close with clear commitments.",
+    status: "PUBLISHED",
+    type: "NATIVE_VIDEO",
+    expectedDurationMinutes: 30,
+    estimatedCompletionBusinessDays: 3,
+    categoryId: leadershipCategory.id,
+    tagIds: [leadershipTag.id],
   });
 
-  const coachingModule = await prisma.courseModule.upsert({
-    where: {
-      organizationId_courseId_slug: {
-        organizationId: organization.id,
-        courseId: coachingCourse.id,
-        slug: "manager-foundations",
-      },
-    },
-    update: {
-      title: "Manager Foundations",
-      sortOrder: 0,
-    },
-    create: {
-      organizationId: organization.id,
-      courseId: coachingCourse.id,
-      title: "Manager Foundations",
-      slug: "manager-foundations",
-      sortOrder: 0,
-    },
+  const privacyCourse = await upsertPublishedNativeCourse({
+    slug: "data-privacy-essentials",
+    title: "Data Privacy Essentials",
+    description: "Build everyday habits for collecting, sharing, and storing customer and employee data with care.",
+    status: "PUBLISHED",
+    type: "NATIVE_VIDEO",
+    expectedDurationMinutes: 38,
+    estimatedCompletionBusinessDays: 4,
+    categoryId: privacyCategory.id,
+    tagIds: [privacyTag.id, onboardingTag.id],
   });
 
-  const coachingLesson = await prisma.videoLesson.upsert({
-    where: {
-      organizationId_courseId_slug: {
-        organizationId: organization.id,
-        courseId: coachingCourse.id,
-        slug: "coaching-conversation-basics",
-      },
-    },
-    update: {
-      moduleId: coachingModule.id,
-      title: "Coaching Conversation Basics",
-      sortOrder: 0,
-      durationSeconds: 180,
-      required: true,
-      providerAssetId: null,
-      playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
-      transcriptLanguage: "en",
-    },
-    create: {
-      organizationId: organization.id,
-      courseId: coachingCourse.id,
-      moduleId: coachingModule.id,
-      title: "Coaching Conversation Basics",
-      slug: "coaching-conversation-basics",
-      sortOrder: 0,
-      durationSeconds: 180,
-      required: true,
-      playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
-      transcriptLanguage: "en",
-    },
+  const difficultConversationsCourse = await upsertPublishedNativeCourse({
+    slug: "handling-difficult-conversations",
+    title: "Handling Difficult Conversations",
+    description: "Use calm, structured conversation moves to de-escalate tension and keep customer commitments clear.",
+    status: "PUBLISHED",
+    type: "NATIVE_VIDEO",
+    expectedDurationMinutes: 52,
+    estimatedCompletionBusinessDays: 5,
+    categoryId: customerCareCategory.id,
+    tagIds: [customerCareTag.id, leadershipTag.id],
   });
 
-  await prisma.videoChapter.deleteMany({
-    where: {
-      organizationId: organization.id,
-      lessonId: coachingLesson.id,
-    },
+  const safetyCourse = await upsertPublishedNativeCourse({
+    slug: "warehouse-safety-fundamentals",
+    title: "Warehouse Safety Fundamentals",
+    description: "Review the safety routines that prevent injuries around equipment, aisles, lifting, and incident reporting.",
+    status: "PUBLISHED",
+    type: "NATIVE_VIDEO",
+    expectedDurationMinutes: 42,
+    estimatedCompletionBusinessDays: 3,
+    categoryId: safetyCategory.id,
+    tagIds: [safetyTag.id, onboardingTag.id],
   });
 
-  await prisma.videoChapter.createMany({
-    data: [
+  const inclusiveCommunicationCourse = await upsertPublishedNativeCourse({
+    slug: "inclusive-team-communication",
+    title: "Inclusive Team Communication",
+    description: "Practice clearer team communication that makes meetings, feedback, and handoffs easier for everyone to follow.",
+    status: "PUBLISHED",
+    type: "NATIVE_VIDEO",
+    expectedDurationMinutes: 34,
+    estimatedCompletionBusinessDays: 4,
+    categoryId: customerCareCategory.id,
+    tagIds: [inclusionTag.id, leadershipTag.id],
+  });
+
+  const securityLessons = await upsertNativeCourseSurface(securityCourse, {
+    moduleSlug: "security-foundations",
+    moduleTitle: "Security Foundations",
+    lessons: [
+      ["welcome-and-course-goals", "Welcome and Course Goals", 240],
+      ["password-and-device-hygiene", "Password and Device Hygiene", 540],
+      ["recognize-suspicious-requests", "Recognize Suspicious Requests", 660],
+      ["reporting-security-incidents", "Reporting Security Incidents", 420],
+    ],
+  });
+
+  const coachingLessons = await upsertNativeCourseSurface(coachingCourse, {
+    moduleSlug: "manager-foundations",
+    moduleTitle: "Manager Foundations",
+    lessons: [
+      ["coaching-conversation-basics", "Coaching Conversation Basics", 420],
+      ["listen-and-reflect", "Listen and Reflect", 480],
+      ["commitments-and-follow-up", "Commitments and Follow-Up", 360],
+    ],
+  });
+
+  const privacyLessons = await upsertNativeCourseSurface(privacyCourse, {
+    moduleSlug: "privacy-foundations",
+    moduleTitle: "Privacy Foundations",
+    lessons: [
+      ["identify-personal-data", "Identify Personal Data", 420],
+      ["share-data-safely", "Share Data Safely", 540],
+      ["privacy-incident-response", "Privacy Incident Response", 360],
+    ],
+  });
+
+  const difficultConversationLessons = await upsertNativeCourseSurface(difficultConversationsCourse, {
+    moduleSlug: "conversation-practice",
+    moduleTitle: "Conversation Practice",
+    lessons: [
+      ["prepare-for-high-emotion", "Prepare for High Emotion", 480],
+      ["de-escalate-in-the-moment", "De-escalate in the Moment", 660],
+      ["close-with-next-steps", "Close with Next Steps", 420],
+    ],
+  });
+
+  const safetyLessons = await upsertNativeCourseSurface(safetyCourse, {
+    moduleSlug: "warehouse-safety-basics",
+    moduleTitle: "Warehouse Safety Basics",
+    lessons: [
+      ["ppe-and-floor-awareness", "PPE and Floor Awareness", 420],
+      ["safe-lifting-and-equipment", "Safe Lifting and Equipment", 540],
+      ["reporting-near-misses", "Reporting Near Misses", 360],
+    ],
+  });
+
+  const inclusiveCommunicationLessons = await upsertNativeCourseSurface(inclusiveCommunicationCourse, {
+    moduleSlug: "inclusive-communication-basics",
+    moduleTitle: "Inclusive Communication Basics",
+    lessons: [
+      ["set-shared-context", "Set Shared Context", 360],
+      ["invite-every-voice", "Invite Every Voice", 480],
+      ["confirm-understanding", "Confirm Understanding", 420],
+    ],
+  });
+
+  const securityIncidentCheck = await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-security-incident-report",
+    courseId: securityCourse.id,
+    lessonId: securityLessons["recognize-suspicious-requests"].id,
+    prompt: "Security incident practice quiz: which message should be reported?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 0,
+    explanation: "Unexpected urgency, payment pressure, and external links are common incident signals.",
+    answers: [
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        title: "Open the Conversation",
-        startSecond: 0,
-        endSecond: 45,
+        id: "seed-kca-security-incident-urgent-link",
+        text: "An urgent payment request with an external link from an unknown sender.",
+        correct: true,
+        feedback: "Urgency, payment pressure, and unknown links are strong reporting signals.",
         sortOrder: 0,
       },
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        title: "Ask Better Questions",
-        startSecond: 45,
-        endSecond: 120,
+        id: "seed-kca-security-incident-team-calendar",
+        text: "A calendar reminder for the weekly team meeting from your manager.",
+        correct: false,
+        feedback: "Known sender and expected context make this much less suspicious.",
         sortOrder: 1,
       },
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        title: "Close with Commitments",
-        startSecond: 120,
-        endSecond: null,
+        id: "seed-kca-security-incident-benefits-news",
+        text: "A benefits newsletter from the approved HR mailbox.",
+        correct: false,
+        feedback: "Approved internal senders are not automatic incident signals.",
         sortOrder: 2,
       },
     ],
   });
 
-  await prisma.videoTranscriptCue.deleteMany({
-    where: {
-      organizationId: organization.id,
-      lessonId: coachingLesson.id,
-    },
+  await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-security-passwords",
+    courseId: securityCourse.id,
+    lessonId: securityLessons["password-and-device-hygiene"].id,
+    prompt: "What is the safest way to manage a new work password?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 1,
+    explanation: "A password manager and unique password reduce reuse and phishing risk.",
+    answers: [
+      {
+        id: "seed-kca-security-password-manager",
+        text: "Create a unique password and store it in the approved password manager.",
+        correct: true,
+        feedback: "Unique credentials and approved storage are the right pattern.",
+        sortOrder: 0,
+      },
+      {
+        id: "seed-kca-security-password-reuse",
+        text: "Reuse a memorable personal password so you do not forget it.",
+        correct: false,
+        feedback: "Password reuse lets one breach unlock multiple systems.",
+        sortOrder: 1,
+      },
+    ],
   });
 
-  await prisma.videoTranscriptCue.createMany({
-    data: [
+  await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-coaching-listening",
+    courseId: coachingCourse.id,
+    lessonId: coachingLessons["listen-and-reflect"].id,
+    prompt: "Which response best shows active listening in a coaching conversation?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 0,
+    explanation: "Reflecting what you heard before advising keeps the conversation learner-centered.",
+    answers: [
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        startSecond: 0,
-        endSecond: 30,
-        text: "Welcome to coaching conversation basics for managers.",
+        id: "seed-kca-coaching-reflect",
+        text: "Summarize what you heard and ask whether you understood correctly.",
+        correct: true,
+        feedback: "Reflection confirms understanding before moving to advice.",
+        sortOrder: 0,
       },
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        startSecond: 30,
-        endSecond: 90,
-        text: "Start by naming the goal and inviting the team member to share context.",
+        id: "seed-kca-coaching-solve-fast",
+        text: "Interrupt with the solution once you recognize the issue.",
+        correct: false,
+        feedback: "Solving too early can miss the real blocker.",
+        sortOrder: 1,
+      },
+    ],
+  });
+
+  await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-privacy-personal-data",
+    courseId: privacyCourse.id,
+    lessonId: privacyLessons["identify-personal-data"].id,
+    prompt: "Which item should be treated as personal data?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 0,
+    explanation: "Customer contact details can identify a person and need privacy controls.",
+    answers: [
+      {
+        id: "seed-kca-privacy-customer-email",
+        text: "A customer email address linked to an account.",
+        correct: true,
+        feedback: "Emails tied to accounts can identify customers.",
+        sortOrder: 0,
       },
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        startSecond: 90,
-        endSecond: 150,
-        text: "Use open questions to understand blockers before offering advice.",
+        id: "seed-kca-privacy-office-hours",
+        text: "The public office holiday schedule.",
+        correct: false,
+        feedback: "Public schedules do not usually identify an individual.",
+        sortOrder: 1,
+      },
+    ],
+  });
+
+  await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-conversations-deescalate",
+    courseId: difficultConversationsCourse.id,
+    lessonId: difficultConversationLessons["de-escalate-in-the-moment"].id,
+    prompt: "What should you do first when a customer conversation becomes tense?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 0,
+    explanation: "Acknowledging emotion and slowing the pace helps restore a productive conversation.",
+    answers: [
+      {
+        id: "seed-kca-conversations-acknowledge",
+        text: "Acknowledge the concern and restate the shared goal.",
+        correct: true,
+        feedback: "This lowers tension while keeping the conversation focused.",
+        sortOrder: 0,
       },
       {
-        organizationId: organization.id,
-        lessonId: coachingLesson.id,
-        startSecond: 150,
-        endSecond: null,
-        text: "End with clear commitments, owners, and a follow-up date.",
+        id: "seed-kca-conversations-policy-only",
+        text: "Repeat the policy louder until the customer accepts it.",
+        correct: false,
+        feedback: "Volume and repetition usually escalate tension.",
+        sortOrder: 1,
+      },
+    ],
+  });
+
+  await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-safety-near-miss",
+    courseId: safetyCourse.id,
+    lessonId: safetyLessons["reporting-near-misses"].id,
+    prompt: "Why should a near miss be reported even when no one is hurt?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 0,
+    explanation: "Near-miss reports help teams remove hazards before they cause injuries.",
+    answers: [
+      {
+        id: "seed-kca-safety-prevent",
+        text: "It helps the team fix hazards before an injury happens.",
+        correct: true,
+        feedback: "Near misses are early warning signals.",
+        sortOrder: 0,
+      },
+      {
+        id: "seed-kca-safety-ignore",
+        text: "It should not be reported unless equipment was damaged.",
+        correct: false,
+        feedback: "No-damage incidents can still reveal unsafe conditions.",
+        sortOrder: 1,
+      },
+    ],
+  });
+
+  await upsertKnowledgeCheckQuestion({
+    id: "seed-kcq-inclusive-understanding",
+    courseId: inclusiveCommunicationCourse.id,
+    lessonId: inclusiveCommunicationLessons["confirm-understanding"].id,
+    prompt: "Which habit makes team handoffs more inclusive?",
+    questionType: "SINGLE_CHOICE",
+    sortOrder: 0,
+    explanation: "Confirming decisions and next steps reduces ambiguity for everyone involved.",
+    answers: [
+      {
+        id: "seed-kca-inclusive-summarize",
+        text: "Summarize the decision, owner, and next step before ending the handoff.",
+        correct: true,
+        feedback: "Clear summaries give every teammate the same context.",
+        sortOrder: 0,
+      },
+      {
+        id: "seed-kca-inclusive-assume",
+        text: "Assume experienced teammates already know what you mean.",
+        correct: false,
+        feedback: "Assumptions create avoidable gaps in shared understanding.",
+        sortOrder: 1,
       },
     ],
   });
@@ -457,7 +829,7 @@ async function main() {
       type: "SCORM_1_2",
       estimatedCompletionBusinessDays: 5,
       expectedDurationMinutes: 40,
-      categoryId: category.id,
+      categoryId: complianceCategory.id,
     },
     create: {
       organizationId: organization.id,
@@ -468,7 +840,7 @@ async function main() {
       type: "SCORM_1_2",
       estimatedCompletionBusinessDays: 5,
       expectedDurationMinutes: 40,
-      categoryId: category.id,
+      categoryId: complianceCategory.id,
     },
   });
 
@@ -512,25 +884,137 @@ async function main() {
     where: {
       organizationId_courseId_membershipId: {
         organizationId: organization.id,
-        courseId: course.id,
+        courseId: securityCourse.id,
         membershipId: learnerMembership.id,
       },
     },
     update: {
       assignedByMembershipId: adminMembership.id,
       startDate,
-      dueDate: addBusinessDays(startDate, course.estimatedCompletionBusinessDays),
+      dueDate: addBusinessDays(startDate, securityCourse.estimatedCompletionBusinessDays),
       status: "ASSIGNED",
     },
     create: {
       id: "seed-acme-learner-security-basics",
       organizationId: organization.id,
-      courseId: course.id,
+      courseId: securityCourse.id,
       membershipId: learnerMembership.id,
       assignedByMembershipId: adminMembership.id,
       startDate,
-      dueDate: addBusinessDays(startDate, course.estimatedCompletionBusinessDays),
+      dueDate: addBusinessDays(startDate, securityCourse.estimatedCompletionBusinessDays),
       status: "ASSIGNED",
+    },
+  });
+
+  const completedQuestion = securityIncidentCheck.question;
+  const correctAnswer = securityIncidentCheck.answers.find((answer) => answer.correct);
+
+  if (!correctAnswer) {
+    throw new Error("Seed security incident knowledge check is missing a correct answer.");
+  }
+
+  await prisma.knowledgeCheckAttempt.upsert({
+    where: {
+      organizationId_assignmentId_questionId_attemptNumber: {
+        organizationId: organization.id,
+        assignmentId: "seed-acme-learner-security-basics",
+        questionId: completedQuestion.id,
+        attemptNumber: 1,
+      },
+    },
+    update: {
+      selectedAnswerIds: [correctAnswer.id],
+      correct: true,
+      scorePercent: 100,
+      submittedAt: new Date("2026-06-12T15:00:00.000Z"),
+    },
+    create: {
+      organizationId: organization.id,
+      assignmentId: "seed-acme-learner-security-basics",
+      questionId: completedQuestion.id,
+      attemptNumber: 1,
+      selectedAnswerIds: [correctAnswer.id],
+      correct: true,
+      scorePercent: 100,
+      submittedAt: new Date("2026-06-12T15:00:00.000Z"),
+    },
+  });
+
+  const completedStartDate = new Date("2026-06-03T12:00:00.000Z");
+  const completedAssignment = await prisma.courseAssignment.upsert({
+    where: {
+      organizationId_courseId_membershipId: {
+        organizationId: organization.id,
+        courseId: privacyCourse.id,
+        membershipId: learnerMembership.id,
+      },
+    },
+    update: {
+      assignedByMembershipId: adminMembership.id,
+      startDate: completedStartDate,
+      dueDate: addBusinessDays(completedStartDate, privacyCourse.estimatedCompletionBusinessDays),
+      status: "COMPLETED",
+    },
+    create: {
+      id: "seed-acme-learner-data-privacy",
+      organizationId: organization.id,
+      courseId: privacyCourse.id,
+      membershipId: learnerMembership.id,
+      assignedByMembershipId: adminMembership.id,
+      startDate: completedStartDate,
+      dueDate: addBusinessDays(completedStartDate, privacyCourse.estimatedCompletionBusinessDays),
+      status: "COMPLETED",
+    },
+  });
+
+  await prisma.assignmentProgress.upsert({
+    where: {
+      organizationId_assignmentId: {
+        organizationId: organization.id,
+        assignmentId: completedAssignment.id,
+      },
+    },
+    update: {
+      progressPercent: 100,
+      lastEventAt: new Date("2026-06-10T14:00:00.000Z"),
+    },
+    create: {
+      organizationId: organization.id,
+      assignmentId: completedAssignment.id,
+      progressPercent: 100,
+      lastEventAt: new Date("2026-06-10T14:00:00.000Z"),
+    },
+  });
+
+  await prisma.certificate.upsert({
+    where: {
+      organizationId_assignmentId: {
+        organizationId: organization.id,
+        assignmentId: completedAssignment.id,
+      },
+    },
+    update: {
+      courseTitle: "Data Privacy Essentials",
+      verificationCode: "LHACMEDATAPRIVACY1",
+      verificationUrl: "http://localhost:3100/certificates/LHACMEDATAPRIVACY1",
+      issuedAt: new Date("2026-06-10T14:00:00.000Z"),
+    },
+    create: {
+      organizationId: organization.id,
+      assignmentId: completedAssignment.id,
+      courseId: privacyCourse.id,
+      membershipId: learnerMembership.id,
+      userId: learner.id,
+      learnerName: "Leela Learner",
+      learnerEmail: "learner@acme.test",
+      courseTitle: "Data Privacy Essentials",
+      issuerName: organization.name,
+      issuerLogoUrl: organization.logoUrl,
+      issuerPrimaryColor: organization.primaryColor,
+      issuerAccentColor: organization.accentColor,
+      verificationCode: "LHACMEDATAPRIVACY1",
+      verificationUrl: "http://localhost:3100/certificates/LHACMEDATAPRIVACY1",
+      issuedAt: new Date("2026-06-10T14:00:00.000Z"),
     },
   });
 

@@ -141,4 +141,17 @@ describe("learner experience page shells", () => {
     expect(org).toContain("Manager workspace");
     expect(org).toContain("/admin/assignments");
   });
+
+  it("seeds a complete learner demo surface", () => {
+    const seed = read("prisma/seed.ts");
+
+    expect(seed).toContain("Data Privacy Essentials");
+    expect(seed).toContain("Handling Difficult Conversations");
+    expect(seed).toContain("Warehouse Safety Fundamentals");
+    expect(seed).toContain("Security incident practice quiz");
+    expect(seed).toContain("knowledgeCheckAttempt.upsert");
+    expect(seed).toContain("certificate.upsert");
+    expect(seed).not.toContain("Demo native video course foundation record.");
+    expect(seed).not.toContain("Demo published course for manager assignment flows.");
+  });
 });
