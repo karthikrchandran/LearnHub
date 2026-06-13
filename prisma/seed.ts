@@ -5,7 +5,8 @@ import { createPrismaClient } from "../src/lib/prisma";
 const prisma = createPrismaClient();
 const demoAdminEmail = "admin@example.com";
 const legacyDemoAdminEmail = "admin@acme.test";
-const demoCertificateBaseUrl = "http://localhost:3100/certificates";
+const demoAppBaseUrl = process.env.APP_BASE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3100";
+const demoCertificateBaseUrl = `${demoAppBaseUrl.replace(/\/+$/, "")}/certificates`;
 
 async function main() {
   const passwordHash = await hashPassword("LearnHubDemo123!");

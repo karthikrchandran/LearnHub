@@ -162,6 +162,8 @@ describe("learner experience page shells", () => {
     expect(seed).toContain("videoLessonProgress.upsert");
     expect(seed).toContain("certificatePayload");
     expect(seed).toContain("demoCertificateBaseUrl");
+    expect(seed).toContain("process.env.APP_BASE_URL");
+    expect(seed).toContain("process.env.NEXTAUTH_URL");
     expect(seed).toContain("update: certificatePayload");
     expect(seed).toContain('id: "seed-acme-learner-manager-coaching"');
     expect(seed).toContain('status: "ASSIGNED"');
