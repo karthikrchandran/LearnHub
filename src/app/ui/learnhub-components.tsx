@@ -111,8 +111,9 @@ export function ProgressBar({ value }: { value: number }) {
 
 export function CourseCover({ title, categorySlug }: { title: string; categorySlug?: string | null }) {
   return (
-    <div className={`flex h-32 items-end bg-gradient-to-br ${courseGradientForCategory(categorySlug)} p-4 text-white`}>
-      <p className="line-clamp-2 min-w-0 break-words text-xl font-black leading-tight">{title}</p>
+    <div className={`relative flex h-32 items-end overflow-hidden bg-gradient-to-br ${courseGradientForCategory(categorySlug)} p-4 text-white`}>
+      <span aria-hidden="true" className="absolute inset-0 bg-black/45" />
+      <p className="relative z-10 line-clamp-2 min-w-0 break-words text-xl font-black leading-tight">{title}</p>
     </div>
   );
 }

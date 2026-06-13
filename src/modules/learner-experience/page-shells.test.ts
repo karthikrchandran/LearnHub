@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Badge, CertificateCard, ProgressBar } from "@/app/ui/learnhub-components";
+import { Badge, CertificateCard, CourseCover, ProgressBar } from "@/app/ui/learnhub-components";
 import { courseGradientForCategory, courseToneForCategory } from "@/app/ui/learnhub-tokens";
 
 const root = process.cwd();
@@ -74,6 +74,16 @@ describe("learner experience page shells", () => {
     expect(markup).toContain("bg-[var(--learnhub-paper)]");
     expect(markup).toContain("text-[var(--learnhub-ink)]");
     expect(markup).not.toContain("text-white");
+  });
+
+  it("renders course cover titles above a reusable dark scrim", () => {
+    const markup = renderToStaticMarkup(createElement(CourseCover, { categorySlug: "leadership", title: "Bright gradient course" }));
+
+    expect(markup).toContain("relative");
+    expect(markup).toContain("bg-black/45");
+    expect(markup).toContain("absolute inset-0");
+    expect(markup).toContain("relative z-10");
+    expect(markup).toContain("Bright gradient course");
   });
 
   it("renders accessible progress with finite clamped values", () => {
