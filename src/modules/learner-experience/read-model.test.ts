@@ -28,11 +28,14 @@ describe("learner experience read models", () => {
       href: "/org/acme/certificates",
       variant: "light",
     });
-    expect(buildCourseAction({ slug: "acme", courseSlug: "coaching", assignmentId: null, status: "AVAILABLE" })).toEqual({
+    const availableAction = buildCourseAction({ slug: "acme", courseSlug: "coaching", assignmentId: null, status: "AVAILABLE" });
+
+    expect(availableAction).toEqual({
       label: "Enroll",
-      href: "/org/acme/learn/courses/coaching",
+      href: "/org/acme/learn/catalog",
       variant: "light",
     });
+    expect(availableAction.href).not.toContain("/learn/courses/");
   });
 
   it("builds compact course metadata", () => {

@@ -37,7 +37,7 @@ export function buildCourseAction(input: LearnerCourseActionInput): LearnerCours
   }
 
   if (input.status === "AVAILABLE") {
-    return { label: "Enroll", href: `/org/${input.slug}/learn/courses/${input.courseSlug}`, variant: "light" };
+    return { label: "Enroll", href: `/org/${input.slug}/learn/catalog`, variant: "light" };
   }
 
   if (input.status === "IN_PROGRESS") {
