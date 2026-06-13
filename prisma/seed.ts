@@ -297,7 +297,7 @@ async function main() {
       },
     });
 
-    const lessonsBySlug: Record<string, { id: string }> = {};
+    const lessonsBySlug: Record<string, { id: string; durationSeconds: number }> = {};
 
     for (const [sortOrder, [lessonSlug, title, durationSeconds]] of input.lessons.entries()) {
       const lesson = await prisma.videoLesson.upsert({
@@ -337,7 +337,7 @@ async function main() {
         },
       });
 
-      lessonsBySlug[lessonSlug] = lesson;
+      lessonsBySlug[lessonSlug] = { id: lesson.id, durationSeconds };
 
       const firstBreak = Math.floor(durationSeconds / 3);
       const secondBreak = Math.floor((durationSeconds * 2) / 3);
@@ -720,7 +720,7 @@ async function main() {
     ],
   });
 
-  await upsertKnowledgeCheckQuestion({
+  const privacyPersonalDataCheck = await upsertKnowledgeCheckQuestion({
     id: "seed-kcq-privacy-personal-data",
     courseId: privacyCourse.id,
     lessonId: privacyLessons["identify-personal-data"].id,
@@ -889,6 +889,32 @@ async function main() {
 
   const startDate = new Date("2026-06-15T12:00:00.000Z");
 
+  await prisma.courseAssignment.upsert({
+    where: {
+      organizationId_courseId_membershipId: {
+        organizationId: organization.id,
+        courseId: coachingCourse.id,
+        membershipId: learnerMembership.id,
+      },
+    },
+    update: {
+      assignedByMembershipId: adminMembership.id,
+      startDate,
+      dueDate: addBusinessDays(startDate, coachingCourse.estimatedCompletionBusinessDays),
+      status: "ASSIGNED",
+    },
+    create: {
+      id: "seed-acme-learner-manager-coaching",
+      organizationId: organization.id,
+      courseId: coachingCourse.id,
+      membershipId: learnerMembership.id,
+      assignedByMembershipId: adminMembership.id,
+      startDate,
+      dueDate: addBusinessDays(startDate, coachingCourse.estimatedCompletionBusinessDays),
+      status: "ASSIGNED",
+    },
+  });
+
   const securityAssignment = await prisma.courseAssignment.upsert({
     where: {
       organizationId_courseId_membershipId: {
@@ -1043,6 +1069,75 @@ async function main() {
       lastEventAt: new Date("2026-06-10T14:00:00.000Z"),
     },
   });
+
+  const privacyLessonProgressPayload = {
+    completed: true,
+    lastWatchedAt: new Date("2026-06-10T13:45:00.000Z"),
+  };
+
+  for (const lesson of Object.values(privacyLessons)) {
+    await prisma.videoLessonProgress.upsert({
+      where: {
+        organizationId_assignmentId_lessonId: {
+          organizationId: organization.id,
+          assignmentId: completedAssignment.id,
+          lessonId: lesson.id,
+        },
+      },
+      update: {
+        courseId: privacyCourse.id,
+        lastPositionSecond: lesson.durationSeconds,
+        maxWatchedSecond: lesson.durationSeconds,
+        ...privacyLessonProgressPayload,
+      },
+      create: {
+        organizationId: organization.id,
+        courseId: privacyCourse.id,
+        assignmentId: completedAssignment.id,
+        lessonId: lesson.id,
+        lastPositionSecond: lesson.durationSeconds,
+        maxWatchedSecond: lesson.durationSeconds,
+        ...privacyLessonProgressPayload,
+      },
+    });
+  }
+
+  const privacyCorrectAnswer = privacyPersonalDataCheck.answers.find((answer) => answer.correct);
+
+  if (!privacyCorrectAnswer) {
+    throw new Error("Seed privacy knowledge check is missing a correct answer.");
+  }
+
+  const privacyKnowledgeCheckAttempt = await prisma.knowledgeCheckAttempt.upsert({
+    where: {
+      organizationId_assignmentId_questionId_attemptNumber: {
+        organizationId: organization.id,
+        assignmentId: completedAssignment.id,
+        questionId: privacyPersonalDataCheck.question.id,
+        attemptNumber: 1,
+      },
+    },
+    update: {
+      selectedAnswerIds: [privacyCorrectAnswer.id],
+      correct: true,
+      scorePercent: 100,
+      submittedAt: new Date("2026-06-10T13:50:00.000Z"),
+    },
+    create: {
+      organizationId: organization.id,
+      assignmentId: completedAssignment.id,
+      questionId: privacyPersonalDataCheck.question.id,
+      attemptNumber: 1,
+      selectedAnswerIds: [privacyCorrectAnswer.id],
+      correct: true,
+      scorePercent: 100,
+      submittedAt: new Date("2026-06-10T13:50:00.000Z"),
+    },
+  });
+
+  if (!privacyKnowledgeCheckAttempt.correct) {
+    throw new Error("Seed privacy knowledge check attempt did not converge to correct.");
+  }
 
   const dataPrivacyVerificationCode = "LHACMEDATAPRIVACY1";
   const certificatePayload = {

@@ -159,6 +159,12 @@ describe("learner experience page shells", () => {
     expect(seed).toContain("certificatePayload");
     expect(seed).toContain("demoCertificateBaseUrl");
     expect(seed).toContain("update: certificatePayload");
+    expect(seed).toContain('id: "seed-acme-learner-manager-coaching"');
+    expect(seed).toContain('status: "ASSIGNED"');
+    expect(seed).toContain('id: "seed-acme-learner-data-privacy"');
+    expect(seed).toContain('id: "seed-kcq-privacy-personal-data"');
+    expect(seed).toContain("privacyLessonProgressPayload");
+    expect(seed).toContain("privacyKnowledgeCheckAttempt");
     expect(seed).not.toContain("Demo native video course foundation record.");
     expect(seed).not.toContain("Demo published course for manager assignment flows.");
   });
