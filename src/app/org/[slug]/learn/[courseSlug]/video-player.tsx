@@ -164,6 +164,8 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
     );
   }
 
+  const playbackUrl = playablePlaybackUrl(currentLesson.playbackUrl);
+
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="flex flex-col gap-4">
@@ -175,11 +177,11 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
           </p>
         </header>
 
-        {currentLesson.playbackUrl ? (
+        {playbackUrl ? (
           <video
             controls
             className="aspect-video w-full rounded-md bg-slate-950"
-            src={currentLesson.playbackUrl}
+            src={playbackUrl}
             onTimeUpdate={(event) => updateVideoPosition(event.currentTarget.currentTime)}
             onLoadedMetadata={(event) => {
               event.currentTarget.currentTime = currentLesson.progress.lastPositionSecond;
@@ -264,6 +266,24 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
       </aside>
     </section>
   );
+}
+
+function playablePlaybackUrl(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (url.hostname === "video.learnhub.local") {
+      return null;
+    }
+
+    return value;
+  } catch {
+    return null;
+  }
 }
 
 function formatSeconds(value: number): string {

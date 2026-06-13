@@ -201,4 +201,27 @@ describe("VideoPlayer", () => {
       root.unmount();
     });
   });
+
+  it("shows the missing media fallback for seeded placeholder video URLs", async () => {
+    const payload = launchPayload();
+    payload.currentLesson.playbackUrl = "https://video.learnhub.local/demo/lesson.mp4";
+    payload.lessons[0].playbackUrl = payload.currentLesson.playbackUrl;
+
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("/launch");
+      return Response.json(payload);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, root } = await render(
+      <VideoPlayer launchPath="/launch" progressPath="/progress" initialProgressPercent={0} />,
+    );
+
+    expect(container.textContent).toContain("Media source is not available for this lesson.");
+    expect(container.querySelector("video")).toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });
