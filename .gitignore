@@ -2,6 +2,7 @@
 
 .worktrees/
 .superpowers/
+.learnhub/
 
 # dependencies
 /node_modules
