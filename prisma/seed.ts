@@ -5,6 +5,7 @@ import { createPrismaClient } from "../src/lib/prisma";
 const prisma = createPrismaClient();
 const demoAdminEmail = "admin@example.com";
 const legacyDemoAdminEmail = "admin@acme.test";
+const demoCertificateBaseUrl = "http://localhost:3100/certificates";
 
 async function main() {
   const passwordHash = await hashPassword("LearnHubDemo123!");
@@ -255,6 +256,14 @@ async function main() {
         },
       });
     }
+
+    await prisma.courseTagLink.deleteMany({
+      where: {
+        organizationId: organization.id,
+        courseId: course.id,
+        tagId: { notIn: input.tagIds },
+      },
+    });
 
     return course;
   }
@@ -880,7 +889,7 @@ async function main() {
 
   const startDate = new Date("2026-06-15T12:00:00.000Z");
 
-  await prisma.courseAssignment.upsert({
+  const securityAssignment = await prisma.courseAssignment.upsert({
     where: {
       organizationId_courseId_membershipId: {
         organizationId: organization.id,
@@ -892,7 +901,7 @@ async function main() {
       assignedByMembershipId: adminMembership.id,
       startDate,
       dueDate: addBusinessDays(startDate, securityCourse.estimatedCompletionBusinessDays),
-      status: "ASSIGNED",
+      status: "IN_PROGRESS",
     },
     create: {
       id: "seed-acme-learner-security-basics",
@@ -902,7 +911,56 @@ async function main() {
       assignedByMembershipId: adminMembership.id,
       startDate,
       dueDate: addBusinessDays(startDate, securityCourse.estimatedCompletionBusinessDays),
-      status: "ASSIGNED",
+      status: "IN_PROGRESS",
+    },
+  });
+
+  const securityAssignmentProgressPayload = {
+    progressPercent: 58,
+    lastEventAt: new Date("2026-06-12T15:00:00.000Z"),
+  };
+
+  await prisma.assignmentProgress.upsert({
+    where: {
+      organizationId_assignmentId: {
+        organizationId: organization.id,
+        assignmentId: securityAssignment.id,
+      },
+    },
+    update: securityAssignmentProgressPayload,
+    create: {
+      organizationId: organization.id,
+      assignmentId: securityAssignment.id,
+      ...securityAssignmentProgressPayload,
+    },
+  });
+
+  const securityResumeLesson = securityLessons["recognize-suspicious-requests"];
+  const securityLessonProgressPayload = {
+    lastPositionSecond: 420,
+    maxWatchedSecond: 510,
+    completed: false,
+    lastWatchedAt: new Date("2026-06-12T15:00:00.000Z"),
+  };
+
+  await prisma.videoLessonProgress.upsert({
+    where: {
+      organizationId_assignmentId_lessonId: {
+        organizationId: organization.id,
+        assignmentId: securityAssignment.id,
+        lessonId: securityResumeLesson.id,
+      },
+    },
+    update: {
+      courseId: securityCourse.id,
+      ...securityLessonProgressPayload,
+    },
+    create: {
+      organizationId: organization.id,
+      courseId: securityCourse.id,
+      assignmentId: securityAssignment.id,
+      lessonId: securityResumeLesson.id,
+      ...securityLessonProgressPayload,
     },
   });
 
@@ -917,7 +975,7 @@ async function main() {
     where: {
       organizationId_assignmentId_questionId_attemptNumber: {
         organizationId: organization.id,
-        assignmentId: "seed-acme-learner-security-basics",
+        assignmentId: securityAssignment.id,
         questionId: completedQuestion.id,
         attemptNumber: 1,
       },
@@ -930,7 +988,7 @@ async function main() {
     },
     create: {
       organizationId: organization.id,
-      assignmentId: "seed-acme-learner-security-basics",
+      assignmentId: securityAssignment.id,
       questionId: completedQuestion.id,
       attemptNumber: 1,
       selectedAnswerIds: [correctAnswer.id],
@@ -986,6 +1044,25 @@ async function main() {
     },
   });
 
+  const dataPrivacyVerificationCode = "LHACMEDATAPRIVACY1";
+  const certificatePayload = {
+    courseId: privacyCourse.id,
+    membershipId: learnerMembership.id,
+    userId: learner.id,
+    learnerName: "Leela Learner",
+    learnerEmail: "learner@acme.test",
+    courseTitle: "Data Privacy Essentials",
+    issuerName: organization.name,
+    issuerLogoUrl: organization.logoUrl,
+    issuerPrimaryColor: organization.primaryColor,
+    issuerAccentColor: organization.accentColor,
+    artifactStorageKey: null,
+    artifactContentType: "text/html",
+    verificationCode: dataPrivacyVerificationCode,
+    verificationUrl: `${demoCertificateBaseUrl}/${dataPrivacyVerificationCode}`,
+    issuedAt: new Date("2026-06-10T14:00:00.000Z"),
+  };
+
   await prisma.certificate.upsert({
     where: {
       organizationId_assignmentId: {
@@ -993,28 +1070,11 @@ async function main() {
         assignmentId: completedAssignment.id,
       },
     },
-    update: {
-      courseTitle: "Data Privacy Essentials",
-      verificationCode: "LHACMEDATAPRIVACY1",
-      verificationUrl: "http://localhost:3100/certificates/LHACMEDATAPRIVACY1",
-      issuedAt: new Date("2026-06-10T14:00:00.000Z"),
-    },
+    update: certificatePayload,
     create: {
       organizationId: organization.id,
       assignmentId: completedAssignment.id,
-      courseId: privacyCourse.id,
-      membershipId: learnerMembership.id,
-      userId: learner.id,
-      learnerName: "Leela Learner",
-      learnerEmail: "learner@acme.test",
-      courseTitle: "Data Privacy Essentials",
-      issuerName: organization.name,
-      issuerLogoUrl: organization.logoUrl,
-      issuerPrimaryColor: organization.primaryColor,
-      issuerAccentColor: organization.accentColor,
-      verificationCode: "LHACMEDATAPRIVACY1",
-      verificationUrl: "http://localhost:3100/certificates/LHACMEDATAPRIVACY1",
-      issuedAt: new Date("2026-06-10T14:00:00.000Z"),
+      ...certificatePayload,
     },
   });
 

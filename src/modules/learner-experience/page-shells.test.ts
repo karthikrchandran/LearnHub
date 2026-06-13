@@ -151,6 +151,14 @@ describe("learner experience page shells", () => {
     expect(seed).toContain("Security incident practice quiz");
     expect(seed).toContain("knowledgeCheckAttempt.upsert");
     expect(seed).toContain("certificate.upsert");
+    expect(seed).toContain('id: "seed-acme-learner-security-basics"');
+    expect(seed).toContain('status: "IN_PROGRESS"');
+    expect(seed).toContain("securityAssignmentProgressPayload");
+    expect(seed).toContain("assignmentProgress.upsert");
+    expect(seed).toContain("videoLessonProgress.upsert");
+    expect(seed).toContain("certificatePayload");
+    expect(seed).toContain("demoCertificateBaseUrl");
+    expect(seed).toContain("update: certificatePayload");
     expect(seed).not.toContain("Demo native video course foundation record.");
     expect(seed).not.toContain("Demo published course for manager assignment flows.");
   });
