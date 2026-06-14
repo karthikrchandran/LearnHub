@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { addBusinessDays } from "../src/lib/dates/business-days";
 import { hashPassword } from "../src/lib/auth/password";
 import { createPrismaClient } from "../src/lib/prisma";
@@ -8,6 +11,7 @@ const legacyDemoAdminEmail = "admin@acme.test";
 const demoAppBaseUrl = process.env.APP_BASE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3100";
 const demoCertificateBaseUrl = `${demoAppBaseUrl.replace(/\/+$/, "")}/certificates`;
 const demoVideoPlaybackUrl = (lessonSlug: string) => `/api/demo/video/${lessonSlug}`;
+const demoScormPackageId = "seed-compliance-policy-simulation-package";
 
 async function main() {
   const passwordHash = await hashPassword("LearnHubDemo123!");
@@ -270,6 +274,73 @@ async function main() {
     return course;
   }
 
+  async function upsertPublishedScormCourse(input: {
+    slug: string;
+    title: string;
+    description: string;
+    expectedDurationMinutes: number;
+    estimatedCompletionBusinessDays: number;
+    categoryId: string;
+    tagIds: string[];
+  }) {
+    const course = await prisma.course.upsert({
+      where: {
+        organizationId_slug: {
+          organizationId: organization.id,
+          slug: input.slug,
+        },
+      },
+      update: {
+        title: input.title,
+        description: input.description,
+        status: "PUBLISHED",
+        type: "SCORM_1_2",
+        estimatedCompletionBusinessDays: input.estimatedCompletionBusinessDays,
+        expectedDurationMinutes: input.expectedDurationMinutes,
+        categoryId: input.categoryId,
+      },
+      create: {
+        organizationId: organization.id,
+        title: input.title,
+        slug: input.slug,
+        description: input.description,
+        status: "PUBLISHED",
+        type: "SCORM_1_2",
+        estimatedCompletionBusinessDays: input.estimatedCompletionBusinessDays,
+        expectedDurationMinutes: input.expectedDurationMinutes,
+        categoryId: input.categoryId,
+      },
+    });
+
+    for (const tagId of input.tagIds) {
+      await prisma.courseTagLink.upsert({
+        where: {
+          organizationId_courseId_tagId: {
+            organizationId: organization.id,
+            courseId: course.id,
+            tagId,
+          },
+        },
+        update: {},
+        create: {
+          organizationId: organization.id,
+          courseId: course.id,
+          tagId,
+        },
+      });
+    }
+
+    await prisma.courseTagLink.deleteMany({
+      where: {
+        organizationId: organization.id,
+        courseId: course.id,
+        tagId: { notIn: input.tagIds },
+      },
+    });
+
+    return course;
+  }
+
   async function upsertNativeCourseSurface(
     course: { id: string },
     input: {
@@ -489,6 +560,97 @@ async function main() {
     return { question, answers };
   }
 
+  async function seedDemoScormContent(input: { contentRootKey: string; title: string }) {
+    const contentDirectory = join(process.cwd(), ".learnhub", "scorm", ...input.contentRootKey.split("/"));
+    await mkdir(contentDirectory, { recursive: true });
+    await writeFile(
+      join(contentDirectory, "index.html"),
+      `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>${input.title}</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: #020617;
+        color: #ffffff;
+      }
+
+      main {
+        display: grid;
+        gap: 20px;
+        min-height: 100vh;
+        align-content: center;
+        padding: 48px;
+      }
+
+      h1 {
+        max-width: 720px;
+        margin: 0;
+        font-size: 42px;
+        line-height: 1.05;
+      }
+
+      p {
+        max-width: 680px;
+        margin: 0;
+        color: #dbeafe;
+        font-size: 18px;
+        line-height: 1.6;
+      }
+
+      button {
+        width: fit-content;
+        border: 0;
+        border-radius: 999px;
+        background: #93c5fd;
+        color: #0f172a;
+        cursor: pointer;
+        font-weight: 800;
+        padding: 12px 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p>SCORM 1.2 demo package</p>
+      <h1>${input.title}</h1>
+      <p>This local demo package proves the learner can launch SCORM content, communicate through the LMS API, and commit progress.</p>
+      <button type="button" id="complete">Complete simulation</button>
+    </main>
+    <script>
+      const api = window.API;
+
+      if (api) {
+        api.LMSInitialize("");
+        api.LMSSetValue("cmi.core.lesson_status", "incomplete");
+        api.LMSSetValue("cmi.core.score.raw", "40");
+        api.LMSSetValue("cmi.core.session_time", "0000:03:00.00");
+        api.LMSCommit("");
+      }
+
+      document.getElementById("complete").addEventListener("click", () => {
+        if (!api) return;
+        api.LMSSetValue("cmi.core.lesson_status", "passed");
+        api.LMSSetValue("cmi.core.score.raw", "95");
+        api.LMSSetValue("cmi.core.session_time", "0000:08:00.00");
+        api.LMSCommit("");
+        api.LMSFinish("");
+      });
+    </script>
+  </body>
+</html>
+`,
+      "utf8",
+    );
+  }
+
   const complianceCategory = await upsertCategory("compliance", "Compliance");
   const securityCategory = await upsertCategory("security", "Security");
   const leadershipCategory = await upsertCategory("leadership", "Leadership");
@@ -574,6 +736,62 @@ async function main() {
     estimatedCompletionBusinessDays: 4,
     categoryId: customerCareCategory.id,
     tagIds: [inclusionTag.id, leadershipTag.id],
+  });
+
+  const complianceSimulationCourse = await upsertPublishedScormCourse({
+    slug: "compliance-policy-simulation",
+    title: "Compliance Policy Simulation",
+    description: "Launch a SCORM 1.2 policy simulation that demonstrates completion, score, and LMS progress tracking.",
+    expectedDurationMinutes: 35,
+    estimatedCompletionBusinessDays: 4,
+    categoryId: complianceCategory.id,
+    tagIds: [onboardingTag.id],
+  });
+
+  const complianceSimulationContentRootKey = `org/${organization.id}/courses/${complianceSimulationCourse.id}/scorm/${demoScormPackageId}/content`;
+  const complianceSimulationPackage = await prisma.scormPackage.upsert({
+    where: {
+      organizationId_courseId: {
+        organizationId: organization.id,
+        courseId: complianceSimulationCourse.id,
+      },
+    },
+    update: {
+      originalFileName: "compliance-policy-simulation.zip",
+      contentType: "application/zip",
+      byteSize: 8192,
+      storageKey: `org/${organization.id}/courses/${complianceSimulationCourse.id}/scorm/${demoScormPackageId}/source/compliance-policy-simulation.zip`,
+      contentRootKey: complianceSimulationContentRootKey,
+      launchPath: "index.html",
+      manifestTitle: "Compliance Policy Simulation",
+      extractionStatus: "READY",
+      extractionError: null,
+      malwareScanStatus: "PASSED",
+      malwareScanError: null,
+      uploadedByUserId: admin.id,
+      active: true,
+    },
+    create: {
+      id: demoScormPackageId,
+      organizationId: organization.id,
+      courseId: complianceSimulationCourse.id,
+      originalFileName: "compliance-policy-simulation.zip",
+      contentType: "application/zip",
+      byteSize: 8192,
+      storageKey: `org/${organization.id}/courses/${complianceSimulationCourse.id}/scorm/${demoScormPackageId}/source/compliance-policy-simulation.zip`,
+      contentRootKey: complianceSimulationContentRootKey,
+      launchPath: "index.html",
+      manifestTitle: "Compliance Policy Simulation",
+      extractionStatus: "READY",
+      malwareScanStatus: "PASSED",
+      uploadedByUserId: admin.id,
+      active: true,
+    },
+  });
+
+  await seedDemoScormContent({
+    contentRootKey: complianceSimulationPackage.contentRootKey,
+    title: "Compliance Policy Simulation",
   });
 
   const securityLessons = await upsertNativeCourseSurface(securityCourse, {
@@ -890,6 +1108,84 @@ async function main() {
   });
 
   const startDate = new Date("2026-06-15T12:00:00.000Z");
+
+  const complianceSimulationAssignment = await prisma.courseAssignment.upsert({
+    where: {
+      organizationId_courseId_membershipId: {
+        organizationId: organization.id,
+        courseId: complianceSimulationCourse.id,
+        membershipId: learnerMembership.id,
+      },
+    },
+    update: {
+      assignedByMembershipId: adminMembership.id,
+      startDate,
+      dueDate: addBusinessDays(startDate, complianceSimulationCourse.estimatedCompletionBusinessDays),
+      status: "ASSIGNED",
+    },
+    create: {
+      id: "seed-acme-learner-compliance-policy-simulation",
+      organizationId: organization.id,
+      courseId: complianceSimulationCourse.id,
+      membershipId: learnerMembership.id,
+      assignedByMembershipId: adminMembership.id,
+      startDate,
+      dueDate: addBusinessDays(startDate, complianceSimulationCourse.estimatedCompletionBusinessDays),
+      status: "ASSIGNED",
+    },
+  });
+
+  await prisma.assignmentProgress.upsert({
+    where: {
+      organizationId_assignmentId: {
+        organizationId: organization.id,
+        assignmentId: complianceSimulationAssignment.id,
+      },
+    },
+    update: {
+      progressPercent: 0,
+      lastEventAt: null,
+    },
+    create: {
+      organizationId: organization.id,
+      assignmentId: complianceSimulationAssignment.id,
+      progressPercent: 0,
+      lastEventAt: null,
+    },
+  });
+
+  await prisma.scormRegistration.upsert({
+    where: {
+      organizationId_assignmentId: {
+        organizationId: organization.id,
+        assignmentId: complianceSimulationAssignment.id,
+      },
+    },
+    update: {
+      packageId: complianceSimulationPackage.id,
+      cmiData: {},
+      lessonStatus: "not attempted",
+      scoreRaw: null,
+      sessionTimeSeconds: 0,
+      totalTimeSeconds: 0,
+      launchCount: 0,
+      lastLaunchedAt: null,
+      lastCommittedAt: null,
+    },
+    create: {
+      organizationId: organization.id,
+      assignmentId: complianceSimulationAssignment.id,
+      packageId: complianceSimulationPackage.id,
+      cmiData: {},
+      lessonStatus: "not attempted",
+      scoreRaw: null,
+      sessionTimeSeconds: 0,
+      totalTimeSeconds: 0,
+      launchCount: 0,
+      lastLaunchedAt: null,
+      lastCommittedAt: null,
+    },
+  });
 
   await prisma.courseAssignment.upsert({
     where: {

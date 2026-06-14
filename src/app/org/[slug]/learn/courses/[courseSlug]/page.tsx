@@ -68,6 +68,7 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
     notFound();
   }
 
+  const isScormCourse = course.type === "SCORM_1_2";
   const assignment = course.assignments[0] ?? null;
   const currentLesson = assignment ? findCurrentLesson(course.videoLessons, assignment) : null;
   const progressPercent = assignment ? assignment.progress?.progressPercent ?? (assignment.status === "COMPLETED" ? 100 : 0) : 0;
@@ -161,7 +162,7 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
-          <MetricCard label="Curriculum" value={formatLessonCount(course.videoLessons.length)} />
+          <MetricCard label={isScormCourse ? "Runtime" : "Curriculum"} value={formatCurriculumValue(course.type, course.videoLessons.length)} />
           <MetricCard label="Assessments" value={`${assessmentCount} active`} detail={`${requiredAssessmentCount} required`} />
           <MetricCard label="Certificate eligibility" value={assignment?.certificate ? "Earned" : "Included"} detail="Issued on completion" />
         </section>
@@ -169,10 +170,16 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
         <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
           <div className="grid gap-4">
             <div>
-              <p className="lh-eyebrow">Curriculum</p>
-              <h2 className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">Lessons in this course</h2>
+              <p className="lh-eyebrow">{isScormCourse ? "SCORM package" : "Curriculum"}</p>
+              <h2 className="mt-2 text-2xl font-black text-[var(--learnhub-ink)]">
+                {isScormCourse ? "Launch the simulation" : "Lessons in this course"}
+              </h2>
             </div>
-            <CurriculumList courseSlug={courseSlug} lessons={course.videoLessons} modules={course.modules} slug={slug} />
+            {isScormCourse ? (
+              <ScormPackagePanel assignment={assignment} href={scormRuntimeHref} />
+            ) : (
+              <CurriculumList courseSlug={courseSlug} lessons={course.videoLessons} modules={course.modules} slug={slug} />
+            )}
           </div>
 
           <aside className="grid content-start gap-4">
@@ -182,7 +189,9 @@ export default async function CourseOverviewPage({ params }: CourseOverviewPageP
                 {assignment?.certificate ? "Certificate earned" : "Certificate on completion"}
               </h2>
               <p className="mt-2 text-sm text-[var(--learnhub-muted)]">
-                Complete the required lessons and assessments to generate a verifiable LearnHub certificate for this course.
+                {isScormCourse
+                  ? "Complete the SCORM package and any required assessments to generate a verifiable LearnHub certificate for this course."
+                  : "Complete the required lessons and assessments to generate a verifiable LearnHub certificate for this course."}
               </p>
               {assignment?.certificate ? (
                 <PrimaryButton href={`/org/${slug}/certificates`} variant="light">
@@ -279,6 +288,26 @@ function LessonRows({ slug, courseSlug, lessons }: { slug: string; courseSlug: s
   );
 }
 
+function ScormPackagePanel({ assignment, href }: { assignment: CourseAssignment | null; href: string }) {
+  return (
+    <section className="lh-curriculum-card">
+      <h3 className="min-w-0 break-words text-lg font-black text-[var(--learnhub-ink)]">SCORM package</h3>
+      <p className="mt-2 text-sm text-[var(--learnhub-muted)]">
+        Launch the interactive package in the LearnHub SCORM player. Progress, score, and completion are saved back to this course.
+      </p>
+      {assignment ? (
+        <div className="mt-4">
+          <PrimaryButton href={href} variant="blue">
+            {assignment.status === "IN_PROGRESS" ? "Resume SCORM course" : "Launch SCORM course"}
+          </PrimaryButton>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm font-bold text-[var(--learnhub-muted-strong)]">Enroll or receive an assignment to launch this package.</p>
+      )}
+    </section>
+  );
+}
+
 function MetricCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <section className="lh-metric-card">
@@ -321,6 +350,10 @@ function formatAssignmentStatus(status: string): string {
 
 function formatBusinessDays(days: number): string {
   return `${days} ${days === 1 ? "business day" : "business days"}`;
+}
+
+function formatCurriculumValue(type: string, lessonCount: number): string {
+  return type === "SCORM_1_2" ? "SCORM package" : formatLessonCount(lessonCount);
 }
 
 function formatLessonCount(count: number): string {

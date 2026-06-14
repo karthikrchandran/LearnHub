@@ -96,7 +96,7 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
   ].filter((course): course is LearnerCourseView => Boolean(course));
   const uniqueFeaturedCourses = Array.from(
     new Map(featuredCourses.map((course) => [`${course.status}-${course.id}`, course])).values(),
-  ).slice(0, 3);
+  );
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">

@@ -212,6 +212,13 @@ describe("learner experience page shells", () => {
     expect(seed).toContain("Data Privacy Essentials");
     expect(seed).toContain("Handling Difficult Conversations");
     expect(seed).toContain("Warehouse Safety Fundamentals");
+    expect(seed).toContain("Compliance Policy Simulation");
+    expect(seed).toContain('slug: "compliance-policy-simulation"');
+    expect(seed).toContain('type: "SCORM_1_2"');
+    expect(seed).toContain('id: "seed-acme-learner-compliance-policy-simulation"');
+    expect(seed).toContain('const demoScormPackageId = "seed-compliance-policy-simulation-package"');
+    expect(seed).toContain("seedDemoScormContent");
+    expect(seed).toContain("scormRegistration.upsert");
     expect(seed).toContain("Security incident practice quiz");
     expect(seed).toContain("knowledgeCheckAttempt.upsert");
     expect(seed).toContain("certificate.upsert");
@@ -248,6 +255,7 @@ describe("learner experience page shells", () => {
     expect(myCourses).toContain("LearnerAppShell");
     expect(myCourses).toContain("CourseCard");
     expect(myCourses).toContain("Learner access required");
+    expect(myCourses).not.toContain(".slice(0, 3)");
     expect(catalog).toContain("Course Catalog");
     expect(catalog).toContain("Find the next course for your role");
     expect(catalog).toContain("selfEnrollFormAction");
@@ -270,6 +278,8 @@ describe("learner experience page shells", () => {
     expect(overview).toContain("enrollmentPolicy: true");
     expect(overview).toContain('organization.enrollmentPolicy === "ASSIGNMENT_AND_SELF_ENROLLMENT"');
     expect(overview).toContain("/learn/${encodeURIComponent(courseSlug)}/scorm");
+    expect(overview).toContain("ScormPackagePanel");
+    expect(overview).toContain("SCORM package");
     expect(overview).toContain("lessons/${encodeURIComponent(currentLesson.slug)}");
     expect(overview).toContain("lessons/${encodeURIComponent(lesson.slug)}");
     expect(legacy).toContain("redirect(`/org/${slug}/learn/courses/${courseSlug}`)");
