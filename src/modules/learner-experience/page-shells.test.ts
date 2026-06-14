@@ -231,8 +231,11 @@ describe("learner experience page shells", () => {
     expect(seed).toContain('id: "seed-kcq-privacy-personal-data"');
     expect(seed).toContain("privacyLessonProgressPayload");
     expect(seed).toContain("privacyKnowledgeCheckAttempt");
+    expect(seed).toContain("demoVideoPlaybackUrl");
+    expect(seed).toContain("/api/demo/video/${lessonSlug}");
     expect(seed).not.toContain("Demo native video course foundation record.");
     expect(seed).not.toContain("Demo published course for manager assignment flows.");
+    expect(seed).not.toContain("video.learnhub.local");
   });
 
   it("wires My Courses and Catalog learner pages", () => {

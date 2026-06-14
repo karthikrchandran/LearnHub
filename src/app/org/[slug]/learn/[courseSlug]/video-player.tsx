@@ -158,8 +158,8 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
 
   if (!runtime || !currentLesson) {
     return (
-      <section className="rounded-md border border-slate-200 p-4">
-        <p className="text-sm text-slate-600">{statusMessage}</p>
+      <section className="lh-runtime-panel">
+        <p className="lh-runtime-muted">{statusMessage}</p>
       </section>
     );
   }
@@ -167,12 +167,12 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
   const playbackUrl = playablePlaybackUrl(currentLesson.playbackUrl);
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <section className="lh-runtime-player">
       <div className="flex flex-col gap-4">
         <header>
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Learning runtime</p>
-          <h2 className="text-2xl font-semibold text-slate-950">{runtime.courseTitle}</h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="lh-runtime-label">Learning runtime</p>
+          <h2 className="lh-runtime-heading">{runtime.courseTitle}</h2>
+          <p className="lh-runtime-muted">
             {progressPercent}% complete / {statusMessage}
           </p>
         </header>
@@ -180,7 +180,7 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
         {playbackUrl ? (
           <video
             controls
-            className="aspect-video w-full rounded-md bg-slate-950"
+            className="lh-runtime-video"
             src={playbackUrl}
             onTimeUpdate={(event) => updateVideoPosition(event.currentTarget.currentTime)}
             onLoadedMetadata={(event) => {
@@ -188,7 +188,7 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
             }}
           />
         ) : (
-          <div className="flex aspect-video items-center justify-center rounded-md border border-slate-200 bg-slate-950 px-4 text-center text-sm font-medium text-white">
+          <div className="lh-runtime-missing-media">
             Media source is not available for this lesson.
           </div>
         )}
@@ -197,24 +197,24 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
           <button
             type="button"
             onClick={() => void saveProgress()}
-            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+            className="lh-runtime-action"
           >
             Save progress
           </button>
-          <span className="rounded-md bg-slate-50 px-4 py-2 text-sm text-slate-700">
+          <span className="lh-runtime-stat">
             {positionSecond}s position / {watchedSecond}s watched
           </span>
         </div>
 
-        <section className="rounded-md border border-slate-200 p-4">
-          <h3 className="text-lg font-semibold text-slate-950">Lessons</h3>
+        <section className="lh-runtime-panel">
+          <h3 className="lh-runtime-subheading">Lessons</h3>
           <div className="mt-3 grid gap-2">
             {runtime.lessons.map((lesson) => (
               <button
                 key={lesson.id}
                 type="button"
                 onClick={() => selectLesson(lesson)}
-                className="rounded-md border border-slate-200 px-3 py-2 text-left text-sm text-slate-700"
+                className="lh-runtime-list-button"
               >
                 {lesson.title}
               </button>
@@ -224,18 +224,18 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
       </div>
 
       <aside className="flex flex-col gap-4">
-        <section className="rounded-md border border-slate-200 p-4">
-          <h3 className="text-lg font-semibold text-slate-950">Chapters</h3>
+        <section className="lh-runtime-panel">
+          <h3 className="lh-runtime-subheading">Chapters</h3>
           <div className="mt-4 flex flex-col gap-2">
             {currentLesson.chapters.length === 0 ? (
-              <p className="text-sm text-slate-500">No chapters recorded.</p>
+              <p className="lh-runtime-muted">No chapters recorded.</p>
             ) : (
               currentLesson.chapters.map((chapter) => (
                 <button
                   key={chapter.id}
                   type="button"
                   onClick={() => updateVideoPosition(chapter.startSecond)}
-                  className="rounded-md border border-slate-200 px-3 py-2 text-left text-sm text-slate-700"
+                  className="lh-runtime-list-button"
                 >
                   {chapter.title}
                 </button>
@@ -244,18 +244,18 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
           </div>
         </section>
 
-        <section className="rounded-md border border-slate-200 p-4">
-          <h3 className="text-lg font-semibold text-slate-950">Transcript</h3>
-          <div className="mt-4 space-y-3 text-sm text-slate-600">
+        <section className="lh-runtime-panel">
+          <h3 className="lh-runtime-subheading">Transcript</h3>
+          <div className="mt-4 space-y-3">
             {currentLesson.transcriptCues.length === 0 ? (
-              <p className="text-slate-500">No transcript cues recorded.</p>
+              <p className="lh-runtime-muted">No transcript cues recorded.</p>
             ) : (
               currentLesson.transcriptCues.map((cue) => (
                 <button
                   key={cue.id}
                   type="button"
                   onClick={() => updateVideoPosition(cue.startSecond)}
-                  className="block text-left text-slate-700"
+                  className="lh-runtime-transcript-button"
                 >
                   {formatSeconds(cue.startSecond)} {cue.text}
                 </button>
@@ -271,6 +271,10 @@ export function VideoPlayer({ launchPath, progressPath, initialProgressPercent, 
 function playablePlaybackUrl(value: string | null): string | null {
   if (!value) {
     return null;
+  }
+
+  if (value.startsWith("/")) {
+    return value;
   }
 
   try {

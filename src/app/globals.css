@@ -553,6 +553,111 @@ body {
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.24);
 }
 
+.lh-runtime-player {
+  display: grid;
+  gap: 24px;
+  color: #ffffff;
+}
+
+@media (min-width: 1024px) {
+  .lh-runtime-player {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+  }
+}
+
+.lh-runtime-label {
+  color: #bfdbfe;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lh-runtime-heading {
+  margin-top: 4px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.lh-runtime-subheading {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.lh-runtime-muted {
+  margin-top: 8px;
+  color: #dbeafe;
+  font-size: 14px;
+}
+
+.lh-runtime-video,
+.lh-runtime-missing-media {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  border-radius: 12px;
+  background: #020617;
+}
+
+.lh-runtime-missing-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(219, 234, 254, 0.7);
+  color: #ffffff;
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.lh-runtime-action {
+  border-radius: 10px;
+  background: #020617;
+  color: #ffffff;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.lh-runtime-stat {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--learnhub-ink);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lh-runtime-panel {
+  border: 1px solid rgba(219, 234, 254, 0.75);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.24);
+  color: #ffffff;
+  padding: 16px;
+}
+
+.lh-runtime-list-button,
+.lh-runtime-transcript-button {
+  width: 100%;
+  border: 1px solid rgba(219, 234, 254, 0.75);
+  border-radius: 10px;
+  color: #ffffff;
+  text-align: left;
+  font-size: 14px;
+}
+
+.lh-runtime-list-button {
+  padding: 10px 12px;
+}
+
+.lh-runtime-transcript-button {
+  display: block;
+  padding: 0;
+}
+
 .lh-assessment-board {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);

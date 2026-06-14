@@ -7,6 +7,7 @@ const demoAdminEmail = "admin@example.com";
 const legacyDemoAdminEmail = "admin@acme.test";
 const demoAppBaseUrl = process.env.APP_BASE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3100";
 const demoCertificateBaseUrl = `${demoAppBaseUrl.replace(/\/+$/, "")}/certificates`;
+const demoVideoPlaybackUrl = (lessonSlug: string) => `/api/demo/video/${lessonSlug}`;
 
 async function main() {
   const passwordHash = await hashPassword("LearnHubDemo123!");
@@ -320,7 +321,7 @@ async function main() {
           providerPlaybackId: null,
           providerStatus: "READY",
           providerError: null,
-          playbackUrl: `https://video.learnhub.local/demo/${lessonSlug}.mp4`,
+          playbackUrl: demoVideoPlaybackUrl(lessonSlug),
           transcriptLanguage: "en",
         },
         create: {
@@ -333,7 +334,7 @@ async function main() {
           durationSeconds,
           required: true,
           providerStatus: "READY",
-          playbackUrl: `https://video.learnhub.local/demo/${lessonSlug}.mp4`,
+          playbackUrl: demoVideoPlaybackUrl(lessonSlug),
           transcriptLanguage: "en",
         },
       });

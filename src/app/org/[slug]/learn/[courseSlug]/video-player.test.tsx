@@ -224,4 +224,53 @@ describe("VideoPlayer", () => {
       root.unmount();
     });
   });
+
+  it("renders LearnHub demo media URLs as a playable video source", async () => {
+    const payload = launchPayload();
+    payload.currentLesson.playbackUrl = "/api/demo/video/lesson-one";
+    payload.lessons[0].playbackUrl = payload.currentLesson.playbackUrl;
+
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("/launch");
+      return Response.json(payload);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, root } = await render(
+      <VideoPlayer launchPath="/launch" progressPath="/progress" initialProgressPercent={0} />,
+    );
+
+    const video = container.querySelector("video");
+
+    expect(container.textContent).not.toContain("Media source is not available for this lesson.");
+    expect(video).not.toBeNull();
+    expect(video?.getAttribute("src")).toBe("/api/demo/video/lesson-one");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("uses dark runtime classes so text stays readable on the lesson media surface", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("/launch");
+      return Response.json(launchPayload());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container, root } = await render(
+      <VideoPlayer launchPath="/launch" progressPath="/progress" initialProgressPercent={0} />,
+    );
+
+    expect(container.querySelector(".lh-runtime-player")).not.toBeNull();
+    expect(container.querySelector(".lh-runtime-heading")).not.toBeNull();
+    expect(container.querySelector(".lh-runtime-panel")).not.toBeNull();
+    expect(container.querySelector(".lh-runtime-muted")).not.toBeNull();
+    expect(container.innerHTML).not.toContain("text-slate-950");
+    expect(container.innerHTML).not.toContain("text-slate-700");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });
