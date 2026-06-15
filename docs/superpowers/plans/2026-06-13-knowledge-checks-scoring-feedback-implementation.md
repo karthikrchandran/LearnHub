@@ -10,55 +10,6 @@
 
 ---
 
-## Planning Prep And Start Gate
-
-This plan is prep-ready but not implementation-ready until the upstream parallel lanes finish.
-
-Start Task 3 only after all of the following are true:
-
-- Task 2, global library copy workflow, is merged into the base branch and its focused tests plus `npm run lint`, `npx prisma validate`, `npm run prisma:generate`, `npx tsc --noEmit --incremental false`, and `npm run build` passed.
-- Task 4, notifications/jobs/email providers, is merged into the base branch and has passed spec review, code quality review, focused tests, and the same shared gates.
-- Task 5, production media/storage/SCORM operations, is merged into the base branch and has passed spec review, code quality review, focused tests, and the same shared gates.
-- `main` has been updated to include Tasks 2, 4, and 5 before creating `feature/knowledge-checks-scoring-feedback`.
-
-Current repo context captured during planning prep:
-
-- `main` has no `src/modules/assessments` or `src/modules/feedback` modules yet.
-- `prisma/schema.prisma` has no knowledge-check or course-feedback models on `main`.
-- `src/app/org/[slug]/learn/[courseSlug]/page.tsx` currently renders only `VideoPlayer` for assigned native-video learners.
-- `src/modules/video/video-runtime.ts` currently calculates native completion from required lessons only.
-- `src/modules/progress/progress.ts` accepts opaque `rawPayload`; Task 3 should add knowledge-check counts in native raw payload without changing SCORM capping rules.
-- `src/modules/reports/progress-report.ts` and `src/modules/reports/prisma-repository.ts` currently expose progress rows without assessment score fields.
-- Task 2 branch currently adds global-library lineage fields but not Task 3 knowledge-check schema; its copy workflow tolerates an empty `knowledgeChecks` payload so Task 3 can extend copy behavior later if needed.
-
-Before implementation, run this preflight in the Task 3 worktree:
-
-```powershell
-git status --short --branch
-rg "KnowledgeCheck|CourseFeedback|knowledgeCheck|courseFeedback" prisma src
-rg "globalLibrary|isGlobalLibraryCourse|sourceGlobal" prisma/schema.prisma src/modules/library
-rg "NotificationJob|Mux|R2|ScormPackageJob|contentRootKey" prisma/schema.prisma src/modules src/app/api
-npm run test -- src/modules/video/video-runtime.test.ts src/modules/progress/progress.test.ts src/modules/reports/progress-report.test.ts src/modules/reports/prisma-repository.test.ts
-npm run lint
-npx prisma validate
-npm run prisma:generate
-npx tsc --noEmit --incremental false
-npm run build
-```
-
-Expected preflight result:
-
-- Branch is clean before edits.
-- Any knowledge-check or feedback models introduced by Task 2 merge are identified before schema work starts.
-- Task 4 and Task 5 provider/job models are visible before adding report and operations-adjacent reads.
-- Existing video, progress, and report tests pass before Task 3 changes them.
-
-Recommended worktree creation after upstream merge:
-
-```powershell
-git worktree add .worktrees/knowledge-checks-scoring-feedback -b feature/knowledge-checks-scoring-feedback main
-```
-
 ## Scope Boundary
 
 This plan implements MVP knowledge checks and learner course feedback for native video courses. It does not add SCORM quiz parsing, timed exams, attempt limits, proctoring, question banks, randomized answer order, rubric grading, PDF exports, chart libraries, or notification jobs.
