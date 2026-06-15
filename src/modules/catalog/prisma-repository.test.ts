@@ -3,6 +3,21 @@ import { describe, expect, it, vi } from "vitest";
 import { createPrismaCatalogRepository } from "./prisma-repository";
 import type { CreateCourseData } from "./course-service";
 
+type ReadinessCourseRecord = {
+  type: "NATIVE_VIDEO" | "SCORM_1_2";
+  videoLessons: Array<{
+    playbackUrl: string | null;
+    providerPlaybackId: string | null;
+    providerStatus: "READY" | "PROCESSING" | "FAILED";
+    providerError: string | null;
+  }>;
+  scormPackages: Array<{
+    launchPath: string | null;
+    extractionStatus: "READY" | "PENDING" | "FAILED";
+    malwareScanStatus: "PASSED" | "PENDING" | "FAILED";
+  }>;
+};
+
 function createCatalogClient() {
   return {
     $transaction: vi.fn(async (operation) => operation(createCatalogClient())),
@@ -16,6 +31,18 @@ function createCatalogClient() {
     },
     course: {
       create: vi.fn(async ({ data }) => ({ id: "course_1", slug: data.slug })),
+      findFirst: vi.fn(async (): Promise<ReadinessCourseRecord> => ({
+        type: "NATIVE_VIDEO",
+        videoLessons: [
+          {
+            playbackUrl: "https://video.test/lesson.mp4",
+            providerPlaybackId: null,
+            providerStatus: "READY",
+            providerError: null,
+          },
+        ],
+        scormPackages: [],
+      })),
       update: vi.fn(async () => ({})),
     },
     courseTagLink: {
@@ -131,5 +158,83 @@ describe("createPrismaCatalogRepository", () => {
     expect(rootClient.auditLog.create).not.toHaveBeenCalled();
     expect(transactionClient.courseCategory.create).toHaveBeenCalledTimes(1);
     expect(transactionClient.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports native video publish readiness from playable lessons", async () => {
+    const client = createCatalogClient();
+    const repository = createPrismaCatalogRepository(
+      client as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
+
+    await expect(
+      repository.findCoursePublishReadiness({
+        organizationId: "org_1",
+        courseId: "course_1",
+      }),
+    ).resolves.toEqual({
+      type: "NATIVE_VIDEO",
+      ready: true,
+      blockers: [],
+    });
+    expect(client.course.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "course_1",
+          organizationId: "org_1",
+        },
+      }),
+    );
+  });
+
+  it("reports SCORM publish readiness only for extracted clean active packages", async () => {
+    const client = createCatalogClient();
+    client.course.findFirst.mockResolvedValueOnce({
+      type: "SCORM_1_2",
+      videoLessons: [],
+      scormPackages: [
+        {
+          launchPath: "/scorm/org/org_1/courses/course_1/scorm/pkg_1/content/index.html",
+          extractionStatus: "READY",
+          malwareScanStatus: "PASSED",
+        },
+      ],
+    });
+    const repository = createPrismaCatalogRepository(
+      client as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
+
+    await expect(
+      repository.findCoursePublishReadiness({
+        organizationId: "org_1",
+        courseId: "course_1",
+      }),
+    ).resolves.toEqual({
+      type: "SCORM_1_2",
+      ready: true,
+      blockers: [],
+    });
+  });
+
+  it("returns publish blockers for missing course content", async () => {
+    const client = createCatalogClient();
+    client.course.findFirst.mockResolvedValueOnce({
+      type: "NATIVE_VIDEO",
+      videoLessons: [],
+      scormPackages: [],
+    });
+    const repository = createPrismaCatalogRepository(
+      client as unknown as Parameters<typeof createPrismaCatalogRepository>[0],
+    );
+
+    await expect(
+      repository.findCoursePublishReadiness({
+        organizationId: "org_1",
+        courseId: "course_1",
+      }),
+    ).resolves.toEqual({
+      type: "NATIVE_VIDEO",
+      ready: false,
+      blockers: ["Add at least one ready video lesson."],
+    });
   });
 });

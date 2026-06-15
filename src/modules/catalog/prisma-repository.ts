@@ -82,6 +82,66 @@ export function createPrismaCatalogRepository(
         })),
       });
     },
+    async findCoursePublishReadiness(input) {
+      const course = await activeClient().course.findFirst({
+        where: {
+          id: input.courseId,
+          organizationId: input.organizationId,
+        },
+        select: {
+          type: true,
+          videoLessons: {
+            select: {
+              playbackUrl: true,
+              providerPlaybackId: true,
+              providerStatus: true,
+              providerError: true,
+            },
+          },
+          scormPackages: {
+            where: { active: true },
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+            select: {
+              launchPath: true,
+              extractionStatus: true,
+              malwareScanStatus: true,
+            },
+          },
+        },
+      });
+
+      if (!course) {
+        return null;
+      }
+
+      if (course.type === "NATIVE_VIDEO") {
+        const readyLessonCount = course.videoLessons.filter((lesson) => {
+          const hasPlayableSource = Boolean(lesson.playbackUrl?.trim() || lesson.providerPlaybackId?.trim());
+
+          return hasPlayableSource && lesson.providerStatus === "READY" && !lesson.providerError;
+        }).length;
+
+        return {
+          type: course.type,
+          ready: readyLessonCount > 0,
+          blockers: readyLessonCount > 0 ? [] : ["Add at least one ready video lesson."],
+        };
+      }
+
+      const activePackage = course.scormPackages[0];
+      const packageReady = Boolean(
+        activePackage?.launchPath?.trim() &&
+          activePackage.extractionStatus === "READY" &&
+          activePackage.malwareScanStatus === "PASSED",
+      );
+
+      return {
+        type: course.type,
+        ready: packageReady,
+        blockers: packageReady ? [] : ["Upload an active SCORM package with completed extraction and passed malware scan."],
+      };
+    },
     async updateCourseLifecycle(input) {
       await activeClient().course.update({
         where: {

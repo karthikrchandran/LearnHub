@@ -7,6 +7,8 @@ type ScormPackageUploadFormProps = {
   courseId: string;
   packageId: string;
   uploadUrl: string;
+  disabled?: boolean;
+  disabledMessage?: string;
 };
 
 type SignedUploadResponse = {
@@ -17,13 +19,21 @@ type SignedUploadResponse = {
 export function ScormPackageUploadForm({
   action,
   courseId,
+  disabled = false,
+  disabledMessage = "R2 storage is not configured.",
   packageId,
   uploadUrl,
 }: ScormPackageUploadFormProps) {
   const uploadedRef = useRef(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(disabled ? disabledMessage : "");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (disabled) {
+      event.preventDefault();
+      setMessage(disabledMessage);
+      return;
+    }
+
     if (uploadedRef.current) {
       uploadedRef.current = false;
       return;
@@ -90,7 +100,13 @@ export function ScormPackageUploadForm({
       <input type="hidden" name="storageKey" />
       <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
         Upload zip
-        <input name="packageFile" type="file" accept=".zip,application/zip" className="rounded-md border border-slate-300 px-3 py-2" />
+        <input
+          name="packageFile"
+          type="file"
+          accept=".zip,application/zip"
+          disabled={disabled}
+          className="rounded-md border border-slate-300 px-3 py-2"
+        />
       </label>
       <label className="grid gap-1 text-sm font-medium text-slate-700">
         Launch path
@@ -101,7 +117,11 @@ export function ScormPackageUploadForm({
         <input name="manifestTitle" className="rounded-md border border-slate-300 px-3 py-2" />
       </label>
       {message ? <p className="text-sm font-medium text-slate-600 md:col-span-2">{message}</p> : null}
-      <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white md:col-span-2">
+      <button
+        type="submit"
+        disabled={disabled}
+        className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 md:col-span-2"
+      >
         Save package metadata
       </button>
     </form>

@@ -242,6 +242,15 @@ export function createPrismaUserLifecycleRepository(
         select: lifecycleMembershipSelect,
       });
     },
+    countActiveAdminMemberships(input) {
+      return activeClient().organizationMembership.count({
+        where: {
+          organizationId: input.organizationId,
+          status: "ACTIVE",
+          roles: { has: "ADMIN" },
+        },
+      });
+    },
     saveMembershipLifecycle(input) {
       return activeClient().organizationMembership.update({
         where: {

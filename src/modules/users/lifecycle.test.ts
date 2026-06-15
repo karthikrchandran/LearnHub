@@ -96,6 +96,13 @@ function createRepository(
 
       return null;
     },
+    async countActiveAdminMemberships(input) {
+      return current?.organizationId === input.organizationId &&
+        current.status === "ACTIVE" &&
+        current.roles.includes("ADMIN")
+        ? 1
+        : 0;
+    },
     async saveMembershipLifecycle(data) {
       savedMemberships.push(data);
       current = { ...current!, ...data };
@@ -271,6 +278,76 @@ describe("organization user lifecycle", () => {
     expect(repository.savedUserStatuses).toEqual([
       { userId: "learner_user", status: "INACTIVE" },
     ]);
+  });
+
+  it("blocks deactivating the last active organization admin", async () => {
+    const lastAdminMembership: OrganizationUserLifecycleRecord = {
+      ...baseMembership,
+      id: "admin_membership",
+      userId: "admin_user",
+      roles: ["ADMIN"],
+      user: {
+        email: "admin@acme.test",
+        status: "ACTIVE",
+      },
+    };
+    const repository = createRepository(lastAdminMembership);
+
+    await expect(
+      updateOrganizationUserLifecycle(
+        {
+          actor: admin,
+          organizationId: "org_1",
+          membershipId: "admin_membership",
+          changes: {
+            roles: ["ADMIN"],
+            managerMembershipId: null,
+            employeeId: "EMP-1",
+            department: "Operations",
+            title: "Specialist",
+            status: "INACTIVE",
+          },
+        },
+        repository,
+      ),
+    ).rejects.toThrow("At least one active organization admin is required");
+    expect(repository.savedMemberships).toEqual([]);
+    expect(repository.savedUserStatuses).toEqual([]);
+  });
+
+  it("blocks removing the admin role from the last active organization admin", async () => {
+    const lastAdminMembership: OrganizationUserLifecycleRecord = {
+      ...baseMembership,
+      id: "admin_membership",
+      userId: "admin_user",
+      roles: ["ADMIN", "LEARNER"],
+      user: {
+        email: "admin@acme.test",
+        status: "ACTIVE",
+      },
+    };
+    const repository = createRepository(lastAdminMembership);
+
+    await expect(
+      updateOrganizationUserLifecycle(
+        {
+          actor: admin,
+          organizationId: "org_1",
+          membershipId: "admin_membership",
+          changes: {
+            roles: ["LEARNER"],
+            managerMembershipId: null,
+            employeeId: "EMP-1",
+            department: "Operations",
+            title: "Specialist",
+            status: "ACTIVE",
+          },
+        },
+        repository,
+      ),
+    ).rejects.toThrow("At least one active organization admin is required");
+    expect(repository.savedMemberships).toEqual([]);
+    expect(repository.savedUserStatuses).toEqual([]);
   });
 
   it("resends invitations only for invited memberships and records audit metadata", async () => {

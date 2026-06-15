@@ -54,7 +54,7 @@ export async function POST(_request: Request, { params }: MuxUploadRouteContext)
       },
       data: {
         providerUploadId: upload.providerUploadId,
-        providerStatus: "PROCESSING",
+        providerStatus: "UPLOAD_CREATED",
         providerError: null,
       },
     });

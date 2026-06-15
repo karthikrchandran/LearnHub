@@ -36,12 +36,22 @@ export type UpdateCourseLifecycleInput = {
   status: CourseStatus;
 };
 
+export type CoursePublishReadiness = {
+  type: CourseType;
+  ready: boolean;
+  blockers: string[];
+};
+
 export type CourseCatalogRepository = {
   runInTransaction<T>(operation: () => Promise<T>): Promise<T>;
   findCategoryById(input: { organizationId: string; categoryId: string }): Promise<{ id: string } | null>;
   findTagsByIds(input: { organizationId: string; tagIds: string[] }): Promise<Array<{ id: string }>>;
   createCourse(data: CreateCourseData): Promise<{ id: string; slug: string }>;
   replaceCourseTags(data: { organizationId: string; courseId: string; tagIds: string[] }): Promise<void>;
+  findCoursePublishReadiness(input: {
+    organizationId: string;
+    courseId: string;
+  }): Promise<CoursePublishReadiness | null>;
   updateCourseLifecycle(data: {
     organizationId: string;
     courseId: string;
@@ -125,6 +135,10 @@ export async function updateCourseLifecycle(
   const actorId = requireNonEmptyValue(input.actorId, "Actor id is required");
   const courseId = requireNonEmptyValue(input.courseId, "Course id is required");
 
+  if (input.status === "PUBLISHED") {
+    await requirePublishReadiness({ organizationId, courseId }, repository);
+  }
+
   await repository.runInTransaction(async () => {
     await repository.updateCourseLifecycle({
       organizationId,
@@ -139,6 +153,21 @@ export async function updateCourseLifecycle(
       targetId: courseId,
     });
   });
+}
+
+async function requirePublishReadiness(
+  input: { organizationId: string; courseId: string },
+  repository: CourseCatalogRepository,
+): Promise<void> {
+  const readiness = await repository.findCoursePublishReadiness(input);
+
+  if (!readiness) {
+    throw new Error("Course was not found");
+  }
+
+  if (!readiness.ready) {
+    throw new Error(`Course cannot be published until content is ready: ${readiness.blockers.join(" ")}`);
+  }
 }
 
 function requireNonEmptyValue(value: string, message: string): string {

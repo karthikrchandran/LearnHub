@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 import { CourseCard, EmptyActionState, LearnerAppShell } from "@/app/ui/learnhub-components";
@@ -22,6 +23,9 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
   const { slug } = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
   const enrollmentError = firstSearchParam(resolvedSearchParams.enrollmentError);
+  const query = firstSearchParam(resolvedSearchParams.query)?.trim() ?? "";
+  const categoryFilter = firstSearchParam(resolvedSearchParams.category);
+  const certificateOnly = firstSearchParam(resolvedSearchParams.certificate) === "1";
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
   const { prisma } = await import("@/lib/prisma");
   const repository = createPrismaLearnerExperienceRepository(prisma);
@@ -47,6 +51,18 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
   const availableCourses = learnerMembership
     ? await repository.listAvailableCourses({ organizationId, excludedCourseIds: assignedCourseIds })
     : [];
+  const filteredAvailableCourses = filterAvailableCourses(availableCourses, {
+    categoryFilter,
+    certificateOnly,
+    query,
+  });
+  const categoryFilters = Array.from(
+    new Map(
+      availableCourses
+        .filter((course) => course.category)
+        .map((course) => [course.category!.slug, course.category!]),
+    ).values(),
+  );
   const today = new Date().toISOString().slice(0, 10);
   const selfEnrollAction = async (formData: FormData) => {
     "use server";
@@ -69,15 +85,33 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
             <h1>Find the next course for your role.</h1>
             <p>Browse recommended compliance, leadership, security, and certificate-ready courses.</p>
           </div>
-          <div className="lh-searchbar">Search catalog</div>
+          <form className="lh-searchbar" method="get">
+            {categoryFilter ? <input type="hidden" name="category" value={categoryFilter} /> : null}
+            {certificateOnly ? <input type="hidden" name="certificate" value="1" /> : null}
+            <input aria-label="Search catalog" defaultValue={query} name="query" placeholder="Search catalog" />
+            <button type="submit">Search</button>
+          </form>
         </header>
 
         <div className="lh-filters" aria-label="Catalog filters">
-          <span className="lh-filter active">All</span>
-          <span className="lh-filter">Compliance</span>
-          <span className="lh-filter">Leadership</span>
-          <span className="lh-filter">Security</span>
-          <span className="lh-filter">Certificate eligible</span>
+          <Link className={!categoryFilter && !certificateOnly ? "lh-filter active" : "lh-filter"} href={catalogFilterHref(slug, { query })}>
+            All
+          </Link>
+          {categoryFilters.map((category) => (
+            <Link
+              className={categoryFilter === category.slug ? "lh-filter active" : "lh-filter"}
+              href={catalogFilterHref(slug, { category: category.slug, query })}
+              key={category.slug}
+            >
+              {category.name}
+            </Link>
+          ))}
+          <Link
+            className={certificateOnly ? "lh-filter active" : "lh-filter"}
+            href={catalogFilterHref(slug, { certificate: true, query })}
+          >
+            Certificate eligible
+          </Link>
         </div>
 
         {enrollmentError ? (
@@ -91,14 +125,14 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
             body="Sign in with an active learner membership to enroll from the catalog."
             title="Learner access required"
           />
-        ) : availableCourses.length === 0 ? (
+        ) : filteredAvailableCourses.length === 0 ? (
           <EmptyActionState
-            body="Your assigned and completed courses are already on My Courses. New catalog options will appear here."
-            title="No catalog courses right now"
+            body={availableCourses.length === 0 ? "Your assigned and completed courses are already on My Courses. New catalog options will appear here." : "No catalog courses matched the selected filters."}
+            title={availableCourses.length === 0 ? "No catalog courses right now" : "No matching catalog courses"}
           />
         ) : (
           <div className="lh-grid-3">
-            {availableCourses.map((course) => (
+            {filteredAvailableCourses.map((course) => (
               <CourseCard
                 action={
                   <form action={selfEnrollAction}>
@@ -125,6 +159,31 @@ export default async function CatalogPage({ params, searchParams }: CatalogPageP
   );
 }
 
+function filterAvailableCourses(
+  courses: AvailableCourse[],
+  filters: { categoryFilter: string | null; certificateOnly: boolean; query: string },
+): AvailableCourse[] {
+  const normalizedQuery = normalizeSearch(filters.query);
+
+  return courses.filter((course) => {
+    const matchesQuery = normalizedQuery
+      ? [
+          course.title,
+          course.description,
+          course.category?.name ?? "",
+          course.category?.slug ?? "",
+          course.type,
+          ...course.tagLinks.map((link) => link.tag.name),
+          ...course.tagLinks.map((link) => link.tag.slug),
+        ].some((value) => normalizeSearch(value).includes(normalizedQuery))
+      : true;
+    const matchesCategory = filters.categoryFilter ? course.category?.slug === filters.categoryFilter : true;
+    const matchesCertificate = filters.certificateOnly ? Boolean(course.credentialProvider) : true;
+
+    return matchesQuery && matchesCategory && matchesCertificate;
+  });
+}
+
 function courseMeta(course: AvailableCourse): string[] {
   return [
     `${course.expectedDurationMinutes} min`,
@@ -144,4 +203,31 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
   }
 
   return value ?? null;
+}
+
+function catalogFilterHref(
+  slug: string,
+  input: { category?: string; certificate?: boolean; query?: string },
+): string {
+  const params = new URLSearchParams();
+
+  if (input.query) {
+    params.set("query", input.query);
+  }
+
+  if (input.category) {
+    params.set("category", input.category);
+  }
+
+  if (input.certificate) {
+    params.set("certificate", "1");
+  }
+
+  const queryString = params.toString();
+
+  return `/org/${slug}/learn/catalog${queryString ? `?${queryString}` : ""}`;
+}
+
+function normalizeSearch(value: string): string {
+  return value.trim().toLowerCase();
 }

@@ -1,3 +1,4 @@
+import { LogoffLink } from "@/app/ui/logoff-link";
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 import {
   createPrismaDashboardRepository,
@@ -35,12 +36,12 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
   const managementEntry = isAdminEntry
     ? {
         body: "Manage catalog setup, assignments, users, branding, and notifications.",
-        href: `/org/${slug}/admin/catalog`,
+        href: `/org/${slug}/admin`,
         title: "Admin console",
       }
     : {
         body: "Assign courses, monitor direct-report progress, and keep team learning moving.",
-        href: `/org/${slug}/admin/assignments`,
+        href: `/org/${slug}/manager`,
         title: "Manager workspace",
       };
 
@@ -69,20 +70,23 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10" style={brandStyle}>
-      <header className="flex flex-wrap items-center gap-4">
-        {logoStyle ? (
-          <div
-            aria-hidden="true"
-            className="h-14 w-14 rounded-md border border-slate-200 bg-contain bg-center bg-no-repeat"
-            style={logoStyle}
-          />
-        ) : null}
-        <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Organization</p>
-          <h1 className="text-3xl font-semibold text-slate-950">
-            {summary.organization.name}
-          </h1>
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          {logoStyle ? (
+            <div
+              aria-hidden="true"
+              className="h-14 w-14 rounded-md border border-slate-200 bg-contain bg-center bg-no-repeat"
+              style={logoStyle}
+            />
+          ) : null}
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Organization</p>
+            <h1 className="text-3xl font-semibold text-slate-950">
+              {summary.organization.name}
+            </h1>
+          </div>
         </div>
+        <LogoffLink />
       </header>
       <section className="h-2 rounded-sm bg-[var(--organization-primary)]" />
       <section className="grid gap-4 md:grid-cols-3">

@@ -1,3 +1,4 @@
+import { LogoffLink } from "@/app/ui/logoff-link";
 import { requirePlatformOwner } from "@/lib/auth/guards";
 import { ensureGlobalLibraryOrganization } from "@/modules/library/prisma-repository";
 import Link from "next/link";
@@ -87,9 +88,12 @@ export default async function PlatformLibraryCoursePage({ params }: PlatformLibr
           <h1 className="text-3xl font-semibold text-slate-950">{course.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">{course.description || "No description yet."}</p>
         </div>
-        <Link href="/platform/library" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
-          Back to library
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/platform/library" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+            Back to library
+          </Link>
+          <LogoffLink />
+        </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-4">

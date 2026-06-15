@@ -1,5 +1,10 @@
-import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
+import Link from "next/link";
 
+import { AdminAppShell } from "@/app/ui/learnhub-components";
+import type { AssignmentActionResult } from "@/modules/assignments/server-actions";
+
+import { getAdminWorkspace } from "../admin-utils";
+import { AssignmentActionForm } from "./assignment-action-form";
 import { assignCourseFormAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -12,69 +17,72 @@ type AssignmentsAdminPageProps = {
 
 export default async function AssignmentsAdminPage({ params }: AssignmentsAdminPageProps) {
   const { slug } = await params;
-  const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
-  const activeMembership = context.memberships.find(
-    (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
-  );
-  const canAssignAll = context.isPlatformOwner || Boolean(activeMembership?.roles.includes("ADMIN"));
-  const canAssignDirectReports = Boolean(activeMembership?.roles.includes("MANAGER"));
-  const publishedCourses = await prisma.course.findMany({
-    where: {
-      organizationId,
-      status: "PUBLISHED",
-    },
-    orderBy: { title: "asc" },
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      type: true,
-    },
-  });
-  const eligibleLearners =
-    canAssignAll || canAssignDirectReports
-      ? await prisma.organizationMembership.findMany({
-          where: {
-            organizationId,
-            status: "ACTIVE",
-            roles: { has: "LEARNER" },
-            ...(canAssignAll ? {} : { managerMembershipId: activeMembership?.id }),
-          },
-          orderBy: {
-            user: { email: "asc" },
-          },
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
+  const [publishedCourses, eligibleLearners] = await Promise.all([
+    prisma.course.findMany({
+      where: {
+        organizationId,
+        status: "PUBLISHED",
+      },
+      orderBy: { title: "asc" },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        type: true,
+      },
+    }),
+    prisma.organizationMembership.findMany({
+      where: {
+        organizationId,
+        status: "ACTIVE",
+        roles: { has: "LEARNER" },
+      },
+      orderBy: {
+        user: { email: "asc" },
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        department: true,
+        title: true,
+        user: {
           select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            title: true,
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
+            firstName: true,
+            lastName: true,
+            email: true,
           },
-        })
-      : [];
-  const assignCourseAction = async (formData: FormData) => {
+        },
+      },
+    }),
+  ]);
+  const assignCourseAction = async (_previousState: AssignmentActionResult, formData: FormData) => {
     "use server";
 
-    await assignCourseFormAction(slug, formData);
+    return assignCourseFormAction(slug, formData);
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Assignments</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{slug} course assignments</h1>
-      </header>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="assignments">
+      <div className="lh-main-inner lh-main-wide">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Assignments</p>
+            <h1>Assign one learner</h1>
+            <p>Assign a published course to a single active learner.</p>
+          </div>
+          <Link className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800" href={`/org/${slug}/admin/assignments/bulk`}>
+            Bulk Assignments
+          </Link>
+        </header>
 
-      <section className="grid gap-4">
-        {canAssignAll || canAssignDirectReports ? (
-          <form action={assignCourseAction} className="grid gap-4">
+        <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-5">
+          <AssignmentActionForm
+            action={assignCourseAction}
+            className="grid gap-4"
+            pendingLabel="Assigning..."
+            submitLabel="Assign course"
+          >
             <label className="grid gap-2 text-sm font-medium text-slate-700">
               Course selector
               <select name="courseId" className="rounded-md border border-slate-300 px-3 py-2">
@@ -88,7 +96,7 @@ export default async function AssignmentsAdminPage({ params }: AssignmentsAdminP
             </label>
 
             <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Learner or direct report
+              Learner
               <select name="learnerMembershipId" className="rounded-md border border-slate-300 px-3 py-2">
                 <option value="">Select an active learner</option>
                 {eligibleLearners.map((learner) => (
@@ -103,60 +111,45 @@ export default async function AssignmentsAdminPage({ params }: AssignmentsAdminP
               Start date
               <input name="startDate" type="date" className="rounded-md border border-slate-300 px-3 py-2" />
             </label>
+          </AssignmentActionForm>
+        </section>
 
-            <button type="submit" className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white">
-              Assign course
-            </button>
-          </form>
-        ) : (
-          <p className="rounded-md border border-slate-200 p-4 text-sm text-slate-600">
-            Assignment controls are available to organization admins and managers with direct reports.
-          </p>
-        )}
-      </section>
-
-      <section className="rounded-md border border-slate-200 p-4">
-        <h2 className="text-lg font-semibold text-slate-950">Eligible learners</h2>
-        <div className="mt-4 overflow-x-auto">
+        <section className="overflow-x-auto rounded-md border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-slate-500">
-                <th className="px-3 py-2 font-medium">Learner</th>
-                <th className="px-3 py-2 font-medium">Department</th>
-                <th className="px-3 py-2 font-medium">Title</th>
-                <th className="px-3 py-2 font-medium">Employee id</th>
+                <th className="px-4 py-3 font-medium">Learner</th>
+                <th className="px-4 py-3 font-medium">Department</th>
+                <th className="px-4 py-3 font-medium">Title</th>
+                <th className="px-4 py-3 font-medium">Employee id</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {eligibleLearners.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-4 text-slate-500">
-                    No eligible learners for your assignment scope.
+                  <td colSpan={4} className="px-4 py-5 text-slate-500">
+                    No active learners are available.
                   </td>
                 </tr>
               ) : (
                 eligibleLearners.map((learner) => (
                   <tr key={learner.id}>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-4">
                       <div className="font-medium text-slate-950">
                         {learner.user.firstName} {learner.user.lastName}
                       </div>
                       <div className="text-slate-500">{learner.user.email}</div>
                     </td>
-                    <td className="px-3 py-3 text-slate-700">{learner.department ?? "None"}</td>
-                    <td className="px-3 py-3 text-slate-700">{learner.title ?? "None"}</td>
-                    <td className="px-3 py-3 text-slate-700">{learner.employeeId ?? "None"}</td>
+                    <td className="px-4 py-4 text-slate-700">{learner.department ?? "None"}</td>
+                    <td className="px-4 py-4 text-slate-700">{learner.title ?? "None"}</td>
+                    <td className="px-4 py-4 text-slate-700">{learner.employeeId ?? "None"}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
-      </section>
-
-      <p className="text-sm text-slate-600">
-        Admins can assign courses within the organization; managers only to direct reports.
-      </p>
-    </main>
+        </section>
+      </div>
+    </AdminAppShell>
   );
 }

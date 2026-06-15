@@ -203,7 +203,7 @@ describe("learner experience page shells", () => {
     expect(dashboardSummaryIndex).toBeGreaterThan(-1);
     expect(learnerRedirectIndex).toBeLessThan(dashboardSummaryIndex);
     expect(org).toContain("Manager workspace");
-    expect(org).toContain("/admin/assignments");
+    expect(org).toContain("/manager");
   });
 
   it("seeds a complete learner demo surface", () => {
@@ -252,17 +252,26 @@ describe("learner experience page shells", () => {
     expect(myCourses).toContain("My Courses");
     expect(myCourses).toContain("lh-feature-panel");
     expect(myCourses).toContain("groupLearnerCourses");
+    expect(myCourses).toContain("searchParams");
+    expect(myCourses).toContain('name="query"');
+    expect(myCourses).toContain("filterLearnerCourseViews");
     expect(myCourses).toContain("LearnerAppShell");
     expect(myCourses).toContain("CourseCard");
     expect(myCourses).toContain("Learner access required");
+    expect(myCourses).not.toContain('<div className="lh-searchbar">Search my courses</div>');
     expect(myCourses).not.toContain(".slice(0, 3)");
     expect(catalog).toContain("Course Catalog");
     expect(catalog).toContain("Find the next course for your role");
+    expect(catalog).toContain('name="query"');
+    expect(catalog).toContain("filteredAvailableCourses");
+    expect(catalog).toContain("categoryFilter");
+    expect(catalog).toContain("certificateOnly");
     expect(catalog).toContain("selfEnrollFormAction");
     expect(catalog).toContain("LearnerAppShell");
     expect(catalog).toContain("enrollmentError");
     expect(catalog).toContain("redirect(");
     expect(catalog).toContain('type="submit"');
+    expect(catalog).not.toContain('<div className="lh-searchbar">Search catalog</div>');
     expect(catalog).not.toContain("No available published courses.");
   });
 

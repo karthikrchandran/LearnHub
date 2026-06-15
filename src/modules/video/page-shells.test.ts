@@ -12,8 +12,10 @@ function readPage(relativePath: string): string {
 describe("native video page shells", () => {
   it("includes live admin content forms and server action wiring", () => {
     const page = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/content/page.tsx");
+    const uploadForm = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/content/mux-video-upload-form.tsx");
 
-    expect(page).toContain("requireOrganizationUsersAdminBySlug");
+    expect(page).toContain("AdminAppShell");
+    expect(page).toContain("getAdminWorkspace");
     expect(page).toContain("createLessonFormAction");
     expect(page).toContain("replaceChaptersFormAction");
     expect(page).toContain("replaceTranscriptFormAction");
@@ -22,14 +24,17 @@ describe("native video page shells", () => {
     expect(page).toContain("<form action={replaceTranscriptAction}");
     expect(page).toContain("Modules");
     expect(page).toContain("Video lessons");
+    expect(page).toContain("getMediaProviderReadiness");
+    expect(page).toContain("MuxVideoUploadForm");
+    expect(page).toContain("Mux upload readiness");
+    expect(uploadForm).toContain("Upload video");
     expect(page).toContain("Provider status");
-    expect(page).toContain("Create Mux upload");
     expect(page).toContain("/mux-upload");
     expect(page).toContain("Chapters");
     expect(page).toContain("Transcript");
     expect(page).toContain("/admin/courses/${encodeURIComponent(courseSlug)}/checks");
     expect(page).toContain("Manage knowledge checks");
-    expect(page).not.toContain("disabled");
+    expect(page).toContain("disabled={!readiness.mux.configured}");
   });
 
   it("includes live admin knowledge check forms and server action wiring", () => {

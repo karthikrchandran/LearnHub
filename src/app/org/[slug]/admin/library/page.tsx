@@ -1,6 +1,7 @@
-import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import { AdminAppShell } from "@/app/ui/learnhub-components";
 import { ensureGlobalLibraryOrganization } from "@/modules/library/prisma-repository";
 
+import { getAdminWorkspace } from "../admin-utils";
 import { copyGlobalLibraryCourseFormAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +14,10 @@ type TenantLibraryPageProps = {
 
 export default async function TenantLibraryPage({ params }: TenantLibraryPageProps) {
   const { slug } = await params;
-  const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: {
-      name: true,
       globalLibraryEnabled: true,
     },
   });
@@ -89,10 +88,13 @@ export default async function TenantLibraryPage({ params }: TenantLibraryPagePro
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Catalog Admin</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{organization?.name ?? slug} global library</h1>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="library">
+      <div className="lh-main-inner lh-main-wide">
+      <header className="lh-main-head">
+        <div>
+          <p className="lh-eyebrow">Catalog Admin</p>
+          <h1>{organizationName} global library</h1>
+        </div>
       </header>
 
       {!organization?.globalLibraryEnabled ? (
@@ -181,6 +183,7 @@ export default async function TenantLibraryPage({ params }: TenantLibraryPagePro
           )}
         </section>
       )}
-    </main>
+      </div>
+    </AdminAppShell>
   );
 }

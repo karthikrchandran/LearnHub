@@ -1,8 +1,10 @@
-import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import { AdminAppShell } from "@/app/ui/learnhub-components";
 import {
   createPrismaNotificationRepository,
   type NotificationInspectionJob,
 } from "@/modules/notifications/prisma-repository";
+
+import { getAdminWorkspace } from "../admin-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,21 +16,24 @@ type AdminNotificationsPageProps = {
 
 export default async function AdminNotificationsPage({ params }: AdminNotificationsPageProps) {
   const { slug } = await params;
-  const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
   const jobs = await createPrismaNotificationRepository(prisma).listTenantNotificationJobs({
     organizationId,
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Notifications</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{slug} notification jobs</h1>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="notifications">
+      <div className="lh-main-inner lh-main-wide">
+      <header className="lh-main-head">
+        <div>
+          <p className="lh-eyebrow">Notifications</p>
+          <h1>{organizationName} notification jobs</h1>
+        </div>
       </header>
 
       <NotificationJobsTable jobs={jobs} emptyMessage="No pending or failed notification jobs for this organization." />
-    </main>
+      </div>
+    </AdminAppShell>
   );
 }
 

@@ -1,3 +1,4 @@
+import { LogoffLink } from "@/app/ui/logoff-link";
 import { requirePlatformOwner } from "@/lib/auth/guards";
 import { redirect } from "next/navigation";
 
@@ -45,13 +46,16 @@ export default async function PlatformOrganizationSettingsPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Platform Owner
-        </p>
-        <h1 className="text-3xl font-semibold text-slate-950">
-          {organization.name} settings
-        </h1>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            Platform Owner
+          </p>
+          <h1 className="text-3xl font-semibold text-slate-950">
+            {organization.name} settings
+          </h1>
+        </div>
+        <LogoffLink />
       </header>
 
       <form action={updateAction} className="grid gap-5 rounded-md border border-slate-200 p-5">

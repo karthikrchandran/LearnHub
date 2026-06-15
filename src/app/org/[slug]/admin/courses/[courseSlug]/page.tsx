@@ -1,6 +1,12 @@
+import { AdminAppShell } from "@/app/ui/learnhub-components";
 import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import type { CatalogActionResult } from "@/modules/catalog/server-actions";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
+
+import { getAdminWorkspace } from "../../admin-utils";
+import { updateCourseLifecycleFormAction } from "../../catalog/actions";
+import { CourseLifecycleActionForm } from "./course-lifecycle-action-form";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +19,7 @@ type CourseDetailAdminPageProps = {
 
 export default async function CourseDetailAdminPage({ params }: CourseDetailAdminPageProps) {
   const { slug, courseSlug } = await params;
-  const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
   const course = await prisma.course.findFirst({
     where: {
       organizationId,
@@ -65,6 +70,18 @@ export default async function CourseDetailAdminPage({ params }: CourseDetailAdmi
 
     revalidatePath(`/org/${slug}/admin/courses/${courseSlug}`);
   };
+  const updateLifecycleAction = async (_previousState: CatalogActionResult, formData: FormData) => {
+    "use server";
+
+    const result = await updateCourseLifecycleFormAction(slug, formData);
+
+    if (result.status === "success") {
+      revalidatePath(`/org/${slug}/admin/courses`);
+      revalidatePath(`/org/${slug}/admin/courses/${courseSlug}`);
+    }
+
+    return result;
+  };
   const fields = [
     ["Title", course.title],
     ["Type", course.type],
@@ -76,13 +93,16 @@ export default async function CourseDetailAdminPage({ params }: CourseDetailAdmi
   ];
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Course detail</p>
-        <h1 className="text-3xl font-semibold text-slate-950">
-          {slug} / {courseSlug}
-        </h1>
-      </header>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="courses">
+      <div className="lh-main-inner">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Course detail</p>
+            <h1>
+              {slug} / {courseSlug}
+            </h1>
+          </div>
+        </header>
 
       <section className="grid gap-4 md:grid-cols-2">
         {fields.map(([label, value]) => (
@@ -93,12 +113,23 @@ export default async function CourseDetailAdminPage({ params }: CourseDetailAdmi
         ))}
       </section>
 
-      <section className="flex flex-wrap gap-3">
-        {["Publish", "Deprecate", "Retire"].map((label) => (
-          <button key={label} type="button" disabled className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-500">
-            {label}
-          </button>
-        ))}
+      <section className="rounded-md border border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-950">Course lifecycle</h2>
+        <p className="mt-1 text-sm text-slate-600">Move this course between published, deprecated, and retired states.</p>
+        <div className="mt-4">
+          <CourseLifecycleActionForm action={updateLifecycleAction}>
+            <input type="hidden" name="courseId" value={course.id} />
+            <button type="submit" name="status" value="PUBLISHED" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800">
+              Publish
+            </button>
+            <button type="submit" name="status" value="DEPRECATED" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800">
+              Deprecate
+            </button>
+            <button type="submit" name="status" value="RETIRED" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800">
+              Retire
+            </button>
+          </CourseLifecycleActionForm>
+        </div>
       </section>
 
       <section className="rounded-md border border-slate-200 p-4">
@@ -118,7 +149,8 @@ export default async function CourseDetailAdminPage({ params }: CourseDetailAdmi
           </button>
         </form>
       </section>
-    </main>
+      </div>
+    </AdminAppShell>
   );
 }
 

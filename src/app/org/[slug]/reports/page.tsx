@@ -5,6 +5,7 @@ import {
   type ProgressReportRow,
   type ProgressReportTargetMembership,
 } from "@/modules/reports/progress-report";
+import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -70,82 +71,99 @@ export default async function ProgressReportsPage({ params }: ProgressReportsPag
         </div>
       </header>
 
-      <ProgressReportTable rows={rows} emptyMessage="No progress records match your report scope." />
-      <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Most viewed" value={popularityRows.mostViewed?.courseTitle ?? "None"} />
-        <MetricCard label="Most enrolled" value={popularityRows.mostEnrolled?.courseTitle ?? "None"} />
-        <MetricCard label="Most completed" value={popularityRows.mostCompleted?.courseTitle ?? "None"} />
-        <MetricCard label="Highest rated" value={popularityRows.highestRated?.courseTitle ?? "None"} />
-      </section>
-      <SimpleReportTable
-        title="Course completion"
-        headers={["Course", "Assigned", "Started", "Completed", "Overdue", "Rate"]}
-        rows={completionRows.map((row) => [
-          row.courseTitle,
-          row.assignedCount,
-          row.startedCount,
-          row.completedCount,
-          row.overdueCount,
-          `${row.completionRate}%`,
-        ])}
-        emptyMessage="No completion rows match your report scope."
-      />
-      <SimpleReportTable
-        title="Scoring"
-        headers={["Course", "Attempts", "Average", "Best", "Latest", "Pass rate"]}
-        rows={scoringRows.map((row) => [
-          row.courseTitle,
-          row.attemptCount,
-          row.averageScore,
-          row.bestScore,
-          row.latestScore,
-          `${row.passRate}%`,
-        ])}
-        emptyMessage="No scoring attempts match your report scope."
-      />
-      <SimpleReportTable
-        title="Timing"
-        headers={["Course", "Learners", "Average seconds", "Total seconds", "Last activity"]}
-        rows={timingRows.map((row) => [
-          row.courseTitle,
-          row.learnerCount,
-          row.averageTimeSeconds,
-          row.totalTimeSeconds,
-          row.lastActivityAt?.toLocaleString() ?? "None",
-        ])}
-        emptyMessage="No timing rows match your report scope."
-      />
-      <SimpleReportTable
-        title="Satisfaction"
-        headers={["Course", "Responses", "Average stars", "Latest feedback", "Submitted"]}
-        rows={satisfactionRows.map((row) => [
-          row.courseTitle,
-          row.responseCount,
-          row.averageStars,
-          row.latestFeedbackText ?? "None",
-          row.latestFeedbackAt?.toLocaleString() ?? "None",
-        ])}
-        emptyMessage="No satisfaction responses match your report scope."
-      />
-      <SimpleReportTable
-        title="Quiz difficulty"
-        headers={["Course", "Question", "Attempts", "Correct rate"]}
-        rows={quizDifficultyRows.map((row) => [row.courseTitle, row.prompt, row.attempts, `${row.correctRate}%`])}
-        emptyMessage="No quiz attempts match your report scope."
-      />
-      <SimpleReportTable
-        title="Certificates and credentials"
-        headers={["Learner", "Course", "Issued", "Credential", "Failure"]}
-        rows={certificateRows.map((row) => [
-          row.learnerName,
-          row.courseTitle,
-          row.issuedAt.toLocaleDateString(),
-          row.credentialProvider ? `${row.credentialProvider}: ${row.credentialStatus ?? "PENDING"}` : "Not issued",
-          row.failureMessage ?? "None",
-        ])}
-        emptyMessage="No certificates match your report scope."
-      />
+      <ReportGroup title="Learner progress">
+        <ProgressReportTable rows={rows} emptyMessage="No progress records match your report scope." />
+      </ReportGroup>
+      <ReportGroup title="Engagement">
+        <section className="grid gap-4 md:grid-cols-4">
+          <MetricCard label="Most viewed" value={popularityRows.mostViewed?.courseTitle ?? "None"} />
+          <MetricCard label="Most enrolled" value={popularityRows.mostEnrolled?.courseTitle ?? "None"} />
+          <MetricCard label="Most completed" value={popularityRows.mostCompleted?.courseTitle ?? "None"} />
+          <MetricCard label="Highest rated" value={popularityRows.highestRated?.courseTitle ?? "None"} />
+        </section>
+        <SimpleReportTable
+          title="Timing"
+          headers={["Course", "Learners", "Average seconds", "Total seconds", "Last activity"]}
+          rows={timingRows.map((row) => [
+            row.courseTitle,
+            row.learnerCount,
+            row.averageTimeSeconds,
+            row.totalTimeSeconds,
+            row.lastActivityAt?.toLocaleString() ?? "None",
+          ])}
+          emptyMessage="No timing rows match your report scope."
+        />
+        <SimpleReportTable
+          title="Satisfaction"
+          headers={["Course", "Responses", "Average stars", "Latest feedback", "Submitted"]}
+          rows={satisfactionRows.map((row) => [
+            row.courseTitle,
+            row.responseCount,
+            row.averageStars,
+            row.latestFeedbackText ?? "None",
+            row.latestFeedbackAt?.toLocaleString() ?? "None",
+          ])}
+          emptyMessage="No satisfaction responses match your report scope."
+        />
+      </ReportGroup>
+      <ReportGroup title="Compliance and completion">
+        <SimpleReportTable
+          title="Course completion"
+          headers={["Course", "Assigned", "Started", "Completed", "Overdue", "Rate"]}
+          rows={completionRows.map((row) => [
+            row.courseTitle,
+            row.assignedCount,
+            row.startedCount,
+            row.completedCount,
+            row.overdueCount,
+            `${row.completionRate}%`,
+          ])}
+          emptyMessage="No completion rows match your report scope."
+        />
+        <SimpleReportTable
+          title="Certificates and credentials"
+          headers={["Learner", "Course", "Issued", "Credential", "Failure"]}
+          rows={certificateRows.map((row) => [
+            row.learnerName,
+            row.courseTitle,
+            row.issuedAt.toLocaleDateString(),
+            row.credentialProvider ? `${row.credentialProvider}: ${row.credentialStatus ?? "PENDING"}` : "Not issued",
+            row.failureMessage ?? "None",
+          ])}
+          emptyMessage="No certificates match your report scope."
+        />
+      </ReportGroup>
+      <ReportGroup title="Assessment quality">
+        <SimpleReportTable
+          title="Scoring"
+          headers={["Course", "Attempts", "Average", "Best", "Latest", "Pass rate"]}
+          rows={scoringRows.map((row) => [
+            row.courseTitle,
+            row.attemptCount,
+            row.averageScore,
+            row.bestScore,
+            row.latestScore,
+            `${row.passRate}%`,
+          ])}
+          emptyMessage="No scoring attempts match your report scope."
+        />
+        <SimpleReportTable
+          title="Quiz difficulty"
+          headers={["Course", "Question", "Attempts", "Correct rate"]}
+          rows={quizDifficultyRows.map((row) => [row.courseTitle, row.prompt, row.attempts, `${row.correctRate}%`])}
+          emptyMessage="No quiz attempts match your report scope."
+        />
+      </ReportGroup>
     </main>
+  );
+}
+
+function ReportGroup({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <section className="grid gap-4">
+      <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+      {children}
+    </section>
   );
 }
 

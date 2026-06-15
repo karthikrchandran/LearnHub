@@ -1,10 +1,17 @@
-import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import { AdminAppShell } from "@/app/ui/learnhub-components";
+import { getEnv } from "@/lib/env";
+import {
+  getMediaProviderReadiness,
+  readinessText,
+} from "@/modules/providers/media-provider-readiness";
 
+import { getAdminWorkspace } from "../../../admin-utils";
 import {
   createLessonFormAction,
   replaceChaptersFormAction,
   replaceTranscriptFormAction,
 } from "./actions";
+import { MuxVideoUploadForm } from "./mux-video-upload-form";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +24,8 @@ type CourseContentAdminPageProps = {
 
 export default async function CourseContentAdminPage({ params }: CourseContentAdminPageProps) {
   const { slug, courseSlug } = await params;
-  const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
+  const readiness = getMediaProviderReadiness(getEnv());
   const course = await prisma.course.findFirst({
     where: {
       organizationId,
@@ -77,36 +84,57 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
 
   if (!course) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 px-6 py-10">
-        <header>
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Course content</p>
-          <h1 className="text-3xl font-semibold text-slate-950">
-            {slug} / {courseSlug}
-          </h1>
-        </header>
-        <section className="rounded-md border border-slate-200 p-4">
-          <h2 className="text-lg font-semibold text-slate-950">Native video course not found</h2>
-          <p className="mt-2 text-sm text-slate-600">Create or select a native video course before editing content.</p>
-        </section>
-      </main>
+      <AdminAppShell organizationName={organizationName} slug={slug} active="video-content">
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">Course content</p>
+              <h1>{slug} / {courseSlug}</h1>
+            </div>
+          </header>
+          <section className="rounded-md border border-slate-200 bg-white p-4">
+            <h2 className="text-lg font-semibold text-slate-950">Native video course not found</h2>
+            <p className="mt-2 text-sm text-slate-600">Create or select a native video course before editing content.</p>
+          </section>
+        </div>
+      </AdminAppShell>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Course content</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{course.title}</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          {slug} / {courseSlug}
-        </p>
-        <a
-          href={`/org/${encodeURIComponent(slug)}/admin/courses/${encodeURIComponent(courseSlug)}/checks`}
-          className="mt-4 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
-        >
-          Manage knowledge checks
-        </a>
-      </header>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="video-content">
+      <div className="lh-main-inner lh-main-wide">
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">Course content</p>
+            <h1>{course.title}</h1>
+            <p>
+              {slug} / {courseSlug}
+            </p>
+          </div>
+          <a
+            href={`/org/${encodeURIComponent(slug)}/admin/courses/${encodeURIComponent(courseSlug)}/checks`}
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
+          >
+            Manage knowledge checks
+          </a>
+        </header>
+
+      <section className="rounded-md border border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-950">Mux upload readiness</h2>
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          <div className="rounded-md bg-slate-50 p-3">
+            <dt className="font-medium text-slate-500">Mux Video</dt>
+            <dd className="mt-1 text-slate-950">{readinessText(readiness.mux)}</dd>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <dt className="font-medium text-slate-500">Webhook status</dt>
+            <dd className="mt-1 text-slate-950">
+              {readiness.mux.configured ? "Ready for asset callbacks" : readinessText(readiness.mux)}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="rounded-md border border-slate-200 p-4">
@@ -249,15 +277,11 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
                   <p className="mt-1 text-sm text-slate-500">
                     {lesson.playbackUrl ?? lesson.providerAssetId ?? "No media source recorded"}
                   </p>
-                  <form
-                    method="post"
-                    action={`/api/org/${encodeURIComponent(slug)}/courses/${encodeURIComponent(courseSlug)}/video/lessons/${encodeURIComponent(lesson.id)}/mux-upload`}
-                    className="mt-3"
-                  >
-                    <button type="submit" className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">
-                      Create Mux upload
-                    </button>
-                  </form>
+                  <MuxVideoUploadForm
+                    uploadAction={`/api/org/${encodeURIComponent(slug)}/courses/${encodeURIComponent(courseSlug)}/video/lessons/${encodeURIComponent(lesson.id)}/mux-upload`}
+                    disabled={!readiness.mux.configured}
+                    disabledMessage={readinessText(readiness.mux)}
+                  />
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-md bg-slate-50 p-3">
@@ -279,6 +303,7 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
           )}
         </div>
       </section>
-    </main>
+      </div>
+    </AdminAppShell>
   );
 }

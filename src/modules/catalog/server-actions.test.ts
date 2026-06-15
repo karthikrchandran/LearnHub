@@ -25,6 +25,11 @@ function createRepository(): CourseCatalogRepository & CatalogTaxonomyRepository
     createTag: vi.fn(async ({ slug }) => ({ id: "tag_1", slug })),
     createCourse: vi.fn(async ({ slug }) => ({ id: "course_1", slug })),
     replaceCourseTags: vi.fn(async () => {}),
+    findCoursePublishReadiness: vi.fn(async () => ({
+      type: "NATIVE_VIDEO" as const,
+      ready: true,
+      blockers: [],
+    })),
     updateCourseLifecycle: vi.fn(async () => {}),
     recordAuditLog: vi.fn(async () => {}),
   };

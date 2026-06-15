@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createCourse,
   updateCourseLifecycle,
+  type CoursePublishReadiness,
   type CourseCatalogRepository,
   type CreateCourseData,
   type CreateCourseInput,
@@ -13,6 +14,7 @@ type TestRepository = CourseCatalogRepository & {
   categoriesByOrganization: Set<string>;
   tagsByOrganization: Set<string>;
   createdCourses: CreateCourseData[];
+  publishReadiness: CoursePublishReadiness | null;
 };
 
 function createRepository(): TestRepository {
@@ -20,12 +22,23 @@ function createRepository(): TestRepository {
   const categoriesByOrganization = new Set<string>();
   const tagsByOrganization = new Set<string>();
   const createdCourses: CreateCourseData[] = [];
+  let publishReadiness: CoursePublishReadiness | null = {
+    type: "NATIVE_VIDEO",
+    ready: true,
+    blockers: [],
+  };
 
   return {
     calls,
     categoriesByOrganization,
     tagsByOrganization,
     createdCourses,
+    get publishReadiness() {
+      return publishReadiness;
+    },
+    set publishReadiness(value) {
+      publishReadiness = value;
+    },
     runInTransaction: vi.fn(async (operation) => {
       calls.push("transaction:start");
       const result = await operation();
@@ -53,6 +66,11 @@ function createRepository(): TestRepository {
     }),
     replaceCourseTags: vi.fn(async ({ courseId, tagIds }) => {
       calls.push(`replace-tags:${courseId}:${tagIds.join(",")}`);
+    }),
+    findCoursePublishReadiness: vi.fn(async ({ courseId }) => {
+      calls.push(`readiness:${courseId}`);
+
+      return publishReadiness;
     }),
     updateCourseLifecycle: vi.fn(async ({ courseId, status }) => {
       calls.push(`lifecycle:${courseId}:${status}`);
@@ -218,6 +236,10 @@ describe("updateCourseLifecycle", () => {
       courseId: "course_1",
       status: "PUBLISHED",
     });
+    expect(repository.findCoursePublishReadiness).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      courseId: "course_1",
+    });
     expect(repository.recordAuditLog).toHaveBeenCalledWith({
       organizationId: "org_1",
       actorId: "actor_1",
@@ -226,10 +248,89 @@ describe("updateCourseLifecycle", () => {
       targetId: "course_1",
     });
     expect(repository.calls).toEqual([
+      "readiness:course_1",
       "transaction:start",
       "lifecycle:course_1:PUBLISHED",
       "audit:course.lifecycle_updated:course_1",
       "transaction:end",
     ]);
+  });
+
+  it("blocks publishing native video courses without ready playable lessons", async () => {
+    const repository = createRepository();
+    repository.publishReadiness = {
+      type: "NATIVE_VIDEO",
+      ready: false,
+      blockers: ["Add at least one ready video lesson."],
+    };
+
+    await expect(
+      updateCourseLifecycle(
+        {
+          organizationId: "org_1",
+          actorId: "actor_1",
+          courseId: "course_1",
+          status: "PUBLISHED",
+        },
+        repository,
+      ),
+    ).rejects.toThrow("Course cannot be published until content is ready: Add at least one ready video lesson.");
+
+    expect(repository.updateCourseLifecycle).not.toHaveBeenCalled();
+    expect(repository.recordAuditLog).not.toHaveBeenCalled();
+    expect(repository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("blocks publishing SCORM courses without an extracted and clean active package", async () => {
+    const repository = createRepository();
+    repository.publishReadiness = {
+      type: "SCORM_1_2",
+      ready: false,
+      blockers: ["Upload an active SCORM package with completed extraction and passed malware scan."],
+    };
+
+    await expect(
+      updateCourseLifecycle(
+        {
+          organizationId: "org_1",
+          actorId: "actor_1",
+          courseId: "course_1",
+          status: "PUBLISHED",
+        },
+        repository,
+      ),
+    ).rejects.toThrow(
+      "Course cannot be published until content is ready: Upload an active SCORM package with completed extraction and passed malware scan.",
+    );
+
+    expect(repository.updateCourseLifecycle).not.toHaveBeenCalled();
+    expect(repository.recordAuditLog).not.toHaveBeenCalled();
+    expect(repository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("does not require publish readiness for deprecate or retire transitions", async () => {
+    const repository = createRepository();
+    repository.publishReadiness = {
+      type: "NATIVE_VIDEO",
+      ready: false,
+      blockers: ["Add at least one ready video lesson."],
+    };
+
+    await updateCourseLifecycle(
+      {
+        organizationId: "org_1",
+        actorId: "actor_1",
+        courseId: "course_1",
+        status: "DEPRECATED",
+      },
+      repository,
+    );
+
+    expect(repository.findCoursePublishReadiness).not.toHaveBeenCalled();
+    expect(repository.updateCourseLifecycle).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      courseId: "course_1",
+      status: "DEPRECATED",
+    });
   });
 });

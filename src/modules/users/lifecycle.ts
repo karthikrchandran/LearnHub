@@ -40,6 +40,9 @@ export type OrganizationUserLifecycleRepository = {
     organizationId: string;
     managerMembershipId: string;
   }): Promise<OrganizationUserLifecycleRecord | null>;
+  countActiveAdminMemberships(input: {
+    organizationId: string;
+  }): Promise<number>;
   saveMembershipLifecycle(input: {
     organizationId: string;
     membershipId: string;
@@ -113,6 +116,15 @@ export async function updateOrganizationUserLifecycle(
     if (changed.length === 0) {
       return current;
     }
+
+    await requireRemainingActiveAdmin(
+      {
+        current,
+        next: normalized,
+        organizationId: input.organizationId,
+      },
+      repository,
+    );
 
     if (current.user.status !== normalized.status) {
       await repository.saveUserStatus({
@@ -229,6 +241,30 @@ export async function issueOrganizationUserPasswordReset(
       email: membership.user.email,
     };
   });
+}
+
+async function requireRemainingActiveAdmin(
+  input: {
+    current: OrganizationUserLifecycleRecord;
+    next: OrganizationUserLifecycleChanges;
+    organizationId: string;
+  },
+  repository: OrganizationUserLifecycleRepository,
+): Promise<void> {
+  const currentIsActiveAdmin = input.current.status === "ACTIVE" && input.current.roles.includes("ADMIN");
+  const nextIsActiveAdmin = input.next.status === "ACTIVE" && input.next.roles.includes("ADMIN");
+
+  if (!currentIsActiveAdmin || nextIsActiveAdmin) {
+    return;
+  }
+
+  const activeAdminCount = await repository.countActiveAdminMemberships({
+    organizationId: input.organizationId,
+  });
+
+  if (activeAdminCount <= 1) {
+    throw new Error("At least one active organization admin is required");
+  }
 }
 
 function requireUserManager(

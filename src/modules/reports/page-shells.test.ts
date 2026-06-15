@@ -29,6 +29,9 @@ describe("progress report page shells", () => {
     expect(page).toContain('"certificates.csv"');
     expect(page).toContain("/api/org/${encodeURIComponent(slug)}/reports/${path}");
     expect(page).toContain("Course completion");
+    expect(page).toContain("Compliance and completion");
+    expect(page).toContain("Assessment quality");
+    expect(page).toContain("Engagement");
     expect(page).toContain("Quiz difficulty");
     expect(page).toContain("No progress records match your report scope.");
   });
@@ -36,8 +39,8 @@ describe("progress report page shells", () => {
   it("renders admin organization-wide progress reports with CSV export", async () => {
     const page = await readPage(path.join("admin", "reports"));
 
-    expect(page).toContain("requireOrganizationMemberBySlug");
-    expect(page).toContain("resolveProgressReportScope");
+    expect(page).toContain("AdminAppShell");
+    expect(page).toContain("getAdminWorkspace");
     expect(page).toContain("createPrismaProgressReportRepository");
     expect(page).toContain("Organization progress");
     expect(page).toContain("Learner");
@@ -52,6 +55,10 @@ describe("progress report page shells", () => {
     expect(page).toContain('"certificates.csv"');
     expect(page).toContain("/api/org/${encodeURIComponent(slug)}/reports/${path}");
     expect(page).toContain("Course completion");
+    expect(page).toContain("Learner progress");
+    expect(page).toContain("Compliance and completion");
+    expect(page).toContain("Assessment quality");
+    expect(page).toContain("Engagement");
     expect(page).toContain("Certificates and credentials");
     expect(page).toContain("No progress records for this organization yet.");
   });

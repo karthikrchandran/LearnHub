@@ -140,6 +140,13 @@ function createLifecycleRepository(): OrganizationUserLifecycleRepository & {
     async findManagerMembership() {
       return null;
     },
+    async countActiveAdminMemberships(input) {
+      return current.organizationId === input.organizationId &&
+        current.status === "ACTIVE" &&
+        current.roles.includes("ADMIN")
+        ? 1
+        : 0;
+    },
     async saveMembershipLifecycle(data) {
       savedMemberships.push(data);
       current = { ...current, ...data };

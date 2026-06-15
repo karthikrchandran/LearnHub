@@ -515,22 +515,31 @@ Use this order unless a new dependency changes the work:
 
 1. Finish Wave 3.
 2. Tenant operations, branding, and user lifecycle.
-3. Global library copy workflow.
-4. Knowledge checks, scoring, and learner feedback.
-5. Notifications, jobs, and email providers.
-6. Production media, storage, and SCORM package operations.
-7. Certificates, credentials, and credential operations.
-8. Complete reporting and analytics.
-9. Audit browsing, operational failure views, and admin observability.
-10. Deployment, security, end-to-end smoke, and release artifacts.
+3. Start global library copy workflow and run it alongside Tasks 4 and 5.
+4. Run notifications, jobs, and email providers in parallel with Tasks 2 and 5.
+5. Run production media, storage, and SCORM package operations in parallel with Tasks 2 and 4.
+6. Wait for Tasks 2, 4, and 5 to complete, pass review, and pass their gates before starting Task 3.
+7. Knowledge checks, scoring, and learner feedback.
+8. Certificates, credentials, and credential operations.
+9. Complete reporting and analytics.
+10. Audit browsing, operational failure views, and admin observability.
+11. Deployment, security, end-to-end smoke, and release artifacts.
 
 Parallelization guidance:
 
 - Tasks 1 and 3 should be sequential after Wave 3 because they touch shared schema, progress, learner pages, and admin pages.
-- Tasks 4 and 5 can run in parallel after Task 1 if migration ownership is coordinated.
+- After Task 1 completes, Task 2 may start and Tasks 4 and 5 should run in parallel when migration ownership is coordinated.
+- Do not start Task 3 until Tasks 2, 4, and 5 have completed, passed spec review, passed code quality review, and passed their focused gates.
 - Tasks 6 and 7 depend on Tasks 3, 4, and 5.
 - Task 8 can run after Tasks 4, 5, and 6 create provider failure sources.
 - Task 9 should be last because it needs the final route map, provider config, and release gates.
+
+Per-lane execution policy:
+
+- Implement each task lane with TDD.
+- Run spec compliance review before code quality review.
+- Resolve every review issue before moving the lane forward.
+- Do not merge a parallel branch until its focused tests, `npm run lint`, `npx prisma validate`, `npm run prisma:generate`, `npx tsc --noEmit --incremental false`, and `npm run build` pass.
 
 ## Full MVP Done Criteria
 

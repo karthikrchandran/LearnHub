@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createAssignCourseAction,
+  createBulkAssignCourseAction,
   createSelfEnrollAction,
   type AssignCourseActionDependencies,
   type SelfEnrollActionDependencies,
@@ -9,11 +10,17 @@ import {
 import type { AssignmentRepository } from "./assignment-service";
 import type { MembershipAuthContext } from "../auth/permissions";
 
-function formData(entries: Record<string, string>): FormData {
+function formData(entries: Record<string, string | string[]>): FormData {
   const data = new FormData();
 
   for (const [key, value] of Object.entries(entries)) {
-    data.append(key, value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        data.append(key, item);
+      }
+    } else {
+      data.append(key, value);
+    }
   }
 
   return data;
@@ -163,6 +170,50 @@ describe("assignment server actions", () => {
         courseId: "course_1",
         membershipId: "learner-membership",
         assignedByMembershipId: null,
+      }),
+    );
+  });
+
+  it("assigns one course to multiple learners from a bulk form", async () => {
+    const dependencies = createAssignDependencies();
+    vi.mocked(dependencies.repository.findMembership).mockImplementation(async ({ membershipId }) => ({
+      id: membershipId,
+      userId: `user:${membershipId}`,
+      organizationId: "org_1",
+      managerMembershipId: null,
+      learnerEmail: `${membershipId}@example.com`,
+      learnerName: membershipId,
+      managerEmail: null,
+      managerName: null,
+      status: "ACTIVE" as const,
+      roles: ["LEARNER" as const],
+    }));
+    const action = createBulkAssignCourseAction(dependencies);
+
+    await expect(
+      action(
+        "acme",
+        formData({
+          courseId: "course_1",
+          learnerMembershipIds: ["learner-one", "learner-two"],
+          startDate: "2026-06-12",
+        }),
+      ),
+    ).resolves.toEqual({ status: "success", message: "Assigned course to 2 learners." });
+
+    expect(dependencies.repository.createAssignment).toHaveBeenCalledTimes(2);
+    expect(dependencies.repository.createAssignment).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        courseId: "course_1",
+        membershipId: "learner-one",
+      }),
+    );
+    expect(dependencies.repository.createAssignment).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        courseId: "course_1",
+        membershipId: "learner-two",
       }),
     );
   });

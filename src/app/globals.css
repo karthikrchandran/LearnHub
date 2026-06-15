@@ -43,6 +43,9 @@ body {
 }
 
 .lh-side {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
   border-right: 1px solid rgba(17, 24, 39, 0.1);
   background: #0f172a;
   color: #cbd5e1;
@@ -67,6 +70,15 @@ body {
   white-space: nowrap;
 }
 
+.lh-side-kicker {
+  margin: -18px 0 24px 48px;
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .lh-mark {
   display: grid;
   width: 36px;
@@ -83,6 +95,24 @@ body {
 .lh-side-nav {
   display: grid;
   gap: 8px;
+}
+
+.lh-side-section {
+  display: grid;
+  gap: 6px;
+}
+
+.lh-side-section + .lh-side-section {
+  margin-top: 18px;
+}
+
+.lh-side-section-title {
+  padding: 0 12px 4px;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .lh-side-nav a {
@@ -102,6 +132,11 @@ body {
 .lh-side-nav a[aria-current="page"] {
   background: #ffffff;
   color: var(--learnhub-ink);
+}
+
+.lh-side-footer {
+  margin-top: auto;
+  padding-top: 24px;
 }
 
 .lh-main {

@@ -1,3 +1,4 @@
+import { LearnerAppShell } from "@/app/ui/learnhub-components";
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 
 import { ScormPlayer } from "./scorm-player";
@@ -15,6 +16,11 @@ export default async function ScormLearnerPage({ params }: ScormLearnerPageProps
   const { slug, courseSlug } = await params;
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
   const { prisma } = await import("@/lib/prisma");
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true },
+  });
+  const organizationName = organization?.name ?? slug;
   const learnerMembership = context.memberships.find(
     (membership) =>
       membership.organizationId === organizationId &&
@@ -55,16 +61,20 @@ export default async function ScormLearnerPage({ params }: ScormLearnerPageProps
 
   if (!assignment) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 px-6 py-10">
-        <header>
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">SCORM player</p>
-          <h1 className="text-3xl font-semibold text-slate-950">{courseSlug}</h1>
-        </header>
-        <section className="rounded-md border border-slate-200 p-4">
-          <h2 className="text-lg font-semibold text-slate-950">Assigned course required</h2>
-          <p className="mt-2 text-sm text-slate-600">Assigned course required to launch this runtime.</p>
-        </section>
-      </main>
+      <LearnerAppShell organizationName={organizationName} slug={slug} active="courses">
+        <div className="lh-main-inner">
+          <header className="lh-main-head">
+            <div>
+              <p className="lh-eyebrow">SCORM player</p>
+              <h1>{courseSlug}</h1>
+            </div>
+          </header>
+          <section className="rounded-md border border-slate-200 bg-white p-4">
+            <h2 className="text-lg font-semibold text-slate-950">Assigned course required</h2>
+            <p className="mt-2 text-sm text-slate-600">Assigned course required to launch this runtime.</p>
+          </section>
+        </div>
+      </LearnerAppShell>
     );
   }
 
@@ -72,25 +82,29 @@ export default async function ScormLearnerPage({ params }: ScormLearnerPageProps
   const scormCommitPath = `/api/org/${encodeURIComponent(slug)}/assignments/${encodeURIComponent(assignment.id)}/scorm/commit`;
 
   return (
-    <main
-      className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10"
-      data-scorm-launch-path={scormLaunchPath}
-      data-scorm-commit-path={scormCommitPath}
-    >
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">SCORM player</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{assignment.course.title}</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          {assignment.status} / {assignment.progress?.progressPercent ?? 0}%
-        </p>
-      </header>
+    <LearnerAppShell organizationName={organizationName} slug={slug} active="courses">
+      <div
+        className="lh-main-inner lh-main-wide"
+        data-scorm-launch-path={scormLaunchPath}
+        data-scorm-commit-path={scormCommitPath}
+      >
+        <header className="lh-main-head">
+          <div>
+            <p className="lh-eyebrow">SCORM player</p>
+            <h1>{assignment.course.title}</h1>
+            <p>
+              {assignment.status} / {assignment.progress?.progressPercent ?? 0}%
+            </p>
+          </div>
+        </header>
 
-      <ScormPlayer
-        launchPath={scormLaunchPath}
-        commitPath={scormCommitPath}
-        initialProgressPercent={assignment.progress?.progressPercent ?? 0}
-        initialScore={assignment.scormRegistration?.scoreRaw ?? null}
-      />
-    </main>
+        <ScormPlayer
+          launchPath={scormLaunchPath}
+          commitPath={scormCommitPath}
+          initialProgressPercent={assignment.progress?.progressPercent ?? 0}
+          initialScore={assignment.scormRegistration?.scoreRaw ?? null}
+        />
+      </div>
+    </LearnerAppShell>
   );
 }

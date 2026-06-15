@@ -1,4 +1,6 @@
-import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import { AdminAppShell } from "@/app/ui/learnhub-components";
+
+import { getAdminWorkspace } from "../admin-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +12,7 @@ type AdminCertificatesPageProps = {
 
 export default async function AdminCertificatesPage({ params }: AdminCertificatesPageProps) {
   const { slug } = await params;
-  const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
   const certificates = await prisma.certificate.findMany({
     where: { organizationId },
     orderBy: { issuedAt: "desc" },
@@ -37,10 +38,13 @@ export default async function AdminCertificatesPage({ params }: AdminCertificate
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Certificates</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{slug} certificate operations</h1>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="certificates">
+      <div className="lh-main-inner lh-main-wide">
+      <header className="lh-main-head">
+        <div>
+          <p className="lh-eyebrow">Certificates</p>
+          <h1>{organizationName} certificate operations</h1>
+        </div>
       </header>
 
       <section className="overflow-x-auto rounded-md border border-slate-200">
@@ -100,6 +104,7 @@ export default async function AdminCertificatesPage({ params }: AdminCertificate
           </tbody>
         </table>
       </section>
-    </main>
+      </div>
+    </AdminAppShell>
   );
 }

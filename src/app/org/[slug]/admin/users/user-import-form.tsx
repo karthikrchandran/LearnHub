@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import type { UserImportActionResult } from "@/modules/users/server-actions";
 
@@ -16,6 +16,7 @@ export function UserImportForm({
   validateAction: (previousState: UserImportActionResult, formData: FormData) => Promise<UserImportActionResult>;
   importAction: (previousState: UserImportActionResult, formData: FormData) => Promise<UserImportActionResult>;
 }) {
+  const [csvValue, setCsvValue] = useState("");
   const [validationState, validateFormAction, isValidating] = useActionState(validateAction, initialState);
   const [importState, importFormAction, isImporting] = useActionState(importAction, initialState);
   const latestState = importState.message ? importState : validationState;
@@ -33,6 +34,8 @@ export function UserImportForm({
           rows={12}
           spellCheck={false}
           aria-describedby="expected-columns"
+          value={csvValue}
+          onChange={(event) => setCsvValue(event.target.value)}
           className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm text-slate-950"
         />
       </div>

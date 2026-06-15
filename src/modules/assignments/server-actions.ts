@@ -55,6 +55,67 @@ export function createAssignCourseAction(dependencies: AssignCourseActionDepende
   };
 }
 
+export function createBulkAssignCourseAction(dependencies: AssignCourseActionDependencies) {
+  return async function bulkAssignCourseAction(slug: string, formData: FormData): Promise<AssignmentActionResult> {
+    const startDate = readStartDate(formData);
+
+    if (!startDate) {
+      return { status: "error", message: "Start date is required" };
+    }
+
+    const learnerMembershipIds = Array.from(new Set(readFormStringList(formData, "learnerMembershipIds")));
+
+    if (learnerMembershipIds.length === 0) {
+      return { status: "error", message: "Select at least one learner" };
+    }
+
+    try {
+      const context = await dependencies.getActorAndOrganization(slug);
+      const now = dependencies.now?.() ?? new Date();
+      const assignmentUrl = dependencies.buildAssignmentUrl?.(slug) ?? "";
+      const failures: string[] = [];
+      let assignedCount = 0;
+
+      for (const learnerMembershipId of learnerMembershipIds) {
+        try {
+          await assignCourse(
+            {
+              organizationId: context.organizationId,
+              courseId: readFormString(formData, "courseId"),
+              learnerMembershipId,
+              actor: context.actor,
+              startDate,
+              now,
+              assignmentUrl,
+            },
+            dependencies.repository,
+            dependencies.notificationScheduler,
+          );
+          assignedCount += 1;
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : "Course assignment failed");
+        }
+      }
+
+      if (assignedCount === 0) {
+        return {
+          status: "error",
+          message: failures[0] ?? "Course assignment failed",
+        };
+      }
+
+      const noun = assignedCount === 1 ? "learner" : "learners";
+      const message = `Assigned course to ${assignedCount} ${noun}.`;
+
+      return failures.length > 0
+        ? { status: "success", message: `${message} ${failures.length} failed.` }
+        : { status: "success", message };
+    } catch (error) {
+      return { status: "error", message: error instanceof Error ? error.message : "Course assignment failed" };
+    }
+  };
+}
+
 export function createSelfEnrollAction(dependencies: SelfEnrollActionDependencies) {
   return async function selfEnrollAction(slug: string, formData: FormData): Promise<AssignmentActionResult> {
     const startDate = readStartDate(formData);
@@ -91,6 +152,14 @@ function readFormString(formData: FormData, key: string): string {
   const value = formData.get(key);
 
   return typeof value === "string" ? value : "";
+}
+
+function readFormStringList(formData: FormData, key: string): string[] {
+  return formData
+    .getAll(key)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function readStartDate(formData: FormData): Date | null {

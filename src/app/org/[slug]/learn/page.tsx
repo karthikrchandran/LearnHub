@@ -16,6 +16,7 @@ type MyCoursesPageProps = {
   params: Promise<{
     slug: string;
   }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type LearnerExperienceRepository = ReturnType<typeof createPrismaLearnerExperienceRepository>;
@@ -33,8 +34,10 @@ type LearnerCourseView = LearnerCourseCard & {
   credentialProvider: string | null;
 };
 
-export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
+export default async function MyCoursesPage({ params, searchParams }: MyCoursesPageProps) {
   const { slug } = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const query = firstSearchParam(resolvedSearchParams.query)?.trim() ?? "";
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
   const { prisma } = await import("@/lib/prisma");
   const repository = createPrismaLearnerExperienceRepository(prisma);
@@ -97,6 +100,7 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
   const uniqueFeaturedCourses = Array.from(
     new Map(featuredCourses.map((course) => [`${course.status}-${course.id}`, course])).values(),
   );
+  const filteredFeaturedCourses = filterLearnerCourseViews(uniqueFeaturedCourses, query);
 
   return (
     <LearnerAppShell organizationName={organization.name} slug={slug} active="courses">
@@ -107,14 +111,17 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
             <h1>Pick up where you left off.</h1>
             <p>Assigned courses, active lessons, and certificates are ready when you are.</p>
           </div>
-          <div className="lh-searchbar">Search my courses</div>
+          <form className="lh-searchbar" method="get">
+            <input aria-label="Search my courses" defaultValue={query} name="query" placeholder="Search my courses" />
+            <button type="submit">Search</button>
+          </form>
         </header>
 
-        {continueCourse ? <ContinueLearningPanel course={continueCourse} slug={slug} /> : null}
+        {!query && continueCourse ? <ContinueLearningPanel course={continueCourse} slug={slug} /> : null}
 
-        {uniqueFeaturedCourses.length > 0 ? (
+        {filteredFeaturedCourses.length > 0 ? (
           <div className="lh-grid-3">
-            {uniqueFeaturedCourses.map((course) => (
+            {filteredFeaturedCourses.map((course) => (
               <CourseCard
                 action={<CourseActionButton course={course} slug={slug} />}
                 categorySlug={course.categorySlug}
@@ -134,13 +141,31 @@ export default async function MyCoursesPage({ params }: MyCoursesPageProps) {
                 Browse catalog
               </PrimaryButton>
             }
-            body="Assigned and recommended courses will appear here as your organization publishes learning."
-            title="No courses yet"
+            body={query ? "No courses matched your search." : "Assigned and recommended courses will appear here as your organization publishes learning."}
+            title={query ? "No matching courses" : "No courses yet"}
           />
         )}
 
       </div>
     </LearnerAppShell>
+  );
+}
+
+function filterLearnerCourseViews(courses: LearnerCourseView[], query: string): LearnerCourseView[] {
+  const normalizedQuery = normalizeSearch(query);
+
+  if (!normalizedQuery) {
+    return courses;
+  }
+
+  return courses.filter((course) =>
+    [
+      course.title,
+      course.description,
+      course.categorySlug ?? "",
+      course.type,
+      course.status,
+    ].some((value) => normalizeSearch(value).includes(normalizedQuery)),
   );
 }
 
@@ -241,4 +266,16 @@ function courseMeta(course: LearnerCourseView): string[] {
 
 function formatCourseType(type: string): string {
   return type === "SCORM_1_2" ? "SCORM" : "Native video";
+}
+
+function firstSearchParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
+function normalizeSearch(value: string): string {
+  return value.trim().toLowerCase();
 }

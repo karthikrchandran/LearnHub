@@ -14,9 +14,14 @@ describe("SCORM page shells", () => {
     const page = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/scorm/page.tsx");
     const uploadForm = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/scorm/scorm-package-upload-form.tsx");
 
-    expect(page).toContain("requireOrganizationUsersAdminBySlug");
+    expect(page).toContain("AdminAppShell");
+    expect(page).toContain("getAdminWorkspace");
     expect(page).toContain("uploadScormPackageFormAction");
     expect(page).toContain("ScormPackageUploadForm");
+    expect(page).toContain("getMediaProviderReadiness");
+    expect(page).toContain("SCORM storage readiness");
+    expect(page).toContain("R2 storage");
+    expect(page).toContain("SCORM extraction job");
     expect(uploadForm).toContain("<form");
     expect(uploadForm).toContain("action={action}");
     expect(page).toContain("SCORM package");
@@ -34,12 +39,14 @@ describe("SCORM page shells", () => {
     expect(page).toContain("contentRootKey");
     expect(page).toContain("Extraction status");
     expect(page).toContain("Malware scan");
-    expect(page).not.toContain("disabled");
+    expect(page).toContain("disabled={!readiness.r2.configured}");
   });
 
   it("includes live learner SCORM player wiring", () => {
     const page = readPage("src/app/org/[slug]/learn/[courseSlug]/scorm/page.tsx");
 
+    expect(page).toContain("LearnerAppShell");
+    expect(page).toContain('active="courses"');
     expect(page).toContain("requireOrganizationMemberBySlug");
     expect(page).toContain("ScormPlayer");
     expect(page).toContain("data-scorm-launch-path");

@@ -64,7 +64,7 @@ describe("Mux direct upload route", () => {
     mocks.videoLessonUpdateMany.mockResolvedValue({ count: 1 });
   });
 
-  it("creates a Mux direct upload for an org-owned native video lesson and stores processing state", async () => {
+  it("creates a Mux direct upload for an org-owned native video lesson and stores upload-created state", async () => {
     const response = await POST(new Request("http://learnhub.test", { method: "POST" }), routeContext);
 
     await expect(response.json()).resolves.toEqual({
@@ -107,7 +107,7 @@ describe("Mux direct upload route", () => {
       },
       data: {
         providerUploadId: "upload_1",
-        providerStatus: "PROCESSING",
+        providerStatus: "UPLOAD_CREATED",
         providerError: null,
       },
     });

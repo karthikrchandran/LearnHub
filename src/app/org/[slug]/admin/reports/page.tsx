@@ -1,9 +1,11 @@
-import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
+import { AdminAppShell } from "@/app/ui/learnhub-components";
 import { createPrismaProgressReportRepository } from "@/modules/reports/prisma-repository";
 import {
-  resolveProgressReportScope,
   type ProgressReportRow,
 } from "@/modules/reports/progress-report";
+import type { ReactNode } from "react";
+
+import { getAdminWorkspace } from "../admin-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +17,8 @@ type AdminProgressReportsPageProps = {
 
 export default async function AdminProgressReportsPage({ params }: AdminProgressReportsPageProps) {
   const { slug } = await params;
-  const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
-  const scope = resolveProgressReportScope(context, organizationId);
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
+  const scope = { kind: "admin" as const };
   const repository = createPrismaProgressReportRepository(prisma);
   const [
     rows,
@@ -50,11 +51,12 @@ export default async function AdminProgressReportsPage({ params }: AdminProgress
   ];
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
+    <AdminAppShell organizationName={organizationName} slug={slug} active="reports">
+      <div className="lh-main-inner lh-main-wide">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Organization progress</p>
-          <h1 className="text-3xl font-semibold text-slate-950">{slug} organization progress</h1>
+          <h1 className="text-3xl font-semibold text-slate-950">{organizationName} organization progress</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           {exportLinks.map(([label, path]) => (
@@ -71,76 +73,94 @@ export default async function AdminProgressReportsPage({ params }: AdminProgress
 
       {scope.kind === "admin" ? (
         <>
-          <AdminProgressReportTable rows={rows} />
-          <AdminSimpleReportTable
-            title="Course completion"
-            headers={["Course", "Assigned", "Started", "Completed", "Overdue", "Rate"]}
-            rows={completionRows.map((row) => [
-              row.courseTitle,
-              row.assignedCount,
-              row.startedCount,
-              row.completedCount,
-              row.overdueCount,
-              `${row.completionRate}%`,
-            ])}
-          />
-          <AdminSimpleReportTable
-            title="Scoring"
-            headers={["Course", "Attempts", "Average", "Best", "Latest", "Pass rate"]}
-            rows={scoringRows.map((row) => [
-              row.courseTitle,
-              row.attemptCount,
-              row.averageScore,
-              row.bestScore,
-              row.latestScore,
-              `${row.passRate}%`,
-            ])}
-          />
-          <AdminSimpleReportTable
-            title="Timing"
-            headers={["Course", "Learners", "Average seconds", "Total seconds", "Last activity"]}
-            rows={timingRows.map((row) => [
-              row.courseTitle,
-              row.learnerCount,
-              row.averageTimeSeconds,
-              row.totalTimeSeconds,
-              row.lastActivityAt?.toLocaleString() ?? "None",
-            ])}
-          />
-          <AdminSimpleReportTable
-            title="Satisfaction"
-            headers={["Course", "Responses", "Average stars", "Latest feedback", "Submitted"]}
-            rows={satisfactionRows.map((row) => [
-              row.courseTitle,
-              row.responseCount,
-              row.averageStars,
-              row.latestFeedbackText ?? "None",
-              row.latestFeedbackAt?.toLocaleString() ?? "None",
-            ])}
-          />
-          <AdminSimpleReportTable
-            title="Quiz difficulty"
-            headers={["Course", "Question", "Attempts", "Correct rate"]}
-            rows={quizDifficultyRows.map((row) => [row.courseTitle, row.prompt, row.attempts, `${row.correctRate}%`])}
-          />
-          <AdminSimpleReportTable
-            title="Certificates and credentials"
-            headers={["Learner", "Course", "Issued", "Credential", "Failure"]}
-            rows={certificateRows.map((row) => [
-              row.learnerName,
-              row.courseTitle,
-              row.issuedAt.toLocaleDateString(),
-              row.credentialProvider ? `${row.credentialProvider}: ${row.credentialStatus ?? "PENDING"}` : "Not issued",
-              row.failureMessage ?? "None",
-            ])}
-          />
+          <ReportGroup title="Learner progress">
+            <AdminProgressReportTable rows={rows} />
+          </ReportGroup>
+          <ReportGroup title="Compliance and completion">
+            <AdminSimpleReportTable
+              title="Course completion"
+              headers={["Course", "Assigned", "Started", "Completed", "Overdue", "Rate"]}
+              rows={completionRows.map((row) => [
+                row.courseTitle,
+                row.assignedCount,
+                row.startedCount,
+                row.completedCount,
+                row.overdueCount,
+                `${row.completionRate}%`,
+              ])}
+            />
+            <AdminSimpleReportTable
+              title="Certificates and credentials"
+              headers={["Learner", "Course", "Issued", "Credential", "Failure"]}
+              rows={certificateRows.map((row) => [
+                row.learnerName,
+                row.courseTitle,
+                row.issuedAt.toLocaleDateString(),
+                row.credentialProvider ? `${row.credentialProvider}: ${row.credentialStatus ?? "PENDING"}` : "Not issued",
+                row.failureMessage ?? "None",
+              ])}
+            />
+          </ReportGroup>
+          <ReportGroup title="Assessment quality">
+            <AdminSimpleReportTable
+              title="Scoring"
+              headers={["Course", "Attempts", "Average", "Best", "Latest", "Pass rate"]}
+              rows={scoringRows.map((row) => [
+                row.courseTitle,
+                row.attemptCount,
+                row.averageScore,
+                row.bestScore,
+                row.latestScore,
+                `${row.passRate}%`,
+              ])}
+            />
+            <AdminSimpleReportTable
+              title="Quiz difficulty"
+              headers={["Course", "Question", "Attempts", "Correct rate"]}
+              rows={quizDifficultyRows.map((row) => [row.courseTitle, row.prompt, row.attempts, `${row.correctRate}%`])}
+            />
+          </ReportGroup>
+          <ReportGroup title="Engagement">
+            <AdminSimpleReportTable
+              title="Timing"
+              headers={["Course", "Learners", "Average seconds", "Total seconds", "Last activity"]}
+              rows={timingRows.map((row) => [
+                row.courseTitle,
+                row.learnerCount,
+                row.averageTimeSeconds,
+                row.totalTimeSeconds,
+                row.lastActivityAt?.toLocaleString() ?? "None",
+              ])}
+            />
+            <AdminSimpleReportTable
+              title="Satisfaction"
+              headers={["Course", "Responses", "Average stars", "Latest feedback", "Submitted"]}
+              rows={satisfactionRows.map((row) => [
+                row.courseTitle,
+                row.responseCount,
+                row.averageStars,
+                row.latestFeedbackText ?? "None",
+                row.latestFeedbackAt?.toLocaleString() ?? "None",
+              ])}
+            />
+          </ReportGroup>
         </>
       ) : (
         <section className="rounded-md border border-slate-200 p-4 text-sm text-slate-600">
           Organization progress is available to admins.
         </section>
       )}
-    </main>
+      </div>
+    </AdminAppShell>
+  );
+}
+
+function ReportGroup({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <section className="grid gap-4">
+      <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+      {children}
+    </section>
   );
 }
 

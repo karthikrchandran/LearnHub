@@ -1,6 +1,7 @@
-import { requireOrganizationUsersAdminBySlug } from "@/lib/auth/guards";
+import { AdminAppShell } from "@/app/ui/learnhub-components";
 import { createPrismaCredentialOperationsRepository } from "@/modules/credentials/prisma-repository";
 
+import { getAdminWorkspace } from "../admin-utils";
 import { retryCredentialFormAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,7 @@ type AdminCredentialsPageProps = {
 
 export default async function AdminCredentialsPage({ params }: AdminCredentialsPageProps) {
   const { slug } = await params;
-  const { organizationId } = await requireOrganizationUsersAdminBySlug(slug);
-  const { prisma } = await import("@/lib/prisma");
+  const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
   const rows = await createPrismaCredentialOperationsRepository(prisma).listCredentialOperations({
     organizationId,
   });
@@ -25,10 +25,13 @@ export default async function AdminCredentialsPage({ params }: AdminCredentialsP
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Credentials</p>
-        <h1 className="text-3xl font-semibold text-slate-950">{slug} credential operations</h1>
+    <AdminAppShell organizationName={organizationName} slug={slug} active="credentials">
+      <div className="lh-main-inner lh-main-wide">
+      <header className="lh-main-head">
+        <div>
+          <p className="lh-eyebrow">Credentials</p>
+          <h1>{organizationName} credential operations</h1>
+        </div>
       </header>
 
       <section className="overflow-x-auto rounded-md border border-slate-200">
@@ -101,6 +104,7 @@ export default async function AdminCredentialsPage({ params }: AdminCredentialsP
           </tbody>
         </table>
       </section>
-    </main>
+      </div>
+    </AdminAppShell>
   );
 }
