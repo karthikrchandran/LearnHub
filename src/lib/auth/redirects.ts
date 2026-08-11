@@ -25,7 +25,7 @@ export function resolvePostLoginRedirect(context: PostLoginRedirectContext | nul
   }
 
   const roles = activeMembership.roles ?? [];
-  const isLearnerOnly = roles.includes("LEARNER") && !roles.some((role) => role === "ADMIN" || role === "MANAGER");
+  const isUserOnly = roles.includes("LEARNER") && !roles.some((role) => role === "ADMIN" || role === "MANAGER");
 
-  return isLearnerOnly ? `/org/${activeMembership.organizationSlug}/learn` : `/org/${activeMembership.organizationSlug}`;
+  return isUserOnly ? `/org/${activeMembership.organizationSlug}/learn` : `/org/${activeMembership.organizationSlug}`;
 }

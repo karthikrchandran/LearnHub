@@ -23,7 +23,7 @@ export default function HomePage() {
             Team learning that feels like a course business
           </p>
           <h1 className="mt-3 max-w-4xl text-5xl font-black leading-tight text-[var(--learnhub-ink)]">
-            Launch branded learning programs without handing learners a spreadsheet.
+            Launch branded learning programs without handing users a spreadsheet.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-[var(--learnhub-muted-strong)]">
             LearnHub gives each organization a polished course site, structured lessons, assessments,

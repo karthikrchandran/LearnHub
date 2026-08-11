@@ -13,6 +13,7 @@ import { GET as GET_TIMING } from "@/app/api/org/[slug]/reports/timing.csv/route
 
 const mocks = vi.hoisted(() => ({
   directReportsFindMany: vi.fn(),
+  organizationFindUnique: vi.fn(),
   listCertificateCredentialRows: vi.fn(),
   listCourseCompletionRows: vi.fn(),
   listQuizDifficultyRows: vi.fn(),
@@ -30,6 +31,9 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     organizationMembership: {
       findMany: mocks.directReportsFindMany,
+    },
+    organization: {
+      findUnique: mocks.organizationFindUnique,
     },
     courseAssignment: {},
   },
@@ -147,6 +151,11 @@ describe("progress report CSV export route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.directReportsFindMany.mockResolvedValue([]);
+    mocks.organizationFindUnique.mockResolvedValue({
+      allowManagerReports: true,
+      allowUserReports: true,
+      allowCsvExports: true,
+    });
     mocks.listCertificateCredentialRows.mockResolvedValue([certificateRow]);
     mocks.listCourseCompletionRows.mockResolvedValue([completionRow]);
     mocks.listQuizDifficultyRows.mockResolvedValue([quizDifficultyRow]);

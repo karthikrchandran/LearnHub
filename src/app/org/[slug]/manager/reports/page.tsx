@@ -1,5 +1,6 @@
 import { EmptyActionState, ManagerAppShell } from "@/app/ui/learnhub-components";
 import { createPrismaProgressReportRepository } from "@/modules/reports/prisma-repository";
+import { canViewTenantReports } from "@/modules/reports/report-access";
 import {
   resolveProgressReportScope,
   type ProgressReportRow,
@@ -31,6 +32,19 @@ export default async function ManagerReportsPage({ params }: ManagerReportsPageP
           <EmptyActionState
             body="Only active managers can view direct-report reports from the manager workspace."
             title="Manager access required"
+          />
+        </div>
+      </ManagerAppShell>
+    );
+  }
+
+  if (!canViewTenantReports("manager", workspace.organization)) {
+    return (
+      <ManagerAppShell organizationName={workspace.organization.name} slug={slug} active="reports">
+        <div className="lh-main-inner">
+          <EmptyActionState
+            body="An admin has disabled manager report access for this organization."
+            title="Manager reports disabled"
           />
         </div>
       </ManagerAppShell>
@@ -80,15 +94,17 @@ export default async function ManagerReportsPage({ params }: ManagerReportsPageP
             <p>Reports are scoped to learners who report directly to you.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {exportLinks.map(([label, path]) => (
-              <a
-                key={path}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800"
-                href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
-              >
-                {label} CSV
-              </a>
-            ))}
+            {workspace.organization.allowCsvExports
+              ? exportLinks.map(([label, path]) => (
+                  <a
+                    key={path}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800"
+                    href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
+                  >
+                    {label} CSV
+                  </a>
+                ))
+              : null}
           </div>
         </header>
 

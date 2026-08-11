@@ -22,6 +22,9 @@ export type OrganizationSettingsRecord = {
   enrollmentPolicy: OrganizationEnrollmentPolicy;
   globalLibraryEnabled: boolean;
   allowAdminBranding: boolean;
+  allowManagerReports: boolean;
+  allowUserReports: boolean;
+  allowCsvExports: boolean;
 };
 
 export type OrganizationSettingsInput = Omit<OrganizationSettingsRecord, "id">;
@@ -62,6 +65,9 @@ const settingFieldOrder = [
   "enrollmentPolicy",
   "globalLibraryEnabled",
   "allowAdminBranding",
+  "allowManagerReports",
+  "allowUserReports",
+  "allowCsvExports",
 ] as const;
 const brandingFieldOrder = ["logoUrl", "primaryColor", "accentColor"] as const;
 
@@ -143,6 +149,52 @@ export async function updateOrganizationBranding(
   return next;
 }
 
+export async function updateOrganizationReportAccess(
+  input: {
+    actor: OrganizationSettingsActor;
+    organizationId: string;
+    reportAccess: Pick<
+      OrganizationSettingsRecord,
+      "allowManagerReports" | "allowUserReports" | "allowCsvExports"
+    >;
+  },
+  repository: OrganizationSettingsRepository,
+): Promise<OrganizationSettingsRecord> {
+  const current = await requireOrganization(input.organizationId, repository);
+
+  if (!canManageOrganization(input.actor, current.id)) {
+    throw new Error("Only organization admins can update tenant report access");
+  }
+
+  const normalized = {
+    allowManagerReports: input.reportAccess.allowManagerReports,
+    allowUserReports: input.reportAccess.allowUserReports,
+    allowCsvExports: input.reportAccess.allowCsvExports,
+  };
+  const reportAccessFields = ["allowManagerReports", "allowUserReports", "allowCsvExports"] as const;
+  const changed = changedFields(current, normalized, reportAccessFields);
+
+  if (changed.length === 0) {
+    return current;
+  }
+
+  const next = await repository.saveOrganizationSettings({
+    id: current.id,
+    ...normalized,
+  });
+
+  await repository.recordAuditLog({
+    organizationId: current.id,
+    actorId: input.actor.userId,
+    action: "organization.report_access.updated",
+    targetType: "organization",
+    targetId: current.id,
+    metadata: buildAuditMetadata(current, normalized, changed),
+  });
+
+  return next;
+}
+
 async function requireOrganization(
   organizationId: string,
   repository: OrganizationSettingsRepository,
@@ -206,6 +258,9 @@ function normalizeSettings(
     enrollmentPolicy: settings.enrollmentPolicy,
     globalLibraryEnabled: settings.globalLibraryEnabled,
     allowAdminBranding: settings.allowAdminBranding,
+    allowManagerReports: settings.allowManagerReports,
+    allowUserReports: settings.allowUserReports,
+    allowCsvExports: settings.allowCsvExports,
   };
 }
 

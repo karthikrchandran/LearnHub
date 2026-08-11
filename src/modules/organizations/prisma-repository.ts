@@ -41,6 +41,9 @@ export function createPrismaOrganizationSettingsRepository(
           enrollmentPolicy: true,
           globalLibraryEnabled: true,
           allowAdminBranding: true,
+          allowManagerReports: true,
+          allowUserReports: true,
+          allowCsvExports: true,
         },
       });
     },
@@ -62,6 +65,9 @@ export function createPrismaOrganizationSettingsRepository(
           enrollmentPolicy: true,
           globalLibraryEnabled: true,
           allowAdminBranding: true,
+          allowManagerReports: true,
+          allowUserReports: true,
+          allowCsvExports: true,
         },
       });
     },

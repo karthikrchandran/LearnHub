@@ -2,7 +2,10 @@ import { AdminAppShell } from "@/app/ui/learnhub-components";
 import { redirect } from "next/navigation";
 
 import { getAdminWorkspace } from "../admin-utils";
-import { updateOrganizationBrandingFormAction } from "./actions";
+import {
+  updateOrganizationBrandingFormAction,
+  updateOrganizationReportAccessFormAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +28,9 @@ export default async function OrganizationSettingsPage({
       primaryColor: true,
       accentColor: true,
       allowAdminBranding: true,
+      allowManagerReports: true,
+      allowUserReports: true,
+      allowCsvExports: true,
     },
   });
 
@@ -36,6 +42,11 @@ export default async function OrganizationSettingsPage({
     "use server";
 
     await updateOrganizationBrandingFormAction(slug, formData);
+  };
+  const updateReportAccessAction = async (formData: FormData) => {
+    "use server";
+
+    await updateOrganizationReportAccessFormAction(slug, formData);
   };
 
   return (
@@ -92,6 +103,53 @@ export default async function OrganizationSettingsPage({
               Branding edits are controlled by the platform owner for this organization.
             </p>
           ) : null}
+        </form>
+
+        <form action={updateReportAccessAction} className="grid gap-5 rounded-md border border-slate-200 bg-white p-5">
+          <header>
+            <h2 className="text-lg font-semibold text-slate-950">Report access</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Control manager and user report visibility and CSV export access for this organization.
+            </p>
+          </header>
+          <div className="grid gap-3 text-sm font-medium text-slate-700">
+            <label className="flex items-center gap-2">
+              <input
+                name="allowManagerReports"
+                type="checkbox"
+                value="true"
+                defaultChecked={organization.allowManagerReports}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              Manager report access
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                name="allowUserReports"
+                type="checkbox"
+                value="true"
+                defaultChecked={organization.allowUserReports}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              User report access
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                name="allowCsvExports"
+                type="checkbox"
+                value="true"
+                defaultChecked={organization.allowCsvExports}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              CSV export access
+            </label>
+          </div>
+          <button
+            type="submit"
+            className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+          >
+            Save report access
+          </button>
         </form>
       </div>
     </AdminAppShell>

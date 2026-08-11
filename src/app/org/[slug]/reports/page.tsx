@@ -1,10 +1,15 @@
 import { requireOrganizationMemberBySlug } from "@/lib/auth/guards";
 import { createPrismaProgressReportRepository } from "@/modules/reports/prisma-repository";
 import {
+  canViewTenantReports,
+  resolveReportViewerRole,
+} from "@/modules/reports/report-access";
+import {
   resolveProgressReportScope,
   type ProgressReportRow,
   type ProgressReportTargetMembership,
 } from "@/modules/reports/progress-report";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +24,37 @@ export default async function ProgressReportsPage({ params }: ProgressReportsPag
   const { slug } = await params;
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
   const { prisma } = await import("@/lib/prisma");
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: {
+      allowManagerReports: true,
+      allowUserReports: true,
+      allowCsvExports: true,
+    },
+  });
+
+  if (!organization) {
+    redirect(`/org/${encodeURIComponent(slug)}`);
+  }
+
+  const reportRole = resolveReportViewerRole(context, organizationId);
+
+  if (!canViewTenantReports(reportRole, organization)) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Progress report</p>
+            <h1 className="text-3xl font-semibold text-slate-950">{slug} learning progress</h1>
+          </div>
+        </header>
+        <section className="rounded-md border border-slate-200 p-4 text-sm text-slate-600">
+          Reports are disabled for your role in this organization.
+        </section>
+      </main>
+    );
+  }
+
   const directReports = await loadDirectReportTargets(context, organizationId, prisma);
   const scope = resolveProgressReportScope(context, organizationId, directReports);
   const repository = createPrismaProgressReportRepository(prisma);
@@ -59,15 +95,17 @@ export default async function ProgressReportsPage({ params }: ProgressReportsPag
           <h1 className="text-3xl font-semibold text-slate-950">{slug} learning progress</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          {exportLinks.map(([label, path]) => (
-            <a
-              key={path}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
-              href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
-            >
-              {label} CSV
-            </a>
-          ))}
+          {organization.allowCsvExports
+            ? exportLinks.map(([label, path]) => (
+                <a
+                  key={path}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
+                  href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
+                >
+                  {label} CSV
+                </a>
+              ))
+            : null}
         </div>
       </header>
 

@@ -18,6 +18,10 @@ type AdminProgressReportsPageProps = {
 export default async function AdminProgressReportsPage({ params }: AdminProgressReportsPageProps) {
   const { slug } = await params;
   const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { allowCsvExports: true },
+  });
   const scope = { kind: "admin" as const };
   const repository = createPrismaProgressReportRepository(prisma);
   const [
@@ -59,15 +63,17 @@ export default async function AdminProgressReportsPage({ params }: AdminProgress
           <h1 className="text-3xl font-semibold text-slate-950">{organizationName} organization progress</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          {exportLinks.map(([label, path]) => (
-            <a
-              key={path}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
-              href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
-            >
-              {label} CSV
-            </a>
-          ))}
+          {organization?.allowCsvExports
+            ? exportLinks.map(([label, path]) => (
+                <a
+                  key={path}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800"
+                  href={`/api/org/${encodeURIComponent(slug)}/reports/${path}`}
+                >
+                  {label} CSV
+                </a>
+              ))
+            : null}
         </div>
       </header>
 

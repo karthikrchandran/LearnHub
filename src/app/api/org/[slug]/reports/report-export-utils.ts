@@ -4,13 +4,38 @@ import {
 } from "@/lib/auth/guards";
 import { createPrismaProgressReportRepository } from "@/modules/reports/prisma-repository";
 import {
+  canExportTenantReports,
+  resolveReportViewerRole,
+} from "@/modules/reports/report-access";
+import {
   resolveProgressReportScope,
   type ProgressReportTargetMembership,
 } from "@/modules/reports/progress-report";
 
+class ReportExportAccessError extends Error {}
+
 export async function loadScopedReportContext(slug: string) {
   const { context, organizationId } = await requireOrganizationMemberBySlug(slug);
   const { prisma } = await import("@/lib/prisma");
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: {
+      allowManagerReports: true,
+      allowUserReports: true,
+      allowCsvExports: true,
+    },
+  });
+
+  if (!organization) {
+    throw new ReportExportAccessError("Organization not found");
+  }
+
+  const role = resolveReportViewerRole(context, organizationId);
+
+  if (!canExportTenantReports(role, organization)) {
+    throw new ReportExportAccessError("Report export disabled");
+  }
+
   const directReports = await loadDirectReportTargets(context, organizationId, prisma);
   const scope = resolveProgressReportScope(context, organizationId, directReports);
 
@@ -33,6 +58,10 @@ export function csvResponse(body: string, filename: string): Response {
 export function reportExportErrorResponse(error: unknown): Response {
   if (isLoginRedirect(error)) {
     return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  if (error instanceof ReportExportAccessError) {
+    return Response.json({ error: "Not allowed to export this report" }, { status: 403 });
   }
 
   if (isRedirect(error)) {

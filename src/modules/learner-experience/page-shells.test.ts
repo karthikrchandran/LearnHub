@@ -187,7 +187,7 @@ describe("learner experience page shells", () => {
     expect(login).toContain("Use your organization credentials");
     expect(login).toContain("Organization learning");
     expect(login).not.toContain("Acme Learning");
-    expect(org).toContain("Learner experience");
+    expect(org).toContain("User workspace");
     expect(org).toContain("Admin console");
     expect(org).toContain("Reports");
     expect(org).toContain("redirect(`/org/${slug}/learn`)");

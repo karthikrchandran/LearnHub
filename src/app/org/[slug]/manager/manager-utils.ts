@@ -15,7 +15,12 @@ export async function getManagerWorkspace(slug: string) {
   const { prisma } = await import("@/lib/prisma");
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { name: true },
+    select: {
+      name: true,
+      allowManagerReports: true,
+      allowUserReports: true,
+      allowCsvExports: true,
+    },
   });
 
   if (!organization) {

@@ -4,6 +4,7 @@ import type { MembershipAuthContext } from "../auth/permissions";
 import {
   createProvisionOrganizationAction,
   createUpdateOrganizationBrandingAction,
+  createUpdateOrganizationReportAccessAction,
   createUpdateOrganizationSettingsAction,
 } from "./server-actions";
 import type { ProvisionOrganizationRepository } from "./provisioning";
@@ -122,6 +123,9 @@ const settingsRecord: OrganizationSettingsRecord = {
   enrollmentPolicy: "ASSIGNMENT_ONLY",
   globalLibraryEnabled: false,
   allowAdminBranding: true,
+  allowManagerReports: true,
+  allowUserReports: true,
+  allowCsvExports: true,
 };
 
 function createSettingsRepository(): OrganizationSettingsRepository & {
@@ -167,6 +171,9 @@ describe("organization settings server actions", () => {
         enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
         globalLibraryEnabled: "true",
         allowAdminBranding: "true",
+        allowManagerReports: "false",
+        allowUserReports: "false",
+        allowCsvExports: "false",
       }),
     );
 
@@ -187,6 +194,9 @@ describe("organization settings server actions", () => {
       enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
       globalLibraryEnabled: true,
       allowAdminBranding: true,
+      allowManagerReports: false,
+      allowUserReports: false,
+      allowCsvExports: false,
     });
   });
 
@@ -242,6 +252,35 @@ describe("organization settings server actions", () => {
       logoUrl: "https://cdn.learnhub.test/acme.png",
       primaryColor: "#334455",
       accentColor: "#667788",
+    });
+  });
+
+  it("updates tenant report access from form data", async () => {
+    const repository = createSettingsRepository();
+    const action = createUpdateOrganizationReportAccessAction({
+      getActor: async () => orgAdmin,
+      getOrganizationIdBySlug: async () => "org_1",
+      repository,
+    });
+
+    const result = await action(
+      "acme",
+      formData({
+        allowManagerReports: "false",
+        allowUserReports: "true",
+        allowCsvExports: "false",
+      }),
+    );
+
+    expect(result).toEqual({
+      status: "success",
+      message: "Report access settings updated.",
+    });
+    expect(repository.savedSettings[0]).toMatchObject({
+      id: "org_1",
+      allowManagerReports: false,
+      allowUserReports: true,
+      allowCsvExports: false,
     });
   });
 });

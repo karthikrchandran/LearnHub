@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MembershipAuthContext } from "../auth/permissions";
 import {
   updateOrganizationBranding,
+  updateOrganizationReportAccess,
   updateOrganizationSettings,
   type OrganizationSettingsRecord,
   type OrganizationSettingsRepository,
@@ -40,6 +41,9 @@ const baseOrganization: OrganizationSettingsRecord = {
   enrollmentPolicy: "ASSIGNMENT_ONLY",
   globalLibraryEnabled: false,
   allowAdminBranding: false,
+  allowManagerReports: true,
+  allowUserReports: true,
+  allowCsvExports: true,
 };
 
 function createRepository(
@@ -107,6 +111,9 @@ describe("organization settings", () => {
           enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
           globalLibraryEnabled: true,
           allowAdminBranding: true,
+          allowManagerReports: false,
+          allowUserReports: false,
+          allowCsvExports: false,
         },
       },
       repository,
@@ -124,6 +131,9 @@ describe("organization settings", () => {
       enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
       globalLibraryEnabled: true,
       allowAdminBranding: true,
+      allowManagerReports: false,
+      allowUserReports: false,
+      allowCsvExports: false,
     });
     expect(repository.savedSettings).toEqual([
       {
@@ -138,6 +148,9 @@ describe("organization settings", () => {
         enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
         globalLibraryEnabled: true,
         allowAdminBranding: true,
+        allowManagerReports: false,
+        allowUserReports: false,
+        allowCsvExports: false,
       },
     ]);
     expect(repository.auditLogs).toEqual([
@@ -159,6 +172,9 @@ describe("organization settings", () => {
             "enrollmentPolicy",
             "globalLibraryEnabled",
             "allowAdminBranding",
+            "allowManagerReports",
+            "allowUserReports",
+            "allowCsvExports",
           ],
           previous: {
             name: "Acme",
@@ -171,6 +187,9 @@ describe("organization settings", () => {
             enrollmentPolicy: "ASSIGNMENT_ONLY",
             globalLibraryEnabled: false,
             allowAdminBranding: false,
+            allowManagerReports: true,
+            allowUserReports: true,
+            allowCsvExports: true,
           },
           next: {
             name: "Acme Learning",
@@ -183,6 +202,9 @@ describe("organization settings", () => {
             enrollmentPolicy: "ASSIGNMENT_AND_SELF_ENROLLMENT",
             globalLibraryEnabled: true,
             allowAdminBranding: true,
+            allowManagerReports: false,
+            allowUserReports: false,
+            allowCsvExports: false,
           },
         },
       },
@@ -208,6 +230,9 @@ describe("organization settings", () => {
             enrollmentPolicy: "ASSIGNMENT_ONLY",
             globalLibraryEnabled: false,
             allowAdminBranding: false,
+            allowManagerReports: true,
+            allowUserReports: true,
+            allowCsvExports: true,
           },
         },
         repository,
@@ -252,6 +277,42 @@ describe("organization settings", () => {
       targetId: "org_1",
       metadata: {
         changed: ["logoUrl", "primaryColor", "accentColor"],
+      },
+    });
+  });
+
+  it("lets organization admins update tenant report access", async () => {
+    const repository = createRepository();
+
+    await updateOrganizationReportAccess(
+      {
+        actor: orgAdmin,
+        organizationId: "org_1",
+        reportAccess: {
+          allowManagerReports: false,
+          allowUserReports: false,
+          allowCsvExports: false,
+        },
+      },
+      repository,
+    );
+
+    expect(repository.savedSettings).toEqual([
+      {
+        id: "org_1",
+        allowManagerReports: false,
+        allowUserReports: false,
+        allowCsvExports: false,
+      },
+    ]);
+    expect(repository.auditLogs[0]).toMatchObject({
+      organizationId: "org_1",
+      actorId: "admin_1",
+      action: "organization.report_access.updated",
+      targetType: "organization",
+      targetId: "org_1",
+      metadata: {
+        changed: ["allowManagerReports", "allowUserReports", "allowCsvExports"],
       },
     });
   });

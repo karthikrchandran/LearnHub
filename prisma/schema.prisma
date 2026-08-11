@@ -146,6 +146,9 @@ model Organization {
   enrollmentPolicy     OrganizationEnrollmentPolicy @default(ASSIGNMENT_ONLY)
   globalLibraryEnabled Boolean                      @default(false)
   allowAdminBranding   Boolean                      @default(false)
+  allowManagerReports  Boolean                      @default(true)
+  allowUserReports     Boolean                      @default(true)
+  allowCsvExports      Boolean                      @default(true)
   memberships          OrganizationMembership[]
   invitationTokens     UserInvitationToken[]
   categories           CourseCategory[]

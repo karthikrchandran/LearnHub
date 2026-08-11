@@ -31,6 +31,9 @@ export default async function PlatformOrganizationSettingsPage({
       enrollmentPolicy: true,
       globalLibraryEnabled: true,
       allowAdminBranding: true,
+      allowManagerReports: true,
+      allowUserReports: true,
+      allowCsvExports: true,
     },
   });
 
@@ -158,6 +161,36 @@ export default async function PlatformOrganizationSettingsPage({
               className="h-4 w-4 rounded border-slate-300"
             />
             Tenant admin branding edits
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              name="allowManagerReports"
+              type="checkbox"
+              value="true"
+              defaultChecked={organization.allowManagerReports}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            Manager report access
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              name="allowUserReports"
+              type="checkbox"
+              value="true"
+              defaultChecked={organization.allowUserReports}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            User report access
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              name="allowCsvExports"
+              type="checkbox"
+              value="true"
+              defaultChecked={organization.allowCsvExports}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            CSV export access
           </label>
         </div>
 

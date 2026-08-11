@@ -2,6 +2,7 @@ import { provisionOrganization } from "./provisioning";
 import type { ProvisionOrganizationRepository } from "./provisioning";
 import {
   updateOrganizationBranding,
+  updateOrganizationReportAccess,
   updateOrganizationSettings,
   type OrganizationBrandingInput,
   type OrganizationSettingsInput,
@@ -37,6 +38,11 @@ export type UpdateOrganizationSettingsActionResult =
     };
 
 export type UpdateOrganizationBrandingActionResult = {
+  status: "success" | "error";
+  message: string;
+};
+
+export type UpdateOrganizationReportAccessActionResult = {
   status: "success" | "error";
   message: string;
 };
@@ -178,6 +184,48 @@ export function createUpdateOrganizationBrandingAction(
   };
 }
 
+export function createUpdateOrganizationReportAccessAction(
+  dependencies: UpdateOrganizationSettingsActionDependencies,
+) {
+  return async function updateOrganizationReportAccessAction(
+    slug: string,
+    formData: FormData,
+  ): Promise<UpdateOrganizationReportAccessActionResult> {
+    const organizationId = await dependencies.getOrganizationIdBySlug(slug);
+
+    if (!organizationId) {
+      return { status: "error", message: "Organization was not found" };
+    }
+
+    try {
+      const actor = await dependencies.getActor();
+
+      await updateOrganizationReportAccess(
+        {
+          actor,
+          organizationId,
+          reportAccess: {
+            allowManagerReports: readFormBoolean(formData, "allowManagerReports"),
+            allowUserReports: readFormBoolean(formData, "allowUserReports"),
+            allowCsvExports: readFormBoolean(formData, "allowCsvExports"),
+          },
+        },
+        dependencies.repository,
+      );
+
+      return {
+        status: "success",
+        message: "Report access settings updated.",
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        message: error instanceof Error ? error.message : "Report access settings update failed",
+      };
+    }
+  };
+}
+
 function readOrganizationSettingsForm(formData: FormData): OrganizationSettingsInput {
   return {
     name: readFormString(formData, "name"),
@@ -193,6 +241,9 @@ function readOrganizationSettingsForm(formData: FormData): OrganizationSettingsI
         : "ASSIGNMENT_ONLY",
     globalLibraryEnabled: readFormBoolean(formData, "globalLibraryEnabled"),
     allowAdminBranding: readFormBoolean(formData, "allowAdminBranding"),
+    allowManagerReports: readFormBoolean(formData, "allowManagerReports"),
+    allowUserReports: readFormBoolean(formData, "allowUserReports"),
+    allowCsvExports: readFormBoolean(formData, "allowCsvExports"),
   };
 }
 

@@ -23,12 +23,12 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
     (membership) => membership.organizationId === organizationId && membership.status === "ACTIVE",
   );
   const roles = activeMembership?.roles ?? [];
-  const isLearnerOnly =
+  const isUserOnly =
     !context.isPlatformOwner &&
     roles.includes("LEARNER") &&
     !roles.some((role) => role === "ADMIN" || role === "MANAGER");
 
-  if (isLearnerOnly) {
+  if (isUserOnly) {
     redirect(`/org/${slug}/learn`);
   }
 
@@ -100,15 +100,15 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
       <section className="grid gap-4 md:grid-cols-3">
         <article className="flex flex-col justify-between rounded-md border border-slate-200 bg-white p-5">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Courses</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Learner experience</h2>
+            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">User</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">User workspace</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Continue assigned courses, browse the catalog, and view certificates.
+              Continue assigned courses, browse the catalog, complete assessments, and view certificates.
             </p>
           </div>
           <div className="mt-5">
             <PrimaryButton href={`/org/${slug}/learn`} variant="blue">
-              Learner experience
+              User workspace
             </PrimaryButton>
           </div>
         </article>
@@ -129,7 +129,7 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Insights</p>
             <h2 className="mt-2 text-xl font-semibold text-slate-950">Reports</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Review learner progress, completion, scoring, timing, and credential trends.
+              Review user progress, completion, scoring, timing, and credential trends.
             </p>
           </div>
           <div className="mt-5">
