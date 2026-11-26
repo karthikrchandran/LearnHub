@@ -48,7 +48,8 @@ export type VideoRuntimeLesson = {
   providerAssetId: string | null;
   providerUploadId: string | null;
   providerPlaybackId: string | null;
-  providerStatus: "UPLOAD_CREATED" | "PROCESSING" | "READY" | "FAILED";
+  muxPlaybackPolicy?: string | null;
+  providerStatus: "DRAFT" | "UPLOAD_CREATED" | "PROCESSING" | "READY" | "FAILED";
   providerError: string | null;
   chapters: VideoRuntimeChapter[];
   transcriptCues: VideoRuntimeTranscriptCue[];
@@ -257,6 +258,8 @@ async function loadNativeAssignment(
     throw new Error("Assignment is not for a native video course");
   }
 
+  assignment.course.lessons = assignment.course.lessons.filter((lesson) => lesson.providerStatus !== "DRAFT");
+
   return assignment;
 }
 
@@ -277,7 +280,10 @@ function buildLessonViews(assignment: VideoRuntimeAssignment): VideoRuntimeLesso
 
 function assertProviderAssetsReady(assignment: VideoRuntimeAssignment): void {
   const unavailableLesson = assignment.course.lessons.find(
-    (lesson) => lesson.providerAssetId && lesson.providerStatus !== "READY",
+    (lesson) =>
+      lesson.providerStatus === "DRAFT" ||
+      !lesson.playbackUrl ||
+      Boolean(lesson.providerAssetId && (lesson.providerStatus !== "READY" || lesson.muxPlaybackPolicy !== "signed")),
   );
 
   if (unavailableLesson) {

@@ -12,6 +12,7 @@ import {
   replaceTranscriptFormAction,
 } from "./actions";
 import { MuxVideoUploadForm } from "./mux-video-upload-form";
+import { LessonAuthoringWizard } from "./lesson-authoring-wizard";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,8 @@ type CourseContentAdminPageProps = {
 export default async function CourseContentAdminPage({ params }: CourseContentAdminPageProps) {
   const { slug, courseSlug } = await params;
   const { organizationId, organizationName, prisma } = await getAdminWorkspace(slug);
-  const readiness = getMediaProviderReadiness(getEnv());
+  const env = getEnv();
+  const readiness = getMediaProviderReadiness(env);
   const course = await prisma.course.findFirst({
     where: {
       organizationId,
@@ -54,6 +56,9 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
           providerPlaybackId: true,
           providerStatus: true,
           providerError: true,
+          authoringPrompt: true,
+          narrationScript: true,
+          videoGenerationPrompt: true,
           chapters: {
             orderBy: { sortOrder: "asc" },
             select: { title: true, startSecond: true, endSecond: true },
@@ -69,7 +74,7 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
   const createLessonAction = async (formData: FormData) => {
     "use server";
 
-    await createLessonFormAction(slug, courseSlug, formData);
+    return createLessonFormAction(slug, courseSlug, formData);
   };
   const replaceChaptersAction = async (formData: FormData) => {
     "use server";
@@ -136,59 +141,14 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
         </dl>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="rounded-md border border-slate-200 p-4">
-          <h2 className="text-lg font-semibold text-slate-950">Video lessons</h2>
-          <form action={createLessonAction} className="mt-4 grid gap-3 md:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Title
-              <input name="title" className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Slug
-              <input name="slug" className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Module
-              <select name="moduleId" className="rounded-md border border-slate-300 px-3 py-2">
-                <option value="">No module</option>
-                {course.modules.map((module) => (
-                  <option key={module.id} value={module.id}>
-                    {module.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Sort order
-              <input name="sortOrder" type="number" min="0" defaultValue={course.videoLessons.length} className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Duration seconds
-              <input name="durationSeconds" type="number" min="1" className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Transcript language
-              <input name="transcriptLanguage" defaultValue="en" className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
-              Playback URL
-              <input name="playbackUrl" className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
-              Provider asset ID
-              <input name="providerAssetId" className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input name="required" type="checkbox" defaultChecked className="h-4 w-4 rounded border-slate-300" />
-              Required
-            </label>
-            <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white md:col-span-2">
-              Add lesson
-            </button>
-          </form>
-        </div>
-
+      <section className="grid gap-4">
+        <LessonAuthoringWizard
+          action={createLessonAction}
+          aiDraftUrl={`/api/org/${encodeURIComponent(slug)}/courses/${encodeURIComponent(courseSlug)}/video/ai-draft`}
+          aiConfigured={Boolean(env.OPENAI_API_KEY?.trim())}
+          modules={course.modules}
+          nextSortOrder={course.videoLessons.length}
+        />
         <aside className="rounded-md border border-slate-200 p-4">
           <h2 className="text-lg font-semibold text-slate-950">Modules</h2>
           <div className="mt-4 space-y-2 text-sm text-slate-700">
@@ -277,6 +237,13 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
                   <p className="mt-1 text-sm text-slate-500">
                     {lesson.playbackUrl ?? lesson.providerAssetId ?? "No media source recorded"}
                   </p>
+                  {lesson.videoGenerationPrompt ? (
+                    <details className="mt-2 rounded-md bg-teal-50 p-3 text-sm">
+                      <summary className="cursor-pointer font-medium text-teal-900">AI video prompt and script</summary>
+                      <p className="mt-2 whitespace-pre-wrap text-slate-700">{lesson.videoGenerationPrompt}</p>
+                      {lesson.narrationScript ? <pre className="mt-3 whitespace-pre-wrap font-sans text-slate-700">{lesson.narrationScript}</pre> : null}
+                    </details>
+                  ) : null}
                   <MuxVideoUploadForm
                     uploadAction={`/api/org/${encodeURIComponent(slug)}/courses/${encodeURIComponent(courseSlug)}/video/lessons/${encodeURIComponent(lesson.id)}/mux-upload`}
                     disabled={!readiness.mux.configured}
@@ -286,7 +253,7 @@ export default async function CourseContentAdminPage({ params }: CourseContentAd
                 <dl className="grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-md bg-slate-50 p-3">
                     <dt className="font-medium text-slate-500">Provider status</dt>
-                    <dd className="mt-1 text-slate-950">{lesson.providerStatus}</dd>
+                    <dd className="mt-1 text-slate-950">{lesson.providerStatus === "DRAFT" ? "Draft · video needed" : lesson.providerStatus}</dd>
                     {lesson.providerError ? <dd className="mt-1 text-xs text-red-700">{lesson.providerError}</dd> : null}
                   </div>
                   <div className="rounded-md bg-slate-50 p-3">

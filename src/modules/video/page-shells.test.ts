@@ -12,6 +12,7 @@ function readPage(relativePath: string): string {
 describe("native video page shells", () => {
   it("includes live admin content forms and server action wiring", () => {
     const page = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/content/page.tsx");
+    const authoringWizard = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/content/lesson-authoring-wizard.tsx");
     const uploadForm = readPage("src/app/org/[slug]/admin/courses/[courseSlug]/content/mux-video-upload-form.tsx");
 
     expect(page).toContain("AdminAppShell");
@@ -19,11 +20,13 @@ describe("native video page shells", () => {
     expect(page).toContain("createLessonFormAction");
     expect(page).toContain("replaceChaptersFormAction");
     expect(page).toContain("replaceTranscriptFormAction");
-    expect(page).toContain("<form action={createLessonAction}");
+    expect(page).toContain("<LessonAuthoringWizard");
     expect(page).toContain("<form action={replaceChaptersAction}");
     expect(page).toContain("<form action={replaceTranscriptAction}");
     expect(page).toContain("Modules");
-    expect(page).toContain("Video lessons");
+    expect(authoringWizard).toContain("Create a lesson draft");
+    expect(authoringWizard).toContain("Generate with AI");
+    expect(authoringWizard).toContain("videoGenerationPrompt");
     expect(page).toContain("getMediaProviderReadiness");
     expect(page).toContain("MuxVideoUploadForm");
     expect(page).toContain("Mux upload readiness");

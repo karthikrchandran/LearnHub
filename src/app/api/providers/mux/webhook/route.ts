@@ -26,8 +26,14 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: error instanceof Error ? error.message : "Invalid Mux webhook signature" }, { status: 401 });
   }
 
-  const payload = JSON.parse(rawBody) as MuxWebhookPayload;
-  const event = mapMuxWebhookEvent(payload);
+  let event: ReturnType<typeof mapMuxWebhookEvent>;
+
+  try {
+    const payload = JSON.parse(rawBody) as MuxWebhookPayload;
+    event = mapMuxWebhookEvent(payload);
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "Invalid Mux webhook payload" }, { status: 400 });
+  }
 
   if (!event) {
     return Response.json({ status: "ignored" });
@@ -57,6 +63,7 @@ export async function POST(request: Request): Promise<Response> {
       ? {
           providerAssetId: event.providerAssetId,
           providerPlaybackId: event.playbackId,
+          muxPlaybackPolicy: event.playbackPolicy,
           providerStatus: "READY" as const,
           providerError: null,
           playbackUrl: event.playbackUrl,
@@ -64,11 +71,13 @@ export async function POST(request: Request): Promise<Response> {
       : event.type === "asset.failed"
         ? {
             providerAssetId: event.providerAssetId,
+          muxPlaybackPolicy: null,
             providerStatus: "FAILED" as const,
             providerError: event.errorMessage,
           }
         : {
             providerAssetId: event.providerAssetId,
+          muxPlaybackPolicy: null,
             providerStatus: "PROCESSING" as const,
             providerError: null,
           };

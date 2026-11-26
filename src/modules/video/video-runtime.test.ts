@@ -315,6 +315,25 @@ describe("launchVideoRuntime", () => {
       ),
     ).rejects.toThrow("Video asset is not ready");
   });
+
+  it("keeps draft lessons out of learner playback without blocking published lessons", async () => {
+    const assignment = structuredClone(nativeAssignment);
+    assignment.course.lessons.push({
+      ...assignment.course.lessons[0],
+      id: "lesson_draft",
+      title: "Draft lesson",
+      slug: "draft-lesson",
+      playbackUrl: null,
+      providerStatus: "DRAFT",
+    });
+
+    const runtime = await launchVideoRuntime(
+      { organizationId: "org_1", assignmentId: "assignment_1" },
+      createRepository(assignment),
+    );
+
+    expect(runtime.lessons.map((lesson) => lesson.id)).toEqual(["lesson_1", "lesson_2"]);
+  });
 });
 
 describe("recordVideoProgress", () => {

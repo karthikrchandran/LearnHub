@@ -39,6 +39,8 @@ const envSchema = z.object({
   MUX_TOKEN_ID: z.string().optional(),
   MUX_TOKEN_SECRET: z.string().optional(),
   MUX_WEBHOOK_SECRET: z.string().optional(),
+  MUX_SIGNING_KEY_ID: z.string().optional(),
+  MUX_SIGNING_PRIVATE_KEY: z.string().optional(),
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
@@ -47,6 +49,8 @@ const envSchema = z.object({
   CREDLY_BASE_URL: z.string().url().optional(),
   CREDLY_ORGANIZATION_ID: z.string().optional(),
   CREDLY_API_TOKEN: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_VIDEO_MODEL: z.string().min(1).default("gpt-4.1-mini"),
 }).superRefine((value, context) => {
   if (value.EMAIL_PROVIDER === "smtp" && !value.SMTP_HOST?.trim()) {
     context.addIssue({
@@ -115,6 +119,8 @@ const buildEnvSource = (source: NodeJS.ProcessEnv) => {
     MUX_TOKEN_ID: source.MUX_TOKEN_ID,
     MUX_TOKEN_SECRET: source.MUX_TOKEN_SECRET,
     MUX_WEBHOOK_SECRET: source.MUX_WEBHOOK_SECRET,
+    MUX_SIGNING_KEY_ID: source.MUX_SIGNING_KEY_ID,
+    MUX_SIGNING_PRIVATE_KEY: source.MUX_SIGNING_PRIVATE_KEY,
     R2_ACCOUNT_ID: source.R2_ACCOUNT_ID,
     R2_ACCESS_KEY_ID: source.R2_ACCESS_KEY_ID,
     R2_SECRET_ACCESS_KEY: source.R2_SECRET_ACCESS_KEY,
@@ -123,6 +129,8 @@ const buildEnvSource = (source: NodeJS.ProcessEnv) => {
     CREDLY_BASE_URL: source.CREDLY_BASE_URL,
     CREDLY_ORGANIZATION_ID: source.CREDLY_ORGANIZATION_ID,
     CREDLY_API_TOKEN: source.CREDLY_API_TOKEN,
+    OPENAI_API_KEY: source.OPENAI_API_KEY,
+    OPENAI_VIDEO_MODEL: valueOrUndefined(source.OPENAI_VIDEO_MODEL) ?? "gpt-4.1-mini",
   };
 };
 
@@ -133,8 +141,28 @@ export const getEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
     throw new Error("NEXTAUTH_SECRET must be changed from the placeholder value in production.");
   }
 
+  if (source.NODE_ENV === "production" && parsedEnv.NEXTAUTH_SECRET.length < 32) {
+    throw new Error("NEXTAUTH_SECRET must contain at least 32 characters in production.");
+  }
+
+  if (source.NODE_ENV === "production" && (new URL(parsedEnv.NEXTAUTH_URL).protocol !== "https:" || new URL(parsedEnv.APP_BASE_URL).protocol !== "https:")) {
+    throw new Error("NEXTAUTH_URL and APP_BASE_URL must use HTTPS in production.");
+  }
+
   if (source.NODE_ENV === "production" && !parsedEnv.NOTIFICATION_JOBS_SECRET?.trim()) {
     throw new Error("NOTIFICATION_JOBS_SECRET is required in production.");
+  }
+
+  const muxSettings = [
+    parsedEnv.MUX_TOKEN_ID,
+    parsedEnv.MUX_TOKEN_SECRET,
+    parsedEnv.MUX_WEBHOOK_SECRET,
+    parsedEnv.MUX_SIGNING_KEY_ID,
+    parsedEnv.MUX_SIGNING_PRIVATE_KEY,
+  ];
+
+  if (source.NODE_ENV === "production" && muxSettings.some((value) => value?.trim()) && muxSettings.some((value) => !value?.trim())) {
+    throw new Error("Mux production setup requires API, webhook, and signed playback credentials together.");
   }
 
   if (source.NODE_ENV === "production" && parsedEnv.EMAIL_PROVIDER === "console") {

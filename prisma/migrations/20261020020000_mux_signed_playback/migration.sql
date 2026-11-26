@@ -1,0 +1,1 @@
+ALTER TABLE "VideoLesson" ADD COLUMN "muxPlaybackPolicy" TEXT;

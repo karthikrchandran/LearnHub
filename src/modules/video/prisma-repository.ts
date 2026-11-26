@@ -214,6 +214,7 @@ export function createPrismaVideoRepository(client: PrismaVideoClient): PrismaVi
                   providerAssetId: true,
                   providerUploadId: true,
                   providerPlaybackId: true,
+                  muxPlaybackPolicy: true,
                   providerStatus: true,
                   providerError: true,
                   chapters: {

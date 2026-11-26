@@ -54,6 +54,7 @@ export type OrganizationUserLifecycleRepository = {
     status: UserStatus;
   }): Promise<OrganizationUserLifecycleRecord>;
   saveUserStatus(input: { userId: string; status: UserStatus }): Promise<void>;
+  revokeMobileSessionsForUser?(userId: string, revokedAt: Date): Promise<void>;
   createInvitation(input: {
     organizationId: string;
     membershipId: string;
@@ -131,6 +132,10 @@ export async function updateOrganizationUserLifecycle(
         userId: current.userId,
         status: normalized.status,
       });
+    }
+
+    if (changed.some((field) => field === "roles" || field === "status")) {
+      await repository.revokeMobileSessionsForUser?.(current.userId, new Date());
     }
 
     const next = await repository.saveMembershipLifecycle({

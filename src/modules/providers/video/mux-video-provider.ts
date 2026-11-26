@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 
 import type {
   CreateVideoUploadInput,
@@ -11,8 +11,16 @@ export type MuxVideoProviderConfig = {
   tokenId: string;
   tokenSecret: string;
   webhookSecret: string;
+  corsOrigin: string;
+  signingKeyId: string;
+  signingPrivateKey: string;
   fetch?: typeof fetch;
   apiBaseUrl?: string;
+};
+
+export type MuxPlaybackSigningConfig = {
+  keyId: string;
+  privateKey: string;
 };
 
 export type MuxWebhookPayload = {
@@ -32,6 +40,7 @@ export type MuxWebhookEvent =
       providerAssetId: string;
       providerUploadId: string | null;
       playbackId: string;
+      playbackPolicy: "signed";
       playbackUrl: string;
       errorMessage: null;
     } & MuxWebhookTenantContext)
@@ -55,6 +64,7 @@ export type MuxWebhookEvent =
 export function createMuxVideoProvider(config: MuxVideoProviderConfig): VideoProvider {
   const fetcher = config.fetch ?? fetch;
   const baseUrl = config.apiBaseUrl ?? "https://api.mux.com";
+  const corsOrigin = parseAllowedCorsOrigin(config.corsOrigin);
 
   return {
     async createUpload(input: CreateVideoUploadInput): Promise<CreateVideoUploadResult> {
@@ -65,9 +75,9 @@ export function createMuxVideoProvider(config: MuxVideoProviderConfig): VideoPro
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          cors_origin: "*",
+          cors_origin: corsOrigin,
           new_asset_settings: {
-            playback_policy: ["public"],
+            playback_policy: ["signed"],
             passthrough: JSON.stringify({
               organizationId: input.organizationId,
               courseId: input.courseId,
@@ -111,10 +121,40 @@ export function createMuxVideoProvider(config: MuxVideoProviderConfig): VideoPro
       return {
         providerAssetId,
         playbackId,
-        playbackUrl: playbackUrlForId(playbackId),
+        playbackUrl: createSignedMuxPlaybackUrl(playbackId, {
+          keyId: config.signingKeyId,
+          privateKey: config.signingPrivateKey,
+        }),
       };
     },
   };
+}
+
+export function createMuxPlaybackToken(
+  playbackId: string,
+  config: MuxPlaybackSigningConfig,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): string {
+  const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT", kid: config.keyId }));
+  const payload = base64Url(JSON.stringify({ sub: playbackId, aud: "v", exp: nowSeconds + 60 * 60 }));
+  const unsignedToken = `${header}.${payload}`;
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsignedToken);
+  signer.end();
+  const privateKey = config.privateKey.replace(/\\n/g, "\n");
+  const signature = signer.sign(privateKey).toString("base64url");
+
+  return `${unsignedToken}.${signature}`;
+}
+
+export function createSignedMuxPlaybackUrl(
+  playbackId: string,
+  config: MuxPlaybackSigningConfig,
+  nowSeconds?: number,
+): string {
+  const playbackUrl = new URL(`https://stream.mux.com/${encodeURIComponent(playbackId)}.m3u8`);
+  playbackUrl.searchParams.set("token", createMuxPlaybackToken(playbackId, config, nowSeconds));
+  return playbackUrl.toString();
 }
 
 export function verifyMuxWebhookSignature(input: {
@@ -160,6 +200,7 @@ export function mapMuxWebhookEvent(payload: MuxWebhookPayload): MuxWebhookEvent 
       providerAssetId,
       providerUploadId,
       playbackId,
+      playbackPolicy: "signed",
       playbackUrl: playbackUrlForId(playbackId),
       errorMessage: null,
       ...tenantContext,
@@ -230,11 +271,25 @@ function playbackIdFromData(data: Record<string, unknown> | undefined): string {
     throw new Error("Mux playback id was not returned");
   }
 
+  if (optionalString(firstPlaybackId.policy) !== "signed") {
+    throw new Error("Mux asset must use signed playback policy");
+  }
+
   return requireString(firstPlaybackId.id, "Mux playback id was not returned");
 }
 
 function playbackUrlForId(playbackId: string): string {
   return `https://stream.mux.com/${playbackId}.m3u8`;
+}
+
+function parseAllowedCorsOrigin(origin: string): string {
+  const parsed = new URL(origin);
+
+  if (parsed.origin !== origin || parsed.protocol !== "https:" && parsed.hostname !== "localhost") {
+    throw new Error("Mux CORS origin must be an HTTPS origin");
+  }
+
+  return parsed.origin;
 }
 
 function requireString(value: unknown, message: string): string {
@@ -274,6 +329,10 @@ function constantTimeEqual(left: string, right: string): boolean {
   const rightBuffer = Buffer.from(right);
 
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function base64Url(value: string): string {
+  return Buffer.from(value).toString("base64url");
 }
 
 function muxErrorMessage(data: Record<string, unknown>): string {

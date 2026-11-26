@@ -28,6 +28,12 @@ export function createVideoContentActions(dependencies: VideoContentActionDepend
     async createLesson(slug, courseSlug, formData) {
       return runAction(async () => {
         const context = await dependencies.getContext(slug, courseSlug);
+        const title = readFormString(formData, "title").trim();
+        const durationMinutes = readInteger(formData, "durationMinutes");
+
+        if (durationMinutes < 1 || durationMinutes > 600) {
+          throw new Error("Duration must be between 1 and 600 minutes");
+        }
 
         await createVideoLesson(
           {
@@ -35,14 +41,17 @@ export function createVideoContentActions(dependencies: VideoContentActionDepend
             courseId: context.courseId,
             moduleId: readOptionalFormString(formData, "moduleId"),
             actorId: context.actorId,
-            title: readFormString(formData, "title"),
-            slug: readFormString(formData, "slug"),
+            title,
+            slug: lessonSlugFromTitle(title),
             sortOrder: readInteger(formData, "sortOrder"),
-            durationSeconds: readInteger(formData, "durationSeconds"),
+            durationSeconds: durationMinutes * 60,
             required: formData.has("required"),
             providerAssetId: readOptionalFormString(formData, "providerAssetId"),
             playbackUrl: readOptionalFormString(formData, "playbackUrl"),
             transcriptLanguage: readOptionalFormString(formData, "transcriptLanguage") ?? undefined,
+            authoringPrompt: readOptionalFormString(formData, "authoringPrompt"),
+            narrationScript: readOptionalFormString(formData, "narrationScript"),
+            videoGenerationPrompt: readOptionalFormString(formData, "videoGenerationPrompt"),
           },
           dependencies.repository,
         );
@@ -140,4 +149,13 @@ function readFormStringList(formData: FormData, key: string): string[] {
 
 function readInteger(formData: FormData, key: string): number {
   return Number(readFormString(formData, key));
+}
+
+function lessonSlugFromTitle(title: string): string {
+  return title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }

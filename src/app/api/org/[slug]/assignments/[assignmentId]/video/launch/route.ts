@@ -6,6 +6,8 @@ import {
 } from "@/modules/runtime/runtime-route-service";
 import { createPrismaVideoRepository } from "@/modules/video/prisma-repository";
 import { launchVideoRuntime } from "@/modules/video/video-runtime";
+import { getEnv } from "@/lib/env";
+import { MuxPlaybackConfigurationError, signMuxRuntimePlayback } from "@/modules/video/mux-playback";
 
 type VideoLaunchRouteContext = {
   params: Promise<{
@@ -35,9 +37,18 @@ export async function GET(_request: Request, { params }: VideoLaunchRouteContext
       },
       createPrismaVideoRepository(prisma),
     );
+    const hasMuxAssets = runtime.lessons.some((lesson) => lesson.providerPlaybackId);
+    const env = hasMuxAssets ? getEnv() : null;
+    const signedRuntime = signMuxRuntimePlayback(runtime, env?.MUX_SIGNING_KEY_ID?.trim() && env.MUX_SIGNING_PRIVATE_KEY?.trim()
+      ? { keyId: env.MUX_SIGNING_KEY_ID, privateKey: env.MUX_SIGNING_PRIVATE_KEY }
+      : null);
 
-    return Response.json(runtime);
+    return Response.json(signedRuntime, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if (error instanceof MuxPlaybackConfigurationError) {
+      return Response.json({ error: error.message }, { status: 503 });
+    }
+
     return videoRuntimeErrorResponse(error);
   }
 }

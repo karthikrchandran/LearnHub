@@ -13,6 +13,7 @@ describe("createPrismaUserImportRepository", () => {
       auditLog: {} as never,
       userInvitationToken: {} as never,
       passwordResetToken: {} as never,
+      mobileSession: {} as never,
     });
 
     await repository.upsertUser({
@@ -50,6 +51,7 @@ describe("createPrismaUserImportRepository", () => {
       auditLog: {} as never,
       userInvitationToken: {} as never,
       passwordResetToken: {} as never,
+      mobileSession: {} as never,
     });
 
     await repository.findMembershipByOrganizationAndEmail({

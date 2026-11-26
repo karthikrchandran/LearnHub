@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "LearnHub",
+    "slug": "learnhub",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "learnhub",
+    "ios": {
+      "bundleIdentifier": "com.learnhub.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.learnhub.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f766e"
+      }
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}

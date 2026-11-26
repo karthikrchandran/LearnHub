@@ -72,10 +72,23 @@ export function listManagerDirectReports(
         select: {
           id: true,
           status: true,
+          startDate: true,
+          dueDate: true,
           progress: {
             select: {
               progressPercent: true,
             },
+          },
+          course: {
+            select: {
+              title: true,
+              slug: true,
+              type: true,
+              expectedDurationMinutes: true,
+            },
+          },
+          certificate: {
+            select: { id: true },
           },
         },
       },

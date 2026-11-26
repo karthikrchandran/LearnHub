@@ -115,22 +115,24 @@ describe("createVideoLesson", () => {
     expect(repository.transactions).toBe(0);
   });
 
-  it("requires a playback URL or provider asset id", async () => {
+  it("creates a draft before a media source is attached", async () => {
     const repository = createRepository();
 
-    await expect(
-      createVideoLesson(
-        {
-          ...validCreateLessonInput,
-          playbackUrl: " ",
-          providerAssetId: null,
-        },
-        repository,
-      ),
-    ).rejects.toThrow("Video lesson requires playback URL or provider asset id");
+    await createVideoLesson(
+      {
+        ...validCreateLessonInput,
+        playbackUrl: null,
+        providerAssetId: null,
+      },
+      repository,
+    );
 
-    expect(repository.createdLessons).toHaveLength(0);
-    expect(repository.transactions).toBe(0);
+    expect(repository.createdLessons[0]).toMatchObject({
+      playbackUrl: null,
+      providerAssetId: null,
+      providerStatus: "DRAFT",
+    });
+    expect(repository.transactions).toBe(1);
   });
 
   it("validates duration and sort order before writes", async () => {
@@ -194,9 +196,13 @@ describe("createVideoLesson", () => {
         sortOrder: 1,
         durationSeconds: 180,
         required: false,
+        providerStatus: "READY",
         providerAssetId: "asset_1",
         playbackUrl: "https://video.learnhub.local/demo/coaching-conversation-basics.mp4",
         transcriptLanguage: "es",
+        authoringPrompt: null,
+        narrationScript: null,
+        videoGenerationPrompt: null,
       },
     ]);
     expect(repository.auditLogs).toEqual([

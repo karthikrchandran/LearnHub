@@ -6,9 +6,7 @@ import { authenticateWithPassword } from "@/modules/auth/credentials";
 const localNextAuthSecret = "learnhub-local-secret";
 const nextAuthSecret =
   process.env.NEXTAUTH_SECRET?.trim() ||
-  (process.env.NODE_ENV !== "production" || process.env.NEXT_PHASE === "phase-production-build"
-    ? localNextAuthSecret
-    : undefined);
+  (process.env.NODE_ENV !== "production" ? localNextAuthSecret : undefined);
 
 export const authOptions: NextAuthOptions = {
   secret: nextAuthSecret,
@@ -19,12 +17,31 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials.password) {
           return null;
         }
 
         const { prisma } = await import("@/lib/prisma");
+        const { createPrismaLoginThrottleRepository, isLoginRateLimited, resetLoginRateLimit } = await import(
+          "@/modules/auth/login-rate-limit"
+        );
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+        const requestHeaders = request.headers ?? {};
+        const readHeader = (name: string) => {
+          const value = requestHeaders[name];
+          return Array.isArray(value) ? value.at(-1) : value;
+        };
+        const forwardedFor = readHeader("x-forwarded-for");
+        const ipAddress = readHeader("cf-connecting-ip") ?? readHeader("x-real-ip") ??
+          (typeof forwardedFor === "string" ? forwardedFor.split(",").at(-1)?.trim() : undefined) ?? "unknown";
+        const throttleScope = { ipAddress, normalizedEmail };
+        const throttleRepository = createPrismaLoginThrottleRepository(prisma);
+
+        if (await isLoginRateLimited(throttleScope, throttleRepository)) {
+          return null;
+        }
+
         const user = await authenticateWithPassword(
           {
             email: credentials.email,
@@ -50,6 +67,8 @@ export const authOptions: NextAuthOptions = {
         if (!user) {
           return null;
         }
+
+        await resetLoginRateLimit(throttleScope, throttleRepository);
 
         return {
           id: user.id,

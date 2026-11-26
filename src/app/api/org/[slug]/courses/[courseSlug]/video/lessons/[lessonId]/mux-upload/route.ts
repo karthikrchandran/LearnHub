@@ -38,7 +38,11 @@ export async function POST(_request: Request, { params }: MuxUploadRouteContext)
       return Response.json({ error: "Video lesson not found" }, { status: 404 });
     }
 
-    const provider = createMuxVideoProvider(requiredMuxConfig(getEnv()));
+    const env = getEnv();
+    const provider = createMuxVideoProvider({
+      ...requiredMuxConfig(env),
+      corsOrigin: new URL(env.APP_BASE_URL).origin,
+    });
     const upload = await provider.createUpload({
       organizationId,
       courseId: lesson.courseId,
@@ -59,7 +63,7 @@ export async function POST(_request: Request, { params }: MuxUploadRouteContext)
       },
     });
 
-    return Response.json(upload);
+    return Response.json(upload, { headers: { "Cache-Control": "private, no-store", Pragma: "no-cache" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Unable to create Mux upload" }, { status: 400 });
   }
@@ -70,6 +74,8 @@ function requiredMuxConfig(env: Env) {
     tokenId: required(env.MUX_TOKEN_ID, "MUX_TOKEN_ID is required"),
     tokenSecret: required(env.MUX_TOKEN_SECRET, "MUX_TOKEN_SECRET is required"),
     webhookSecret: required(env.MUX_WEBHOOK_SECRET, "MUX_WEBHOOK_SECRET is required"),
+    signingKeyId: required(env.MUX_SIGNING_KEY_ID, "MUX_SIGNING_KEY_ID is required"),
+    signingPrivateKey: required(env.MUX_SIGNING_PRIVATE_KEY, "MUX_SIGNING_PRIVATE_KEY is required"),
   };
 }
 

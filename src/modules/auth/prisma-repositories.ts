@@ -5,7 +5,7 @@ import type { PasswordResetRepository } from "./password-resets";
 
 type PrismaAuthClient = Pick<
   PrismaClient,
-  "$transaction" | "user" | "organizationMembership" | "userInvitationToken" | "passwordResetToken"
+  "$transaction" | "user" | "organizationMembership" | "userInvitationToken" | "passwordResetToken" | "mobileSession"
 >;
 
 export function createPrismaInvitationRepository(client: PrismaAuthClient): InvitationRepository {
@@ -52,6 +52,10 @@ export function createPrismaInvitationRepository(client: PrismaAuthClient): Invi
         await transaction.organizationMembership.update({
           where: { id: data.membershipId },
           data: { status: "ACTIVE" },
+        });
+        await transaction.mobileSession.updateMany({
+          where: { userId: data.userId, revokedAt: null },
+          data: { revokedAt: data.usedAt },
         });
 
         return true;
@@ -101,6 +105,10 @@ export function createPrismaPasswordResetRepository(client: PrismaAuthClient): P
         await transaction.user.update({
           where: { id: data.userId },
           data: { passwordHash: data.passwordHash },
+        });
+        await transaction.mobileSession.updateMany({
+          where: { userId: data.userId, revokedAt: null },
+          data: { revokedAt: data.usedAt },
         });
 
         return true;

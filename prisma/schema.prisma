@@ -66,6 +66,7 @@ enum KnowledgeCheckQuestionType {
 }
 
 enum VideoAssetStatus {
+  DRAFT
   UPLOAD_CREATED
   PROCESSING
   READY
@@ -117,6 +118,11 @@ enum NotificationEnqueueFailureStatus {
   RESOLVED
 }
 
+enum MobileDevicePlatform {
+  IOS
+  ANDROID
+}
+
 model User {
   id              String                   @id @default(cuid())
   email           String                   @unique
@@ -128,10 +134,26 @@ model User {
   memberships     OrganizationMembership[] @relation("UserMemberships")
   invitationTokens UserInvitationToken[]    @relation("UserInvitationTokens")
   passwordResetTokens PasswordResetToken[]  @relation("UserPasswordResetTokens")
+  mobileSessions MobileSession[]             @relation("UserMobileSessions")
+  mobileDevices MobileDevice[]               @relation("UserMobileDevices")
   uploadedScormPackages ScormPackage[]
   auditLogs       AuditLog[]               @relation("AuditActor")
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
+}
+
+model MobileSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation("UserMobileSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model Organization {
@@ -170,11 +192,53 @@ model Organization {
   credentialIssuances  CredentialIssuance[]
   notificationJobs     NotificationJob[]
   notificationEnqueueFailures NotificationEnqueueFailure[]
+  mobileDevices        MobileDevice[]
   auditLogs            AuditLog[]
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
 
   @@index([status])
+}
+
+model MobileDevice {
+  id               String              @id @default(cuid())
+  userId           String
+  organizationId   String
+  platform         MobileDevicePlatform
+  pushToken        String              @unique
+  appVersion       String?
+  permissionStatus String?
+  lastSeenAt       DateTime            @default(now())
+  revokedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  user             User                @relation("UserMobileDevices", fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, organizationId, revokedAt])
+}
+
+model MobileProgressIdempotency {
+  id             String   @id @default(cuid())
+  organizationId String
+  sessionId      String
+  assignmentId   String
+  lessonId       String
+  idempotencyKey String
+  requestHash    String
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, sessionId, assignmentId, lessonId, idempotencyKey])
+  @@index([createdAt])
+}
+
+model LoginThrottleBucket {
+  keyHash         String   @id
+  attempts        Int      @default(0)
+  windowStartedAt DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
 }
 
 model OrganizationMembership {
@@ -380,7 +444,11 @@ model VideoLesson {
   providerPlaybackId String?
   providerStatus     VideoAssetStatus      @default(READY)
   providerError      String?
+  muxPlaybackPolicy  String?
   playbackUrl        String?
+  authoringPrompt    String?
+  narrationScript    String?
+  videoGenerationPrompt String?
   transcriptLanguage String                @default("en")
   organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   course             Course                @relation(fields: [organizationId, courseId], references: [organizationId, id], onDelete: Cascade)

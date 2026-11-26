@@ -17,7 +17,7 @@ import {
 
 type PrismaUserImportClient = Pick<
   PrismaClient,
-  "$transaction" | "user" | "organizationMembership" | "auditLog" | "userInvitationToken" | "passwordResetToken"
+  "$transaction" | "user" | "organizationMembership" | "auditLog" | "userInvitationToken" | "passwordResetToken" | "mobileSession"
 >;
 type PrismaUserSearchClient = Pick<PrismaClient, "organizationMembership">;
 type PrismaUserLifecycleClient = PrismaUserImportClient;
@@ -274,6 +274,12 @@ export function createPrismaUserLifecycleRepository(
       await activeClient().user.update({
         where: { id: input.userId },
         data: { status: input.status },
+      });
+    },
+    async revokeMobileSessionsForUser(userId, revokedAt) {
+      await activeClient().mobileSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt },
       });
     },
     async createInvitation(data) {

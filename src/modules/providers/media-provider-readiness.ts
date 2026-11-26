@@ -2,6 +2,8 @@ export type MediaProviderEnv = {
   MUX_TOKEN_ID?: string;
   MUX_TOKEN_SECRET?: string;
   MUX_WEBHOOK_SECRET?: string;
+  MUX_SIGNING_KEY_ID?: string;
+  MUX_SIGNING_PRIVATE_KEY?: string;
   R2_ACCOUNT_ID?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
@@ -22,7 +24,7 @@ export type MediaProviderReadiness = {
 
 export function getMediaProviderReadiness(env: MediaProviderEnv): MediaProviderReadiness {
   return {
-    mux: readinessFor(env, ["MUX_TOKEN_ID", "MUX_TOKEN_SECRET", "MUX_WEBHOOK_SECRET"]),
+    mux: readinessFor(env, ["MUX_TOKEN_ID", "MUX_TOKEN_SECRET", "MUX_WEBHOOK_SECRET", "MUX_SIGNING_KEY_ID", "MUX_SIGNING_PRIVATE_KEY"]),
     r2: readinessFor(env, ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]),
     scormExtraction: readinessFor(env, ["SCORM_EXTRACTION_JOB_SECRET"]),
   };

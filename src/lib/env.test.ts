@@ -41,7 +41,7 @@ describe("environment contract", () => {
       getEnv({
         NODE_ENV: "production",
         DATABASE_URL: localDatabaseUrl,
-        NEXTAUTH_SECRET: "production-secret",
+        NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
         NEXTAUTH_URL: "https://learnhub.example.com",
         APP_BASE_URL: "https://learnhub.example.com",
       }),
@@ -53,7 +53,7 @@ describe("environment contract", () => {
       getEnv({
         NODE_ENV: "production",
         DATABASE_URL: localDatabaseUrl,
-        NEXTAUTH_SECRET: "production-secret",
+        NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
         NEXTAUTH_URL: "https://learnhub.example.com",
         APP_BASE_URL: "https://learnhub.example.com",
         EMAIL_PROVIDER: "console",
@@ -68,6 +68,38 @@ describe("environment contract", () => {
     );
   });
 
+  it("requires a 32-character secret and HTTPS URLs in production", () => {
+    const validProduction = {
+      NODE_ENV: "production" as const,
+      DATABASE_URL: localDatabaseUrl,
+      NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
+      NEXTAUTH_URL: "https://learnhub.example.com",
+      APP_BASE_URL: "https://learnhub.example.com",
+      EMAIL_PROVIDER: "smtp" as const,
+      EMAIL_FROM: "no-reply@learnhub.example.com",
+      SMTP_HOST: "smtp.learnhub.example.com",
+      NOTIFICATION_JOBS_SECRET: "jobs-secret",
+    };
+
+    expect(() => getEnv({ ...validProduction, NEXTAUTH_SECRET: "short-secret" })).toThrow(/32 characters/);
+    expect(() => getEnv({ ...validProduction, NEXTAUTH_URL: "http://learnhub.example.com" })).toThrow(/HTTPS/);
+  });
+
+  it("rejects partial production Mux credentials", () => {
+    expect(() => getEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: localDatabaseUrl,
+      NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
+      NEXTAUTH_URL: "https://learnhub.example.com",
+      APP_BASE_URL: "https://learnhub.example.com",
+      EMAIL_PROVIDER: "smtp",
+      EMAIL_FROM: "no-reply@learnhub.example.com",
+      SMTP_HOST: "smtp.learnhub.example.com",
+      NOTIFICATION_JOBS_SECRET: "jobs-secret",
+      MUX_TOKEN_ID: "mux-token-id",
+    })).toThrow(/Mux production setup requires/);
+  });
+
   it("requires SMTP_HOST when the email provider is smtp", () => {
     expect(() => getEnv({ NODE_ENV: "test", EMAIL_PROVIDER: "smtp" })).toThrow(/SMTP_HOST/);
   });
@@ -76,7 +108,7 @@ describe("environment contract", () => {
     const productionBase = {
       NODE_ENV: "production" as const,
       DATABASE_URL: localDatabaseUrl,
-      NEXTAUTH_SECRET: "production-secret",
+      NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
       NEXTAUTH_URL: "https://learnhub.example.com",
       APP_BASE_URL: "https://learnhub.example.com",
       NOTIFICATION_JOBS_SECRET: "jobs-secret",
@@ -103,7 +135,7 @@ describe("environment contract", () => {
     const productionBase = {
       NODE_ENV: "production" as const,
       DATABASE_URL: localDatabaseUrl,
-      NEXTAUTH_SECRET: "production-secret",
+      NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
       NEXTAUTH_URL: "https://learnhub.example.com",
       APP_BASE_URL: "https://learnhub.example.com",
       EMAIL_PROVIDER: "api-provider" as const,
@@ -132,7 +164,7 @@ describe("environment contract", () => {
       getEnv({
         NODE_ENV: "production",
         DATABASE_URL: localDatabaseUrl,
-        NEXTAUTH_SECRET: "production-secret",
+        NEXTAUTH_SECRET: "production-secret-with-at-least-thirty-two-characters",
         NEXTAUTH_URL: "https://learnhub.example.com",
         APP_BASE_URL: "https://learnhub.example.com",
         EMAIL_PROVIDER: "console",

@@ -8,6 +8,8 @@ describe("media provider readiness", () => {
       MUX_TOKEN_ID: "token",
       MUX_TOKEN_SECRET: "secret",
       MUX_WEBHOOK_SECRET: "webhook",
+      MUX_SIGNING_KEY_ID: "key-id",
+      MUX_SIGNING_PRIVATE_KEY: "private-key",
       R2_ACCOUNT_ID: "account",
       R2_ACCESS_KEY_ID: "access",
       R2_SECRET_ACCESS_KEY: "secret",
@@ -34,7 +36,7 @@ describe("media provider readiness", () => {
 
     expect(readiness.mux).toEqual({
       configured: false,
-      missing: ["MUX_TOKEN_SECRET", "MUX_WEBHOOK_SECRET"],
+      missing: ["MUX_TOKEN_SECRET", "MUX_WEBHOOK_SECRET", "MUX_SIGNING_KEY_ID", "MUX_SIGNING_PRIVATE_KEY"],
     });
     expect(readiness.r2).toEqual({
       configured: false,

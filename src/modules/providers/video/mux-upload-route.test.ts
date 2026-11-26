@@ -48,6 +48,9 @@ describe("Mux direct upload route", () => {
       MUX_TOKEN_ID: "token_id",
       MUX_TOKEN_SECRET: "token_secret",
       MUX_WEBHOOK_SECRET: "whsec_test",
+      MUX_SIGNING_KEY_ID: "mux-key-id",
+      MUX_SIGNING_PRIVATE_KEY: "mux-private-key",
+      APP_BASE_URL: "https://learnhub.example.com/app/",
     });
     mocks.createUpload.mockResolvedValue({
       uploadUrl: "https://storage.mux.com/direct-upload",
@@ -72,6 +75,7 @@ describe("Mux direct upload route", () => {
       providerUploadId: "upload_1",
     });
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(mocks.requireOrganizationUsersAdminBySlug).toHaveBeenCalledWith("acme");
     expect(mocks.videoLessonFindFirst).toHaveBeenCalledWith({
       where: {
@@ -92,6 +96,9 @@ describe("Mux direct upload route", () => {
       tokenId: "token_id",
       tokenSecret: "token_secret",
       webhookSecret: "whsec_test",
+      signingKeyId: "mux-key-id",
+      signingPrivateKey: "mux-private-key",
+      corsOrigin: "https://learnhub.example.com",
     });
     expect(mocks.createUpload).toHaveBeenCalledWith({
       organizationId: "org_1",

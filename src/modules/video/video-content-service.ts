@@ -31,7 +31,12 @@ export type CreateVideoLessonInput = {
   providerAssetId?: string | null;
   playbackUrl?: string | null;
   transcriptLanguage?: string;
+  authoringPrompt?: string | null;
+  narrationScript?: string | null;
+  videoGenerationPrompt?: string | null;
 };
+
+export type VideoAssetStatus = "DRAFT" | "UPLOAD_CREATED" | "PROCESSING" | "READY" | "FAILED";
 
 export type CreateVideoLessonData = {
   organizationId: string;
@@ -45,6 +50,10 @@ export type CreateVideoLessonData = {
   providerAssetId: string | null;
   playbackUrl: string | null;
   transcriptLanguage: string;
+  providerStatus: VideoAssetStatus;
+  authoringPrompt: string | null;
+  narrationScript: string | null;
+  videoGenerationPrompt: string | null;
 };
 
 export type VideoChapterInput = {
@@ -93,6 +102,8 @@ export async function createVideoLesson(
   input: CreateVideoLessonInput,
   repository: VideoContentRepository,
 ): Promise<{ id: string; slug: string }> {
+  const providerAssetId = normalizeNullableValue(input.providerAssetId);
+  const playbackUrl = normalizeNullableValue(input.playbackUrl);
   const data: CreateVideoLessonData = {
     organizationId: requireNonEmptyValue(input.organizationId, "Organization id is required"),
     courseId: requireNonEmptyValue(input.courseId, "Course id is required"),
@@ -102,15 +113,15 @@ export async function createVideoLesson(
     sortOrder: requireNonNegativeSecond(input.sortOrder, "Sort order"),
     durationSeconds: requirePositiveDurationSeconds(input.durationSeconds),
     required: input.required ?? true,
-    providerAssetId: normalizeNullableValue(input.providerAssetId),
-    playbackUrl: normalizeNullableValue(input.playbackUrl),
+    providerAssetId,
+    playbackUrl,
     transcriptLanguage: normalizeTranscriptLanguage(input.transcriptLanguage),
+    providerStatus: playbackUrl || providerAssetId ? "READY" : "DRAFT",
+    authoringPrompt: normalizeNullableText(input.authoringPrompt, 4_000),
+    narrationScript: normalizeNullableText(input.narrationScript, 20_000),
+    videoGenerationPrompt: normalizeNullableText(input.videoGenerationPrompt, 8_000),
   };
   const actorId = requireNonEmptyValue(input.actorId, "Actor id is required");
-
-  if (!data.playbackUrl && !data.providerAssetId) {
-    throw new Error("Video lesson requires playback URL or provider asset id");
-  }
 
   const course = await repository.findCourse({
     organizationId: data.organizationId,
@@ -254,6 +265,16 @@ function normalizeTranscriptLanguage(language: string | undefined): string {
   const normalized = language?.trim() ?? "";
 
   return normalized || "en";
+}
+
+function normalizeNullableText(value: string | null | undefined, maximumLength: number): string | null {
+  const normalized = value?.trim() ?? "";
+
+  if (normalized.length > maximumLength) {
+    throw new Error(`Authoring text cannot exceed ${maximumLength} characters`);
+  }
+
+  return normalized || null;
 }
 
 function requireNonEmptyValue(value: string, message: string): string {

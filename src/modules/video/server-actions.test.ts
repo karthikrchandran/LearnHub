@@ -92,13 +92,12 @@ describe("video content server actions", () => {
         "manager-coaching",
         formData({
           title: "Opening",
-          slug: "opening",
           sortOrder: "0",
-          durationSeconds: "120",
+          durationMinutes: "2",
           required: "on",
-          playbackUrl: "https://cdn.example/video.mp4",
-          providerAssetId: "",
-          transcriptLanguage: "en",
+          authoringPrompt: "Teach a safe opening",
+          narrationScript: "Welcome to this short lesson.",
+          videoGenerationPrompt: "An original workplace training scene.",
         }),
       ),
     ).resolves.toEqual({ status: "success", message: "Video lesson created." });
@@ -112,9 +111,13 @@ describe("video content server actions", () => {
       sortOrder: 0,
       durationSeconds: 120,
       required: true,
-      playbackUrl: "https://cdn.example/video.mp4",
+      playbackUrl: null,
       providerAssetId: null,
       transcriptLanguage: "en",
+      providerStatus: "DRAFT",
+      authoringPrompt: "Teach a safe opening",
+      narrationScript: "Welcome to this short lesson.",
+      videoGenerationPrompt: "An original workplace training scene.",
     });
   });
 
@@ -177,9 +180,8 @@ describe("video content server actions", () => {
         "manager-coaching",
         formData({
           title: " ",
-          slug: "bad slug",
           sortOrder: "0",
-          durationSeconds: "120",
+          durationMinutes: "2",
           playbackUrl: "https://cdn.example/video.mp4",
         }),
       ),

@@ -49,7 +49,7 @@ describe("Mux webhook route", () => {
         data: {
           id: "asset_1",
           upload_id: "upload_1",
-          playback_ids: [{ id: "playback_1" }],
+          playback_ids: [{ id: "playback_1", policy: "signed" }],
           passthrough: JSON.stringify({
             organizationId: "org_1",
             courseId: "course_1",
@@ -70,6 +70,7 @@ describe("Mux webhook route", () => {
       data: {
         providerAssetId: "asset_1",
         providerPlaybackId: "playback_1",
+        muxPlaybackPolicy: "signed",
         providerStatus: "READY",
         providerError: null,
         playbackUrl: "https://stream.mux.com/playback_1.m3u8",
@@ -102,7 +103,7 @@ describe("Mux webhook route", () => {
         data: {
           id: "asset_1",
           upload_id: "upload_1",
-          playback_ids: [{ id: "playback_1" }],
+          playback_ids: [{ id: "playback_1", policy: "signed" }],
           passthrough: JSON.stringify({
             organizationId: "org_1",
             courseId: "course_1",
